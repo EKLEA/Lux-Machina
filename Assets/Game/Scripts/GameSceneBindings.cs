@@ -23,8 +23,8 @@ public class GameSceneBindings : MonoInstaller
             Container.Resolve<ILoadingService>(),
             Container.Resolve<SaveService>());
         gameSceneLoader.Initialize();
-        Container.BindInterfacesAndSelfTo<BuildingsVisualService>().FromInstance(gameSceneLoader.buildingsVisualService).AsSingle();
-        Container.BindInterfacesAndSelfTo<BuildingsLogicService>().FromInstance(gameSceneLoader.buildingsLogicService).AsSingle();
+        Container.Bind<ReadOnlyBuildingsVisualService>().FromInstance(gameSceneLoader.buildingsVisualService).AsSingle();
+        Container.BindInterfacesAndSelfTo<ReadOnlyBuildingsLogicService>().FromInstance(gameSceneLoader.buildingsLogicService).AsSingle();
 
     }
 }

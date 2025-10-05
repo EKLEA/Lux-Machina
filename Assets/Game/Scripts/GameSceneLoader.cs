@@ -10,6 +10,7 @@ public class GameSceneLoader : IInitializable
     public BuildingsVisualService buildingsVisualService { get; private set; }
     public BuildingsLogicService buildingsLogicService { get; private set; }
     public BuildingsHealthService buildingsHealghService { get; private set; }
+    public VirtualLogisticsCenter virtualLogisticsCenter{ get; private set; }
     public GameSceneLoader(ILoadingService loadingService, SaveService saveService)
     {
         _saveService = saveService;
@@ -50,8 +51,6 @@ public class GameSceneLoader : IInitializable
                 buildingID = "Core",
                 //innerStorageSlots=рецепт конфиг от ядра
                 priority = Priority.Hight,
-                IsConnected = true,
-                IsHaveEnergy = true
             });
             save.buildingHealthData.Add("Core", new BuildingHealthData
             {
@@ -65,7 +64,8 @@ public class GameSceneLoader : IInitializable
         await buildingsLogicService.LoadBuildingsLogicFromSave();
         buildingsHealghService = new(save, buildingsVisualService);
         await buildingsHealghService.LoadBuildingsHealthFromSave();
-
+        //дороги и лэпы
+       // virtualLogisticsCenter = new VirtualLogisticsCenter(buildingsLogicService);
     }
     //setupUI
 }

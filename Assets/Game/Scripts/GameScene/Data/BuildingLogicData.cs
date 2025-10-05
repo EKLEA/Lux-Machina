@@ -8,8 +8,6 @@ public class BuildingLogicData
     public string buildingID;
     public Dictionary<int, SlotData> innerStorageSlots;
     public Priority priority;
-    public bool IsConnected;
-    public bool IsHaveEnergy;
 }
 public class BuildingProductionLogicData : BuildingLogicData
 {

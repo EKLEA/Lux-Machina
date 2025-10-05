@@ -4,7 +4,7 @@ using Zenject;
 public class BuildingVisualFactory
 {
     [Inject] IReadOnlyBuildingInfo _buildingInfo;
-    [Inject]  DiContainer _container;
+    [Inject]  IInstantiator instantiator;
     [Inject]  IReadOnlyGameFieldSettings _gameFieldSettings;
 
     
@@ -14,7 +14,7 @@ public class BuildingVisualFactory
         var buildingPrefab = buildingInfo.prefab;
         var size = buildingInfo.size;
         
-        var buildingOnScene = _container.InstantiatePrefabForComponent<BuildingOnScene>(
+        var buildingOnScene = instantiator.InstantiatePrefabForComponent<BuildingOnScene>(
             buildingPrefab, 
             CalculateWorldPosition(data), 
             GetRotationFromData(data.rotation), 

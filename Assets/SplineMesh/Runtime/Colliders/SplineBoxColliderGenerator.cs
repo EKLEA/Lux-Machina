@@ -26,7 +26,7 @@ namespace SplineMeshTools.Colliders
             GenerateAndAssignMesh();
         }
 
-        private void GenerateAndAssignMesh()
+        public void GenerateAndAssignMesh()
         {
             if (meshCollider == null)
             {

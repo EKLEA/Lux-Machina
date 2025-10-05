@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Splines;
 using System.Collections.Generic;
+using Unity.Mathematics;
 
 namespace SplineMeshTools.Core
 {
@@ -11,7 +12,7 @@ namespace SplineMeshTools.Core
         [Header("Mesh Resolution Settings")]
 
         [Tooltip("Count must match the number of Splines in the Spline Container")]
-        [SerializeField] private int[] meshResolution;
+        [SerializeField] public int[] meshResolution;
 
         public override void GenerateMeshAlongSpline()
         {
@@ -30,10 +31,6 @@ namespace SplineMeshTools.Core
 
             var normalizedSegmentMesh = segmentMesh.NormalizeMesh(rotationAdjustment, scaleAdjustment);
 
-            //Segment count for twisting
-
-
-
             foreach (var spline in splineContainer.Splines)
             {
                 var vertices = new List<Vector3>();
@@ -41,32 +38,12 @@ namespace SplineMeshTools.Core
                 var uvs = new List<Vector2>();
 
                 var knots = new List<BezierKnot>(spline.Knots);
-                var knotRotations = new List<Quaternion>();
-
-                foreach (var knot in knots)
-                    knotRotations.Add(knot.Rotation);
-
                 var submeshTriangles = new List<int>[normalizedSegmentMesh.subMeshCount];
 
                 for (int i = 0; i < normalizedSegmentMesh.subMeshCount; i++)
                     submeshTriangles[i] = new List<int>();
 
                 int segmentCount = knots.Count - 1;
-
-                if (spline.Closed)
-                    segmentCount++;
-
-                var segmentRatios = new List<float>();
-
-                // Calculate Segment Ratios for the resolution
-                for (int i = 0; i < segmentCount; i++)
-                {
-                    float splinePoint = splineContainer.GetDistanceAlongSpline(splineCounter, knots[i % knots.Count].Position);
-                    float ratio = splinePoint / spline.GetLength();
-                    segmentRatios.Add(ratio);
-                }
-
-                segmentRatios.Add(1f);  //Add the last ratio which will be 1f
 
                 if (meshResolution.Length == 0)
                 {
@@ -97,33 +74,12 @@ namespace SplineMeshTools.Core
                     foreach (var vertex in normalizedSegmentMesh.vertices)
                     {
                         float point = (i / (float)meshResolution[splineCounter]) + (vertexRatios[counter] * (1 / (float)meshResolution[splineCounter]));
-                        point = Mathf.Clamp01(point); // Ensure it's within [0,1]
+                        Vector3 tangent = spline.EvaluateTangent(point);
+                        Vector3 splinePosition = spline.EvaluatePosition(point);
 
-                        // Determine which segment the point is in
-                        int segmentIndex = 0;
-                        for (int s = 0; s < segmentRatios.Count - 1; s++)
-                        {
-                            if (point >= segmentRatios[s] && point <= segmentRatios[s + 1])
-                            {
-                                segmentIndex = s;
-                                break;
-                            }
-                        }
-
-                        // Clamp the index to avoid going out of bounds
-                        int nextIndex = Mathf.Min(segmentIndex + 1, knotRotations.Count - 1);
-
-                        float localRatio = Mathf.InverseLerp(segmentRatios[segmentIndex], segmentRatios[nextIndex], point);
-
-                        
-                        float twistWeight = localRatio;
-
-                        Quaternion twistRotation = Quaternion.Slerp(knotRotations[segmentIndex], knotRotations[nextIndex], twistWeight);
-
-
-                        var tangent = (Vector3)spline.EvaluateTangent(point);
-                        var splinePosition = (Vector3) spline.EvaluatePosition(point);
-                        var splineRotation = Quaternion.LookRotation(tangent.normalized, shouldTwistMesh ? (twistRotation * Vector3.up) : Vector3.up);
+                       Quaternion splineRotation;
+                       if(tangent!=Vector3.zero)splineRotation = Quaternion.LookRotation(tangent, Vector3.up);
+                       else splineRotation = Quaternion.identity;
                         var transformedPosition = splinePosition + splineRotation * vertexOffsets[counter];
 
                         vertices.Add(transformedPosition + positionAdjustment);
@@ -135,35 +91,12 @@ namespace SplineMeshTools.Core
                     {
                         var normal = normalizedSegmentMesh.normals[j];
                         float point = (i / (float)meshResolution[splineCounter]) + (vertexRatios[j] * (1 / (float)meshResolution[splineCounter]));
-                        point = Mathf.Clamp01(point);
 
-                        // Determine which segment the point is in
-                        int segmentIndex = 0;
-                        for (int s = 0; s < segmentRatios.Count - 1; s++)
-                        {
-                            if (point >= segmentRatios[s] && point <= segmentRatios[s + 1])
-                            {
-                                segmentIndex = s;
-                                break;
-                            }
-                        }
-
-
-                        // Clamp the index to avoid going out of bounds
-                        int nextIndex = Mathf.Min(segmentIndex + 1, knotRotations.Count - 1);
-
-                        float localRatio = Mathf.InverseLerp(segmentRatios[segmentIndex], segmentRatios[nextIndex], point);
-
-                        
-                        float twistWeight = localRatio;
-
-                        Quaternion twistRotation = Quaternion.Slerp(knotRotations[segmentIndex], knotRotations[nextIndex], twistWeight);
-
-
-                        var tangent = (Vector3)spline.EvaluateTangent(point);
-                        var splineRotation = Quaternion.LookRotation(tangent.normalized, shouldTwistMesh ? (twistRotation * Vector3.up) : Vector3.up);
+                        Vector3 tangent = spline.EvaluateTangent(point);
+                        Quaternion splineRotation;
+                        if(tangent!= Vector3.zero)  splineRotation= Quaternion.LookRotation(tangent, Vector3.up);
+                        else splineRotation=Quaternion.identity;
                         var transformedNormal = splineRotation * normal;
-
 
                         normals.Add(transformedNormal);
                     }
@@ -225,17 +158,6 @@ namespace SplineMeshTools.Core
             generatedMesh.RecalculateNormals();
             generatedMesh.RecalculateTangents();
         }
-
-        private int FindSegmentIndexFromRatios(List<float> segmentRatios, float t)
-        {
-            for (int i = 0; i < segmentRatios.Count - 1; i++)
-            {
-                if (t >= segmentRatios[i] && t <= segmentRatios[i + 1])
-                    return i;
-            }
-            return segmentRatios.Count - 2; // Fallback to last segment
-        }
-
 
         protected override bool CheckForErrors()
         {

@@ -15,7 +15,7 @@ public class BuildingLogicFactory
             case BuildingLogicData:
                 if (_buildingInfo.BuildingInfos[data.UnicID] is TurretInfo)
                 {
-                    buildingLogic = new BuildingTurretLogic(data, buildingOnScene);
+                    buildingLogic = new TurretBuildingLogic(data, buildingOnScene);
                     //смотрим типы и сетапаем
 
                 }

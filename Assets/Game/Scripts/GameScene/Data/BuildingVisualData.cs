@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class BuildingVisualData
 {
-     public string UnicID;
+    public string UnicID;
     public Vector2Int leftCornerPos;
     public int rotation;
     public string buildingID;
