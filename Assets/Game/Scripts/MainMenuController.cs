@@ -10,6 +10,7 @@ public class MainMenuController : MonoBehaviour
     CanvasGroup currScreen;
     [Inject] SceneLoader _sceneLoader;
     [Inject] SaveService saveService;
+    [Inject] ILoadingService loadingService;
     private bool isTransitioning = false;
 
     void Awake()
@@ -26,8 +27,9 @@ public class MainMenuController : MonoBehaviour
             }
         }
     }
-    public async Task LoadGameAsync(int index)
+    public async void LoadGameAsync(int index)
     {
+        await loadingService.ShowBlackScreenForce(false);
         saveService.saveIndex = index;
         await _sceneLoader.LoadSceneAsync("GameScene");
     }

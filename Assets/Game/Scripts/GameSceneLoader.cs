@@ -3,69 +3,47 @@ using System.Threading.Tasks;
 using UnityEngine;
 using Zenject;
 
-public class GameSceneLoader : IInitializable
+public class GameSceneLoader
 {
-    ILoadingService _loadingService;
-    SaveService _saveService;
+    private readonly IInstantiator _instantiator; 
+    private readonly ILoadingService _loadingService;
+    private readonly SaveService _saveService;
+    private readonly DiContainer _container;
+    
     public BuildingsVisualService buildingsVisualService { get; private set; }
     public BuildingsLogicService buildingsLogicService { get; private set; }
     public BuildingsHealthService buildingsHealghService { get; private set; }
-    public VirtualLogisticsCenter virtualLogisticsCenter{ get; private set; }
-    public GameSceneLoader(ILoadingService loadingService, SaveService saveService)
+    public VirtualLogisticsCenterService virtualLogisticsCenterService { get; private set; }
+    [Inject]
+    public GameSceneLoader(ILoadingService loadingService, SaveService saveService, DiContainer container)
     {
         _saveService = saveService;
         _loadingService = loadingService;
+        _container = container;
     }
 
-    public async void Initialize()
-    {
-        await LoadGameAsync();
-    }
-
-    async Task LoadGameAsync()
+    public async void LoadGameAsync()
     {
         await _loadingService.LoadWithProgressAsync(
             _saveService.LoadGameState,
             LoadGameField
         );
-        
     }
 
     async Task LoadGameField()
     {
         var save = _saveService.GameState;
-        if (!save.buildingVisualDatas.ContainsKey("Core") ||
-            !save.buildingLogicDatas.ContainsKey("Core") ||
-            !save.buildingHealthData.ContainsKey("Core"))
-        {
-            save.buildingVisualDatas.Add("Core", new BuildingVisualData
-            {
-                UnicID = "Core",
-                leftCornerPos = new Vector2Int(-1, -1),
-                rotation = 0,
-                buildingID = "Core"
-            });
-            save.buildingLogicDatas.Add("Core", new BuildingLogicData
-            {
-                UnicID = "Core",
-                buildingID = "Core",
-                //innerStorageSlots=рецепт конфиг от ядра
-                priority = Priority.Hight,
-            });
-            save.buildingHealthData.Add("Core", new BuildingHealthData
-            {
-                UnicID = "Core",
-                buildingID = "Core"
-            });
-        }
-        buildingsVisualService = new(save);
+        
+        buildingsVisualService = _container.Instantiate<BuildingsVisualService>(new object[] { save });
         await buildingsVisualService.LoadBuildingsFromSave();
-        buildingsLogicService = new(save, buildingsVisualService);
+        
+        buildingsLogicService = _container.Instantiate<BuildingsLogicService>(new object[] { save, buildingsVisualService });
         await buildingsLogicService.LoadBuildingsLogicFromSave();
-        buildingsHealghService = new(save, buildingsVisualService);
+        
+        buildingsHealghService = _container.Instantiate<BuildingsHealthService>(new object[] { save, buildingsVisualService });
         await buildingsHealghService.LoadBuildingsHealthFromSave();
-        //дороги и лэпы
-       // virtualLogisticsCenter = new VirtualLogisticsCenter(buildingsLogicService);
+        
+        virtualLogisticsCenterService = _container.Instantiate<VirtualLogisticsCenterService>(new object[] { save, buildingsVisualService, buildingsLogicService });
+        await virtualLogisticsCenterService.LoadCenters();
     }
-    //setupUI
 }

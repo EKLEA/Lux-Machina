@@ -1,31 +1,24 @@
-using System.Collections.Generic;
+
 using UnityEngine;
 
 public interface IReadOnlyLoadingSettings
 {
-    Sprite[] loadingImages { get; }
+    Sprite[] LoadingImages { get; }
     float TimeOfFade { get; }
-    float smoothness { get; }
+    float Smoothness { get; }
 }
 
 public class LoadingSettings : IReadOnlyLoadingSettings
 {
-    public Sprite[] loadingImages { get; private set; }
+    public Sprite[] LoadingImages { get; private set; }
 
     public float TimeOfFade { get; private set; }
 
-    public float smoothness { get; private set; }
-    public LoadingSettings(LoadingSettingsSO info)
+    public float Smoothness { get; private set; }
+    public LoadingSettings(Sprite[] loadingImages,float timeOfFade,float smoothness )
     {
-        loadingImages = info.loadingImages;
-        TimeOfFade = info.timeOfFade;
-        smoothness = info.smoothness;
+        LoadingImages = loadingImages;
+        TimeOfFade = timeOfFade;
+        Smoothness = smoothness;
     }
-}
-[CreateAssetMenu(menuName = "LoadingSettings")]
-public class LoadingSettingsSO : ScriptableObject
-{
-    public Sprite[] loadingImages;
-    [Range(0, 5)][SerializeField] public float timeOfFade;
-    [Min(1)][SerializeField] public float smoothness;
 }

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-public abstract class BuildingLogic : IResourceConsumer
+public class BuildingLogic : IResourceConsumer
 {
     public string UnicID => _data.UnicID;
     public string BuildingID => _data.buildingID;
@@ -19,9 +19,9 @@ public abstract class BuildingLogic : IResourceConsumer
         _buildingVisual = buildingVisual;
     }
     
-    public abstract void LogicPerTick(TickableEvent tickEvent);
-    public abstract void CheckAndRegisterRequests();
-    public abstract void ReceiveResources(string resourceType, int amount);
+    public virtual void LogicPerTick(TickableEvent tickEvent){}
+    public virtual void CheckAndRegisterRequests() { }
+    public virtual void ReceiveResources(string resourceType, int amount){}
     
     public BuildingState CurrentState { get; protected set; }
     

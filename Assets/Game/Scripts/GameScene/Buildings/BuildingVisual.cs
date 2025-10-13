@@ -8,7 +8,8 @@ public class BuildingVisual
 {
     public Vector2Int leftCornerPos { get => data.leftCornerPos; }
     public string buildingID{ get => data.buildingID; }
-    public string UnicID{ get => data.UnicID; }
+    public string UnicID { get => data.UnicID; }
+    public int rotation{ get => data.rotation; }
     public Action<string> OnBuildingDestroy;
     Vector3Int size;
     public BuildingOnScene buildingOnScene{ get; private set; }

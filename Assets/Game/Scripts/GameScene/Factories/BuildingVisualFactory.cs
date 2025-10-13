@@ -3,24 +3,34 @@ using Zenject;
 
 public class BuildingVisualFactory
 {
-    [Inject] IReadOnlyBuildingInfo _buildingInfo;
-    [Inject]  IInstantiator instantiator;
-    [Inject]  IReadOnlyGameFieldSettings _gameFieldSettings;
+    readonly IReadOnlyBuildingInfo _buildingInfo;
+    readonly IInstantiator _instantiator;
+    readonly IReadOnlyGameFieldSettings _gameFieldSettings;
 
-    
+    [Inject]
+    public BuildingVisualFactory(
+        IReadOnlyBuildingInfo buildingInfo,
+        IInstantiator instantiator,
+        IReadOnlyGameFieldSettings gameFieldSettings)
+    {
+        _buildingInfo = buildingInfo;
+        _instantiator = instantiator;
+        _gameFieldSettings = gameFieldSettings;
+    }
+
     public BuildingVisual Create(BuildingVisualData data)
     {
         var buildingInfo = _buildingInfo.BuildingInfos[data.buildingID];
-        var buildingPrefab = buildingInfo.prefab;
+        var buildingPrefab = buildingInfo.prefab;   
         var size = buildingInfo.size;
         
-        var buildingOnScene = instantiator.InstantiatePrefabForComponent<BuildingOnScene>(
+        var buildingOnScene = _instantiator.InstantiatePrefabForComponent<BuildingOnScene>(
             buildingPrefab, 
             CalculateWorldPosition(data), 
             GetRotationFromData(data.rotation), 
             null
         );
-        
+        buildingOnScene.UnicID = data.UnicID;
         ApplyExactScale(buildingOnScene.transform, size);
         
         var buildingVisual = new BuildingVisual(data);
@@ -39,7 +49,7 @@ public class BuildingVisualFactory
         Vector2 centerGridPos = CenterGridPosition(data);
         return new Vector3(
             centerGridPos.x * _gameFieldSettings.cellSize,
-            0f,
+            _buildingInfo.BuildingInfos[data.buildingID].size.y* _gameFieldSettings.cellSize/2,
             centerGridPos.y * _gameFieldSettings.cellSize
         );
     }

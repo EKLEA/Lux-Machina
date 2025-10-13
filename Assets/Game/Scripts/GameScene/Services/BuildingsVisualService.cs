@@ -12,17 +12,22 @@ public class BuildingsVisualService:ReadOnlyBuildingsVisualService
 
     public ReadOnlyDictionary<string, BuildingVisual> Buildings => new(buildings);
     Dictionary<string, BuildingVisual> buildings;
-    public BuildingsVisualService(GameStateData gameStateData)
+    public BuildingsVisualService(GameStateData gameStateData,BuildingVisualFactory buildingFactory)
     {
         _gameStateData = gameStateData;
         buildings = new();
-        factory = new();
+        factory = buildingFactory;
     }
     public async Task LoadBuildingsFromSave()
     {
         if (_gameStateData.buildingVisualDatas.Count > 0)
-            foreach (var b in _gameStateData.buildingVisualDatas.Values)
-                await PlaceBuilding(b);
+        {
+            var tasks = _gameStateData.buildingVisualDatas.Values
+                .Select(buildingVisualDatas => PlaceBuilding(buildingVisualDatas))
+                .ToArray();
+
+            await Task.WhenAll(tasks);
+        }
     }
 
     public async Task PlaceBuilding(BuildingVisualData buildingVisualData)
@@ -50,10 +55,18 @@ public class BuildingsVisualService:ReadOnlyBuildingsVisualService
         _gameStateData.buildingVisualDatas.Remove(UnicID);
     }
 
+    public string[] GetUnicIDsAroundPoints(Vector2Int[] poss)
+    {
+        List<string> res = new();
+        foreach (var pos in poss)
+            res.AddRange(GetUnicIDsAroundPoint(pos).ToList());
+        return res.ToArray();
+    }
 }
 public interface ReadOnlyBuildingsVisualService
 {
     public ReadOnlyDictionary<string, BuildingVisual> Buildings{ get; }
     Task PlaceBuilding(BuildingVisualData buildingVisualData);
     string[] GetUnicIDsAroundPoint(Vector2Int pos);
+    string[] GetUnicIDsAroundPoints(Vector2Int[] poss);
 }

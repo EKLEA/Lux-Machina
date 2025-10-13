@@ -75,4 +75,5 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _loadingScreenPrefab: {fileID: 8882503664344792180, guid: 2233af380c89c434c9a34702031e2de5, type: 3}
-  _loadingSettingsSO: {fileID: 11400000, guid: 7d5a53f8022160743a1f24e0e1849e2a, type: 2}
+  _loadingSettingsSO: {fileID: 11400000, guid: 29ef428cb1082434ab43dbe2239e714c, type: 2}
+  _gameFieldSettingsSO: {fileID: 11400000, guid: 68210c3f753ffd94e84a538f9ebf83f9, type: 2}

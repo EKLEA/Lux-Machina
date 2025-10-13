@@ -14,27 +14,8 @@ public class ConfigService : IReadOnlyBuildingInfo, IReadOnlyItemsInfo, IReadOnl
     private FeatureInfo[] featureInfos;
     public async Task LoadConfigs()
     {
-
-        var loadOperations = new[]
-        {
-            Resources.LoadAsync<FeatureInfo>("Configs/BuildingsConfig"),
-            Resources.LoadAsync<FeatureInfo>("Configs/ItemsConfig"),
-            Resources.LoadAsync<FeatureInfo>("Configs/UIConfig"),
-        };
-
-        foreach (var operation in loadOperations)
-        {
-            while (!operation.isDone)
-            {
-                await Task.Yield();
-            }
-        }
-        featureInfos = new FeatureInfo[loadOperations.Length];
-        for (int i = 0; i < loadOperations.Length; i++)
-        {
-            featureInfos[i] = loadOperations[i].asset as FeatureInfo;
-        }
-       
+        featureInfos = Resources.LoadAll<FeatureInfo>("Configs/");
+        await Task.Yield();
     }
 }
 public interface IReadOnlyBuildingInfo

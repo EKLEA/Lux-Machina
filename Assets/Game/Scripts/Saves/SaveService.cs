@@ -63,7 +63,30 @@ public class SaveService : IGameStateSaver
     }
     GameStateData GenerateDefault()
     {
-        return new GameStateData();
+        var save = new GameStateData();
+        save.buildingHealthData = new();
+        save.buildingLogicDatas = new();
+        save.buildingVisualDatas = new();
+        save.virtualLogisticsCentersData = new();
+        save.buildingVisualDatas.Add("Core", new BuildingVisualData
+            {
+                UnicID = "Core",
+                leftCornerPos = new Vector2Int(-1, -1),
+                rotation = 0,
+                buildingID = "Core"
+            });
+            save.buildingLogicDatas.Add("Core", new BuildingLogicData
+            {
+                UnicID = "Core",
+                buildingID = "Core",
+                priority = Priority.Hight,
+            });
+            save.buildingHealthData.Add("Core", new BuildingHealthData
+            {
+                UnicID = "Core",
+                buildingID = "Core"
+            });
+        return save;
     }
 }
 public interface IGameStateSaver

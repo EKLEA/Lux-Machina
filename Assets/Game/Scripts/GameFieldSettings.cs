@@ -9,13 +9,8 @@ public interface IReadOnlyGameFieldSettings
 public class GameFieldSettings : IReadOnlyGameFieldSettings
 {
     public  float cellSize{ get; private set; }
-    public GameFieldSettings(GameFieldSettingsSO info)
+    public GameFieldSettings(float cellSize)
     {
-        cellSize = info.cellSize;
+        this.cellSize = cellSize;
     }
-}
-[CreateAssetMenu(menuName = "GameFieldSettings")]
-public class GameFieldSettingsSO : ScriptableObject
-{
-    [Range(0, 5)][SerializeField] public float cellSize;
 }

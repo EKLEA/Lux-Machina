@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public abstract class FeatureInfo : ScriptableObject
+public class FeatureInfo : ScriptableObject
 {
 	public Sprite icon;
 	public string id;

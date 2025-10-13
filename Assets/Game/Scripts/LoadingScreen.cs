@@ -2,51 +2,66 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Threading.Tasks;
-using Unity.Mathematics;
-using System;
 using Zenject;
-using Unity.VisualScripting;
 
 public class LoadingScreen : MonoBehaviour
 {
     [SerializeField] private CanvasGroup _canvasGroup;
+    [SerializeField] private CanvasGroup _blackScreen;
     [SerializeField] private Slider _progressBar;
     [SerializeField] private TextMeshProUGUI _progressText;
     [SerializeField] private GameObject _loadingPanel;
-    [Inject] LoadingSettings loadingSettings;
+    [Inject] private LoadingSettings _loadingSettings;
     
-    public async Task Show(bool force)
+    public async Task ShowBlackScreen(bool force)
     {
-       if(!force)await Fader();
+        if (!force)
+            await FadeCanvas(_blackScreen, 0, 1);
+       
+        _blackScreen.alpha = 1;
+        _blackScreen.blocksRaycasts = true;
+        await Task.Yield();
+    }
+    public async Task ShowLoadingScreen()
+    {
+       
+        await FadeCanvas(_canvasGroup, 0, 1);
         _canvasGroup.alpha = 1;
         _canvasGroup.blocksRaycasts = true;
-        
+        _blackScreen.alpha = 0;
+        _blackScreen.blocksRaycasts = false;
+        _loadingPanel.SetActive(true);
+        await Task.Yield();
     }
     
     public async Task Hide(bool force)
     {
-        if(!force)await Fader();
+        if (!force) await FadeCanvas(_canvasGroup, 1f, 0f);
+        _blackScreen.alpha = 0;
+        _blackScreen.blocksRaycasts = true;
         _canvasGroup.alpha = 0;
         _canvasGroup.blocksRaycasts = false;
+        _loadingPanel.SetActive(false);
+        await Task.Yield();
     }
-    async Task Fader()
+    
+    private async Task FadeCanvas(CanvasGroup group, float fromAlpha, float toAlpha)
     {
-        float duration = loadingSettings.TimeOfFade;
-        float targetAlpha = _canvasGroup.alpha == 1 ? 0 : 1;
-        float startAlpha = _canvasGroup.alpha-targetAlpha;
-        
+        float duration = _loadingSettings.TimeOfFade;
         float elapsed = 0f;
         
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float progress = Mathf.Clamp01(elapsed / duration);
-            _canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, progress);
+            group.alpha = Mathf.Lerp(fromAlpha, toAlpha, progress);
             
             await Task.Yield(); 
         }
-        _canvasGroup.alpha = targetAlpha;
+        group.alpha = toAlpha;
+        await Task.Yield();
     }
+    
     public void SetProgress(float progress)
     {
         _progressBar.value = progress;

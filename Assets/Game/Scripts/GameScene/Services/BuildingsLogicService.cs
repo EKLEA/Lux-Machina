@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Zenject;
 
@@ -14,19 +15,24 @@ public class BuildingsLogicService:ReadOnlyBuildingsLogicService
     BuildingsVisualService _buildingsVisualController;
     BuildingLogicFactory factory;
 
-    public BuildingsLogicService(GameStateData gameStateData, BuildingsVisualService buildingsVisualService)
+    public BuildingsLogicService(GameStateData gameStateData, BuildingsVisualService buildingsVisualService,BuildingLogicFactory buildingLogicFactory)
     {
         _gameStateData = gameStateData;
         _buildingsVisualController = buildingsVisualService;
         buildingsLogic = new();
-        factory = new();
+        factory = buildingLogicFactory;
     }
 
     public async Task LoadBuildingsLogicFromSave()
     {
         if (_gameStateData.buildingLogicDatas.Count > 0)
-            foreach (var b in _gameStateData.buildingLogicDatas.Values)
-                await CreateNewLogic(b);
+        {
+            var tasks = _gameStateData.buildingLogicDatas.Values
+                .Select(buildingLogicData => CreateNewLogic(buildingLogicData))
+                .ToArray();
+
+            await Task.WhenAll(tasks);
+        }
     }
 
     public async Task CreateNewLogic(BuildingLogicData buildingLogicData)
@@ -57,14 +63,15 @@ public class BuildingsLogicService:ReadOnlyBuildingsLogicService
         _gameStateData.buildingLogicDatas.Remove(unicID);
     }
 
-    private void UpdateBuildingSubscription(string unicID)
+   private void UpdateBuildingSubscription(string unicID)
     {
         var building = buildingsLogic[unicID];
         bool shouldSubscribe = building.ShouldSubscribeToTicks();
+        
         if (shouldSubscribe)
             _signalBus.Subscribe<TickableEvent>(building.LogicPerTick);
         else
-            _signalBus.Unsubscribe<TickableEvent>(building.LogicPerTick);
+            _signalBus.TryUnsubscribe<TickableEvent>(building.LogicPerTick);
     }
 }
 public interface ReadOnlyBuildingsLogicService

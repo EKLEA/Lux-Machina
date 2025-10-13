@@ -1,12 +1,11 @@
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "BuildingInfo")]
+[CreateAssetMenu(menuName = "Infos/BuildingInfo")]
 public class BuildingInfo : FeatureInfo
 {
 	public BuildingOnScene prefab;
 	public BuildingsTypes buildingType;
 	public ActionType actionType;
-	public TypeOfLogic typeOfLogic;
 	public Vector3Int size;
 	public float MaxHealth;
 	public float TimeToStartRestore;

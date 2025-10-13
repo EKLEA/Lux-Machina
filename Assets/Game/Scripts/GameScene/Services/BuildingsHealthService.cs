@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Zenject;
 
@@ -13,19 +14,24 @@ public class BuildingsHealthService
     private BuildingsVisualService _buildingsVisualController;
     private BuildingHealthFactory factory;
 
-    public BuildingsHealthService(GameStateData gameStateData, BuildingsVisualService buildingsVisualService)
+    public BuildingsHealthService(GameStateData gameStateData, BuildingsVisualService buildingsVisualService,BuildingHealthFactory buildingHealthFactory)
     {
         _gameStateData = gameStateData;
         _buildingsVisualController = buildingsVisualService;
         buildingsHealth = new();
-        factory = new();
+        factory = buildingHealthFactory;
     }
 
     public async Task LoadBuildingsHealthFromSave()
     {
         if (_gameStateData.buildingHealthData.Count > 0)
-            foreach (var b in _gameStateData.buildingHealthData.Values)
-                await CreateNewBuildingHealth(b);
+        {
+            var tasks = _gameStateData.buildingHealthData.Values
+                .Select(buildingHealthData => CreateNewBuildingHealth(buildingHealthData))
+                .ToArray();
+
+            await Task.WhenAll(tasks);
+        }
     }
 
     public async Task CreateNewBuildingHealth(BuildingHealthData buildingHealthData)
@@ -41,7 +47,7 @@ public class BuildingsHealthService
         await Task.Yield();
     }
 
-    private void RemoveBuilding(string unicID)
+    void RemoveBuilding(string unicID)
     {
         if (buildingsHealth.TryGetValue(unicID, out var building))
         {
@@ -53,7 +59,7 @@ public class BuildingsHealthService
         _gameStateData.buildingHealthData.Remove(unicID);
     }
 
-    private void OnBuildingHealthStateChanged(string unicID, bool isFullHealth)
+    void OnBuildingHealthStateChanged(string unicID, bool isFullHealth)
     {
         if (buildingsHealth.TryGetValue(unicID, out var building))
         {
