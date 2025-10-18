@@ -274,6 +274,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   UnicID: 
+  phantomObject: {fileID: 0}
   splineInstantiate: {fileID: 0}
   splineContainer: {fileID: 8001001887557220280}
   resolution: {fileID: 6329796846037864464}

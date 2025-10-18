@@ -1,6 +1,8 @@
 using System.IO;
 using System.Threading.Tasks;
+using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 public class SaveService : IGameStateSaver
 {
@@ -64,28 +66,35 @@ public class SaveService : IGameStateSaver
     GameStateData GenerateDefault()
     {
         var save = new GameStateData();
-        save.buildingHealthData = new();
-        save.buildingLogicDatas = new();
-        save.buildingVisualDatas = new();
-        save.virtualLogisticsCentersData = new();
-        save.buildingVisualDatas.Add("Core", new BuildingVisualData
-            {
-                UnicID = "Core",
-                leftCornerPos = new Vector2Int(-1, -1),
-                rotation = 0,
-                buildingID = "Core"
-            });
-            save.buildingLogicDatas.Add("Core", new BuildingLogicData
-            {
-                UnicID = "Core",
-                buildingID = "Core",
-                priority = Priority.Hight,
-            });
-            save.buildingHealthData.Add("Core", new BuildingHealthData
-            {
-                UnicID = "Core",
-                buildingID = "Core"
-            });
+        save.posDatas = new();
+        save. roadPosDatas= new();
+        save. buildingPosDatas= new();
+        save.healthDatas= new();
+        save.inputSlotDatas= new();
+        save.outPutSlotDatas= new();
+        save.buildingLogicDatas= new();
+        save.consumerBuildingDatas= new();
+        save. producerBuildingDatas= new();
+        save.buildingPosDatas = new();
+        save.consumerBuildingDatas = new();
+        save.producerBuildingDatas = new();
+        save.camData = new PlayerCamData()
+        {
+            lookPointPosition = new Vector3(0, 0, 0),
+            CamPosition = new Vector3(0, 5, -5),
+        };
+        save.posDatas.Add("Core".GetStableHashCode(), new PosData
+        {
+            UnicIDHash = "Core".GetStableHashCode(),
+            BuildingIDHash = "Core".GetStableHashCode(),
+            IsPhantom = false,
+        });
+        save.buildingPosDatas.Add("Core".GetStableHashCode(), new BuildingPosData
+        {
+            LeftCornerPos = new int2(-1, -1),
+            Rotation = 0,
+            Size= new int2(3, 3)
+        });
         return save;
     }
 }

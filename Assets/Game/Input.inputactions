@@ -16,15 +16,6 @@
                     "initialStateCheck": true
                 },
                 {
-                    "name": "Rotate",
-                    "type": "Button",
-                    "id": "e4a125e1-a6ea-408f-b0af-f8b115d60a5a",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
                     "name": "MouseScroll",
                     "type": "Value",
                     "id": "67d03f8d-9f8b-49e0-9949-bad0212ab90a",
@@ -43,18 +34,9 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Hold",
+                    "name": "Speed",
                     "type": "Button",
                     "id": "2744b389-c14d-4371-9c05-154aa7bf36fc",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "Back",
-                    "type": "Button",
-                    "id": "fcc3265d-9adc-4f5f-ad78-16d371775bde",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -137,17 +119,6 @@
                 },
                 {
                     "name": "",
-                    "id": "8a2fbde9-7f97-4df2-a8e5-bd333f58be1f",
-                    "path": "<Keyboard>/r",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Rotate",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "be95e963-794b-4ef4-ad93-2f368906b178",
                     "path": "<Mouse>/scroll/y",
                     "interactions": "",
@@ -175,18 +146,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Hold",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "d38ccfff-558a-476a-9dfc-6d73ab0917dd",
-                    "path": "<Mouse>/rightButton",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Back",
+                    "action": "Speed",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -219,7 +179,7 @@
             "id": "9559bcc6-6b4e-441c-901d-d61d50a40d7d",
             "actions": [
                 {
-                    "name": "New action",
+                    "name": "Click",
                     "type": "Button",
                     "id": "1a6a118d-95cb-4f34-ba95-d1075b6c3197",
                     "expectedControlType": "",
@@ -232,11 +192,119 @@
                 {
                     "name": "",
                     "id": "b69acb22-78a4-402d-bf9d-03584d2ef78a",
-                    "path": "",
+                    "path": "<Mouse>/leftButton",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "New action",
+                    "action": "Click",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        },
+        {
+            "name": "Building",
+            "id": "9e6d846c-5402-405c-85a3-c47f4cfa90c6",
+            "actions": [
+                {
+                    "name": "PlacePoint",
+                    "type": "Button",
+                    "id": "9712719d-b2fe-468e-b4b8-c98cc9e95754",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Back",
+                    "type": "Button",
+                    "id": "c166cc3e-aebe-4136-b75a-f3659efc9fb6",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Rotate",
+                    "type": "Button",
+                    "id": "c3a5e8de-c4c6-432e-8e67-6201fdbd8673",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "ForceBuilding",
+                    "type": "Button",
+                    "id": "95f216d6-51f1-4f04-bace-b4b3548dc51d",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Hold",
+                    "type": "Button",
+                    "id": "47834772-f4f4-44ef-91a7-db4912f1679c",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "5854c7fa-1421-4a10-becb-d41f14aa0f1b",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "PlacePoint",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "cb8e40c1-23f8-49e3-9c1e-f9165b8f0e01",
+                    "path": "<Mouse>/rightButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Back",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "c003a6a7-0195-40b0-92c5-bdd5e28a3717",
+                    "path": "<Keyboard>/r",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Rotate",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "16754cce-bb93-4fd6-9a0e-2e0eb26c24ae",
+                    "path": "<Keyboard>/f",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "ForceBuilding",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "329c2e1a-6557-411c-88db-ecd89b0532af",
+                    "path": "<Keyboard>/leftShift",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Hold",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

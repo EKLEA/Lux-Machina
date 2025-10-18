@@ -13,3 +13,4 @@ MonoBehaviour:
   m_Name: New Game Field Settings SO
   m_EditorClassIdentifier: 
   cellSize: 5
+  tickPerSecond: 20

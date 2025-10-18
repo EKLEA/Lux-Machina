@@ -7,15 +7,23 @@ public class BuildingInfo : FeatureInfo
 	public BuildingsTypes buildingType;
 	public ActionType actionType;
 	public Vector3Int size;
+	public TypeOfLogic typeOfLogic;
+	public RequiredRecipesGroup requiredRecipesGroup;
 	public float MaxHealth;
 	public float TimeToStartRestore;
 	public float RestoreHealthPerSecond;
+}
+public enum RequiredRecipesGroup : int
+{
+	Smeleting,
+	Processing
 }
 public enum TypeOfLogic
 {
 	None,
 	Production,
-	Defence
+	Consuming,
+	Procession,
 }
 public enum BuildingsTypes
 {
