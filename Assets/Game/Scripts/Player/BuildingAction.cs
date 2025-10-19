@@ -49,7 +49,6 @@ public class BuildingAction
             point = 0;
         }
 
-        Debug.Log($"Building setup completed: {buildingID}");
         IsAction = true;
     }
 
@@ -88,10 +87,8 @@ public class BuildingAction
         var buildingPrefab = _buildingInfo.BuildingInfos[visualData.BuildingIDHash].prefab;
         if (buildingPrefab == null)
         {
-            Debug.LogError("Building prefab is null!");
             return;
         }
-        Debug.Log("фантом");
         var previewObject = UnityEngine.Object.Instantiate(buildingPrefab);
 
         var buildingOnScene = previewObject.GetComponent<BuildingOnScene>();
@@ -111,6 +108,7 @@ public class BuildingAction
     {
         var buildingPosData = posData as TempBuildingPosData;
         var bSize = _buildingInfo.BuildingInfos[buildingPosData.BuildingIDHash].size;
+        
         var size = rotation % 2 != 0 ? new Vector2Int(bSize.z, bSize.x) : new Vector2Int(bSize.x, bSize.z);
 
         int cellX = Mathf.FloorToInt(pos.x / _gameFieldSettings.cellSize);
@@ -128,26 +126,15 @@ public class BuildingAction
 
         currPos = new Vector2Int(x, y);
         buildingPosData.LeftCornerPos = currPos;
-        buildingPosData.Rotation = rotation;
 
         if (phantomObject != null)
         {
-            float worldX, worldZ;
-
-            if (size.x % 2 == 0)
-                worldX = (currPos.x + size.x / 2f) * _gameFieldSettings.cellSize;
-            else
-                worldX = (currPos.x + size.x / 2f) * _gameFieldSettings.cellSize;
-
-
-            if (size.y % 2 == 0)
-                worldZ = (currPos.y + size.y / 2f) * _gameFieldSettings.cellSize;
-            else
-                worldZ = (currPos.y + size.y / 2f) * _gameFieldSettings.cellSize;
+            float worldX = (currPos.x + size.x * 0.5f) * _gameFieldSettings.cellSize;
+            float worldZ = (currPos.y + size.y * 0.5f) * _gameFieldSettings.cellSize;
 
             var worldPos = new Vector3(
                 worldX,
-                bSize.y * _gameFieldSettings.cellSize / 2f,
+                bSize.y * _gameFieldSettings.cellSize * 0.5f,
                 worldZ
             );
 
@@ -155,6 +142,9 @@ public class BuildingAction
             phantomObject.transform.rotation = Quaternion.Euler(0, rotation * 90f, 0f);
 
             bool canBuildHere = canBuild() || force;
+            
+            // ОТЛАДКА ЦВЕТА
+            
             phantomObject.CanBuild(canBuildHere);
         }
     }
@@ -170,9 +160,10 @@ public class BuildingAction
     {
         if (!(posData is TempBuildingPosData visual)) return;
 
-        if (!force && !canBuild())
+        // ПРОВЕРЯЕМ РЕЗУЛЬТАТ ПРОВЕРКИ
+        bool canBuildResult = canBuild();
+        if (!force && !canBuildResult)
         {
-            Debug.Log("Cannot build here! Buildings in the way.");
             return;
         }
 
@@ -181,21 +172,22 @@ public class BuildingAction
             var Entitys = GetBuildingsInPlaceArea();
             foreach (var en in Entitys)
             {
-               // en.AddComponent<DestroyComponent>(new DestroyComponent { IsInvokedByPlayer = true });
+            // en.AddComponent<DestroyComponent>(new DestroyComponent { IsInvokedByPlayer = true });
             }
         }
-
+        
+        visual.Rotation = rotation;
         if (phantomObject != null)
         {
             UnityEngine.Object.Destroy(phantomObject.gameObject);
             phantomObject = null;
         }
-        Debug.Log("Скреатил");
+        
+        
         _gameController.PlaceBuilding(
             new PosData
             {
                 UnicIDHash = visual.UnicIDHash,
-                IsPhantom = true,
                 BuildingIDHash = visual.BuildingIDHash
             },
             new BuildingPosData
@@ -203,17 +195,17 @@ public class BuildingAction
                 LeftCornerPos = new int2(visual.LeftCornerPos.x, visual.LeftCornerPos.y),
                 Size = new int2(visual.Size.x, visual.Size.z),
                 Rotation = visual.Rotation,
-            });
-
+            },
+            true);
+        
         if (!manyPoint)
         {
-            Clear();
+            ClearData();
             OnActionDone?.Invoke();
         }
         else
         {
-            var currentBuildingID = visual.UnicIDHash;
-            ClearData();
+            var currentBuildingID = visual.BuildingIDHash;
             posData = CreateVisualData(currentBuildingID);
 
             if (posData is TempBuildingPosData newVisual)
@@ -233,23 +225,25 @@ public class BuildingAction
         {
             if (!manyPoint)
             {
-                Clear();
+                ClearData();
                 OnActionDone?.Invoke();
             }
             else
             {
                 point = 0;
-                ClearData();
             }
         }
     }
 
-    int[] GetBuildingsInPlaceArea()
+   int[] GetBuildingsInPlaceArea()
     {
         if (!(posData is TempBuildingPosData visual)) return new int[] { -1 };
 
         var size = _buildingInfo.BuildingInfos[posData.BuildingIDHash].size;
-        var adjustedSize = rotation % 2 != 0 ? new Vector2Int(size.y, size.x) : new Vector2Int(size.x, size.y);
+        
+        var adjustedSize = rotation % 2 != 0 ? 
+            new Vector2Int(size.z, size.x) : 
+            new Vector2Int(size.x, size.z);
 
         HashSet<Vector2Int> occupiedCells = new HashSet<Vector2Int>();
 
@@ -261,21 +255,23 @@ public class BuildingAction
             }
         }
 
-        // ДОБАВЬТЕ ОТЛАДОЧНУЮ ИНФОРМАЦИЮ
-        Debug.Log($"Checking cells for building at {visual.LeftCornerPos}, size: {adjustedSize}");
-        Debug.Log($"Occupied cells count: {occupiedCells.Count}");
 
         var entities = _gameController.GetBuildingInThereMany(occupiedCells.ToArray());
-        Debug.Log($"Found entities: {entities.Length}");
 
         return entities;
     }
     bool CanBuildThere()
     {
-        if (!(posData is TempBuildingPosData visual)) return false;
+        if (!(posData is TempBuildingPosData visual)) 
+        {
+            return false;
+        }
 
         var size = _buildingInfo.BuildingInfos[posData.BuildingIDHash].size;
-        var adjustedSize = rotation % 2 != 0 ? new Vector2Int(size.y, size.x) : new Vector2Int(size.x, size.y);
+        
+        var adjustedSize = rotation % 2 != 0 ? 
+            new Vector2Int(size.z, size.x) : 
+            new Vector2Int(size.x, size.z);  
 
         HashSet<Vector2Int> occupiedCells = new HashSet<Vector2Int>();
 
@@ -283,11 +279,14 @@ public class BuildingAction
         {
             for (int y = 0; y < adjustedSize.y; y++)
             {
-                occupiedCells.Add(visual.LeftCornerPos + new Vector2Int(x, y));
+                var cell = visual.LeftCornerPos + new Vector2Int(x, y);
+                occupiedCells.Add(cell);
             }
         }
+        
+        var canBuild = _gameController.CanBuildHereMany(occupiedCells.ToArray());
 
-        return _gameController.CanBuildHereMany(occupiedCells.ToArray());
+        return canBuild;
     }
     public void Back()
     {
@@ -302,7 +301,7 @@ public class BuildingAction
                 UnityEngine.Object.Destroy(phantomObject.gameObject);
                 phantomObject = null;
             }
-            Clear();
+            ClearData();
             OnActionDone?.Invoke();
         }
     }
@@ -318,22 +317,19 @@ public class BuildingAction
                 0,
                 currPos.y * _gameFieldSettings.cellSize
             );
+            visual.Rotation = rotation;
             UpdateSimpleBuilding(currentWorldPos, false);
         }
     }
 
-    void Clear()
+    void ClearData()
     {
+        
         placeMethod = null;
         updateMethod = null;
         canBuild = null;
-        point = 0;
         rotation = 0;
-        ClearData();
-    }
-
-    void ClearData()
-    {
+        point = 0;
         if (phantomObject != null)
         {
             UnityEngine.Object.Destroy(phantomObject.gameObject);

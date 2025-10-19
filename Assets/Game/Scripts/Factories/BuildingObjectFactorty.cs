@@ -22,18 +22,18 @@ public class BuildingObjectFactorty
     {
         var buildingInfo = _buildingInfo.BuildingInfos[posData.BuildingIDHash];
         var buildingPrefab = buildingInfo.prefab;
-        var size = buildingInfo.size;
-        //не учитывается поворот
+        var size = buildingPosData.Rotation % 2 != 0 ?  new Vector3Int(buildingInfo.size.z, buildingInfo.size.y, buildingInfo.size.x):buildingInfo.size;
+        
         var buildingOnScene = _instantiator.InstantiatePrefabForComponent<BuildingOnScene>(
             buildingPrefab,
             CalculateWorldPosition(CenterGridPosition(
                 new Vector2Int(buildingPosData.LeftCornerPos.x, buildingPosData.LeftCornerPos.y),
-                buildingInfo.size)),
+               size)),
             GetRotationFromData(buildingPosData.Rotation),
             null
         );
-        ApplyExactScale(buildingOnScene.transform, size);
-        return buildingPrefab.gameObject;
+        ApplyExactScale(buildingOnScene.transform, buildingInfo.size);
+        return buildingOnScene.gameObject;
     }
     public GameObject CreateRoad(PosData posData, RoadPosData roadPosData)
     {
@@ -54,7 +54,7 @@ public class BuildingObjectFactorty
         Quaternion.identity));
         ApplyExactScale(roadOnScene.transform, size);
 
-        return buildingPrefab.gameObject;
+        return roadOnScene.gameObject;
     }
     /*public void Modify(Road road)
     {
@@ -66,7 +66,6 @@ public class BuildingObjectFactorty
     }*/
     void ApplyExactScale(Transform buildingTransform, Vector3Int buildingSize)
     {
-
         buildingTransform.localScale = _gameFieldSettings.cellSize * (Vector3)buildingSize;
     }
     

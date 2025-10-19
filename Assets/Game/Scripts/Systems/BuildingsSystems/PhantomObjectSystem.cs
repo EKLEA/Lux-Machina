@@ -1,61 +1,68 @@
 using Unity.Entities;
-using Unity.Mathematics;
 using UnityEngine;
 using Zenject;
 
-[UpdateInGroup(typeof(SimulationSystemGroup))]
 public partial class PhantomObjectSystem : SystemBase
 {
-    private PhantomObjectFactory _phantomFactory;
-    
-    [Inject]
-    public void Construct(PhantomObjectFactory phantomFactory)
+    [Inject] PhantomObjectFactory _phantomFactory;
+    EndFixedStepSimulationEntityCommandBufferSystem _ecbSystem;
+
+    protected override void OnCreate()
     {
-        _phantomFactory = phantomFactory;
+        base.OnCreate();
+        _ecbSystem = World.GetOrCreateSystemManaged<EndFixedStepSimulationEntityCommandBufferSystem>();
     }
 
     protected override void OnUpdate()
     {
         if (_phantomFactory == null) return;
 
-        Entities.WithNone<PhantomTag>().WithAll<PosData>().ForEach((
-            Entity entity,
-            in PosData posData,
-            in GameObjectReference gameObjectRef) =>
-        {
-            if (posData.IsPhantom)
+        var ecb = _ecbSystem.CreateCommandBuffer();
+        
+        Entities
+            .WithAll<MakePhantomTag>()
+            .WithNone<PhantomTag>()
+            .ForEach((
+                Entity entity,
+                in GameObjectReference gameObjectRef) =>
             {
-                MakePhantom(entity, gameObjectRef.BuildingOnScene);
-            }
-        }).WithoutBurst().Run();
+                MakePhantom(entity, gameObjectRef.BuildingOnScene, ecb);
+            }).WithoutBurst().Run();
 
-        Entities.WithAll<PhantomTag>().WithAll<PosData>().ForEach((
-            Entity entity,
-            in PosData posData,
-            in GameObjectReference gameObjectRef) =>
-        {
-            if (!posData.IsPhantom)
+        Entities
+            .WithAll<RemovePhantomTag>()
+            .WithAll<PhantomTag>()
+            .ForEach((
+                Entity entity,
+                in GameObjectReference gameObjectRef) =>
             {
-                MakeNormal(entity, gameObjectRef.BuildingOnScene);
-            }
-        }).WithoutBurst().Run();
+                MakeNormal(entity, gameObjectRef.BuildingOnScene, ecb);
+            }).WithoutBurst().Run();
+        
+        _ecbSystem.AddJobHandleForProducer(this.Dependency);
     }
 
-    private void MakePhantom(Entity entity, GameObject gameObject)
+    void MakePhantom(Entity entity, GameObject gameObject, EntityCommandBuffer ecb)
     {
-        if (gameObject != null)
+        if (gameObject != null && gameObject.scene.IsValid())
         {
             _phantomFactory.PhantomizeObject(gameObject);
-            EntityManager.AddComponent<PhantomTag>(entity);
+            ecb.AddComponent<PhantomTag>(entity);
+            ecb.RemoveComponent<MakePhantomTag>(entity);
         }
     }
 
-    private void MakeNormal(Entity entity, GameObject gameObject)
+    void MakeNormal(Entity entity, GameObject gameObject, EntityCommandBuffer ecb)
     {
-        if (gameObject != null)
+        if (gameObject != null && gameObject.scene.IsValid())
         {
             _phantomFactory.UnPhantomizeObject(gameObject);
-            EntityManager.RemoveComponent<PhantomTag>(entity);
+            ecb.RemoveComponent<PhantomTag>(entity);
+            ecb.RemoveComponent<RemovePhantomTag>(entity);
         }
     }
 }
+
+// Компоненты-команды
+public struct MakePhantomTag : IComponentData { }
+public struct RemovePhantomTag : IComponentData { }

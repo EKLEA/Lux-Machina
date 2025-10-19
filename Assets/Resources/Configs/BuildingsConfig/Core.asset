@@ -20,7 +20,9 @@ MonoBehaviour:
   prefab: {fileID: 3672447268392439309, guid: 6310176ccf1e09245adac4c4b5094dcd, type: 3}
   buildingType: 0
   actionType: 0
-  size: {x: 3, y: 3, z: 3}
+  size: {x: 2, y: 2, z: 2}
+  typeOfLogic: 0
+  requiredRecipesGroup: 0
   MaxHealth: 100
   TimeToStartRestore: 5
   RestoreHealthPerSecond: 5

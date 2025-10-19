@@ -524,13 +524,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   LookPoint: {fileID: 897788357}
-  rotationSpeed: 100
-  zoomSpeed: 100
-  smoothTime: 100
-  maxDistance: 100
-  minDistance: 20
-  baseSpeed: 10
+  rotationSpeed: 80
+  smoothTime: 0.08
   verticalAngleLimit: 80
+  zoomSpeed: 100
+  maxDistance: 100
+  minDistance: 10
+  baseSpeed: 10
   Move: {fileID: 4027951553813999592, guid: 8bec56acce13f784db01f00503be5ddb, type: 3}
   Scrool: {fileID: 8828840540185332708, guid: 8bec56acce13f784db01f00503be5ddb, type: 3}
   CameraRotateBT: {fileID: 5803942833359023070, guid: 8bec56acce13f784db01f00503be5ddb, type: 3}

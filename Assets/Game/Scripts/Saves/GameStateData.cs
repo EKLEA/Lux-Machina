@@ -14,5 +14,6 @@ public class GameStateData
     public Dictionary<int, BuildingLogicData> buildingLogicDatas;
     public Dictionary<int, ConsumerBuildingData> consumerBuildingDatas;
     public Dictionary<int, ProducerBuildingData> producerBuildingDatas;
+    public HashSet<int> phantomBuildings;
     public PlayerCamData camData;
 }

@@ -4,17 +4,18 @@ using Zenject;
 
 public class GameSceneBindings : MonoInstaller
 {
-    [SerializeField] private PlayerController playerController;
-    [SerializeField] private CameraController cameraController;
+    [SerializeField] PlayerController playerController;
+    [SerializeField] CameraController cameraController;
     
     public override void InstallBindings()
     {
-        BindEcsSystems();
+
         BindServices();
+        BindEcsSystems();
         BindGameScene();
     }
 
-    private void BindEcsSystems()
+    void BindEcsSystems()
     {
         var world = World.DefaultGameObjectInjectionWorld;
         if (world == null) return;
@@ -22,10 +23,14 @@ public class GameSceneBindings : MonoInstaller
         var buildingPositionSystem = world.GetOrCreateSystemManaged<BuildingPositionSystem>();
         var phantomObjectSystem = world.GetOrCreateSystemManaged<PhantomObjectSystem>();
         
+    
+        Container.Inject(buildingPositionSystem);
+        Container.Inject(phantomObjectSystem);
+        
         var fixedSimulationGroup = world.GetOrCreateSystemManaged<FixedStepSimulationSystemGroup>();
         fixedSimulationGroup.AddSystemToUpdateList(buildingPositionSystem);
         fixedSimulationGroup.AddSystemToUpdateList(phantomObjectSystem);
-        
+        Container.Bind<FixedStepSimulationSystemGroup>().FromInstance(fixedSimulationGroup).AsSingle();
         Container.Bind<BuildingPositionSystem>().FromInstance(buildingPositionSystem).AsSingle();
         Container.Bind<PhantomObjectSystem>().FromInstance(phantomObjectSystem).AsSingle();
         
@@ -33,14 +38,14 @@ public class GameSceneBindings : MonoInstaller
         phantomObjectSystem.Enabled = true;
     }
 
-    private void BindServices()
+    void BindServices()
     {
         SignalBusInstaller.Install(Container);
-        Container.Bind<PhantomObjectFactory>().AsSingle(); 
-        Container.Bind<BuildingObjectFactorty>().AsSingle();  
+        Container.Bind<PhantomObjectFactory>().AsSingle().NonLazy(); 
+        Container.Bind<BuildingObjectFactorty>().AsSingle().NonLazy();  
     }   
 
-    private void BindGameScene()
+    void BindGameScene()
     {
         Container.Bind<CameraController>().FromInstance(cameraController).AsSingle();
         
@@ -52,7 +57,7 @@ public class GameSceneBindings : MonoInstaller
         Container.BindInterfacesAndSelfTo<GameController>().AsSingle().NonLazy(); 
     }
     
-    private EntityManager GetEntityManager()
+    EntityManager GetEntityManager()
     {
         return World.DefaultGameObjectInjectionWorld.EntityManager;
     }

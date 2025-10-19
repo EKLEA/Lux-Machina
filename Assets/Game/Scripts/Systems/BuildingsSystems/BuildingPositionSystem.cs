@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
 
 public struct BuildingMap : IComponentData
 {
@@ -12,11 +13,11 @@ public struct BuildingMap : IComponentData
 [BurstCompile]
 public partial class BuildingPositionSystem : SystemBase
 {
-    private EntityQuery _buildingQuery;
-    private EntityQuery _roadQuery;
-    private Entity _buildingMapEntity;
-    private NativeParallelHashMap<int2, int> _readOnlyMap;
-    private bool _needsRebuild;
+    EntityQuery _buildingQuery;
+    EntityQuery _roadQuery;
+    Entity _buildingMapEntity;
+    NativeParallelHashMap<int2, int> _readOnlyMap;
+    bool _needsRebuild;
 
     protected override void OnCreate()
     {
@@ -37,12 +38,10 @@ public partial class BuildingPositionSystem : SystemBase
             _buildingMapEntity = query.GetSingletonEntity();
         }
         
-        // Создаем отдельную карту для чтения
         _readOnlyMap = new NativeParallelHashMap<int2, int>(1000, Allocator.Persistent);
         
         _buildingQuery = new EntityQueryBuilder(Allocator.Temp)
             .WithAll<BuildingPosData, PosData>()
-            .WithNone<PhantomTag>()
             .Build(this);
             
         _roadQuery = new EntityQueryBuilder(Allocator.Temp)
@@ -56,9 +55,16 @@ public partial class BuildingPositionSystem : SystemBase
     {
         if (!_needsRebuild) return;
         
+        RebuildMapImmediate();
+    }
+
+    void RebuildMapImmediate()
+    {
         var buildingMap = EntityManager.GetComponentData<BuildingMap>(_buildingMapEntity);
         buildingMap.CellToBuildingMap.Clear();
         
+        
+
         var processBuildingsJob = new ProcessBuildingsJob
         {
             CellToBuildingMap = buildingMap.CellToBuildingMap.AsParallelWriter()
@@ -73,9 +79,8 @@ public partial class BuildingPositionSystem : SystemBase
         var roadsHandle = processRoadsJob.ScheduleParallel(_roadQuery, Dependency);
         
         Dependency = JobHandle.CombineDependencies(buildingsHandle, roadsHandle);
-        Dependency.Complete(); // Завершаем job'ы
+        Dependency.Complete(); 
         
-        // Копируем данные в read-only карту
         _readOnlyMap.Clear();
         foreach (var pair in buildingMap.CellToBuildingMap)
         {
@@ -84,6 +89,7 @@ public partial class BuildingPositionSystem : SystemBase
         
         EntityManager.SetComponentData(_buildingMapEntity, buildingMap);
         _needsRebuild = false;
+        
     }
 
     public void MarkForRebuild()
@@ -91,15 +97,23 @@ public partial class BuildingPositionSystem : SystemBase
         _needsRebuild = true;
     }
 
+    public void ForceImmediateRebuild()
+    {
+        RebuildMapImmediate();
+    }
+
     public bool CanBuildHere(int2 position)
     {
-        return !_readOnlyMap.ContainsKey(position);
+        bool result = !_readOnlyMap.ContainsKey(position);
+        return result;
     }
     
     public int GetBuildingInThere(int2 position)
     {
-        if (_readOnlyMap.ContainsKey(position))
-            return _readOnlyMap[position];
+        if (_readOnlyMap.TryGetValue(position, out int buildingId))
+        {
+            return buildingId;
+        }
         return -1;
     }
 
@@ -120,14 +134,18 @@ public partial struct ProcessBuildingsJob : IJobEntity
     public NativeParallelHashMap<int2, int>.ParallelWriter CellToBuildingMap;
     
     [BurstCompile]
-    private void Execute(in BuildingPosData buildingPos, in PosData posData)
+    void Execute(in BuildingPosData buildingPos, in PosData posData)
     {
         var leftCorner = buildingPos.LeftCornerPos;
         var size = buildingPos.Size;
         
-        for (int x = 0; x < size.x; x++)
+        int2 adjustedSize = buildingPos.Rotation % 2 != 0 ? 
+            new int2(size.y, size.x) : 
+            new int2(size.x, size.y);
+        
+        for (int x = 0; x < adjustedSize.x; x++)
         {
-            for (int y = 0; y < size.y; y++)
+            for (int y = 0; y < adjustedSize.y; y++)
             {
                 var cellPos = new int2(leftCorner.x + x, leftCorner.y + y);
                 CellToBuildingMap.TryAdd(cellPos, posData.BuildingIDHash);
@@ -142,7 +160,7 @@ public partial struct ProcessRoadsJob : IJobEntity
     public NativeParallelHashMap<int2, int>.ParallelWriter CellToBuildingMap;
     
     [BurstCompile]
-    private void Execute(in RoadPosData roadPos, in PosData posData)
+    void Execute(in RoadPosData roadPos, in PosData posData)
     {
         var start = roadPos.FirstPoint;
         var end = roadPos.EndPoint;

@@ -3,9 +3,11 @@ using System.Threading.Tasks;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using Zenject;
 
 public class SaveService : IGameStateSaver
 {
+    [Inject] IReadOnlyBuildingInfo buildingInfo;
     string SavePath;
     public int saveIndex;
     public GameStateData GameState { get; private set; }
@@ -78,22 +80,24 @@ public class SaveService : IGameStateSaver
         save.buildingPosDatas = new();
         save.consumerBuildingDatas = new();
         save.producerBuildingDatas = new();
+        save.phantomBuildings = new();
         save.camData = new PlayerCamData()
         {
             lookPointPosition = new Vector3(0, 0, 0),
             CamPosition = new Vector3(0, 5, -5),
         };
-        save.posDatas.Add("Core".GetStableHashCode(), new PosData
+        var hash = "Core".GetStableHashCode();
+        save.posDatas.Add(hash, new PosData
         {
-            UnicIDHash = "Core".GetStableHashCode(),
-            BuildingIDHash = "Core".GetStableHashCode(),
-            IsPhantom = false,
+            UnicIDHash = hash,
+            BuildingIDHash = hash,
         });
-        save.buildingPosDatas.Add("Core".GetStableHashCode(), new BuildingPosData
+        var size = buildingInfo.BuildingInfos[hash].size;
+        save.buildingPosDatas.Add(hash, new BuildingPosData
         {
             LeftCornerPos = new int2(-1, -1),
-            Rotation = 0,
-            Size= new int2(3, 3)
+            Rotation = 1,
+            Size = new int2(size.x, size.z)
         });
         return save;
     }

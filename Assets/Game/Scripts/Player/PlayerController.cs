@@ -69,7 +69,6 @@ public class PlayerController : MonoBehaviour
     }
     public void SetUpAction(string buildingID)
     {
-        Debug.Log("id recived");
         _buildingAction.SetUp(buildingID.GetStableHashCode());
         Building.Enable();
         _buildingAction.OnActionDone += ClearAction;
@@ -88,7 +87,7 @@ public class PlayerController : MonoBehaviour
         _buildingAction.OnActionDone -= ClearAction;
     }
     
-    private void OnPlacePointPerformed(InputAction.CallbackContext context)
+    void OnPlacePointPerformed(InputAction.CallbackContext context)
     {
         if (context.performed)
         {
@@ -98,7 +97,7 @@ public class PlayerController : MonoBehaviour
         }
     }
     
-    private void OnBackPerformed(InputAction.CallbackContext context)
+    void OnBackPerformed(InputAction.CallbackContext context)
     {
         if (context.performed)
         {
@@ -106,7 +105,7 @@ public class PlayerController : MonoBehaviour
         }
     }
     
-    private void OnRotateBuildingPerformed(InputAction.CallbackContext context)
+    void OnRotateBuildingPerformed(InputAction.CallbackContext context)
     {
         if (context.performed)
         {

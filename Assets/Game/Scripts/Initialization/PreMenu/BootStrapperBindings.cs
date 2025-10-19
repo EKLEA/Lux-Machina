@@ -24,7 +24,6 @@ public class BootStrapperBindings : MonoInstaller
                              .Select(ls => new GameFieldSettings(ls.cellSize,ls.tickPerSecond,DistributionPriority.Middle))
                              .First())
               .AsSingle().NonLazy();
-        Debug.Log(Container.Resolve<GameFieldSettings>());
         Container.Bind<IReadOnlyLoadingSettings>().To<LoadingSettings>().FromResolve();
         Container.Bind<IReadOnlyGameFieldSettings>().To<GameFieldSettings>().FromResolve();
         var loadingScreen = Container.InstantiatePrefabForComponent<LoadingScreen>(_loadingScreenPrefab);

@@ -29,7 +29,6 @@ public class LoadingService : ILoadingService
 
     public async Task LoadWithProgressAsync(params Func<Task>[] loadTasks)
     {
-        Debug.Log("Показываем экран загрузки");
 
         if (_isFirstLoad)
         {

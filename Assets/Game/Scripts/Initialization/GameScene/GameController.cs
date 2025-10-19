@@ -7,18 +7,18 @@ using Zenject;
 
 public class GameController : IInitializable
 {
-    [Inject] private IReadOnlyGameFieldSettings gameFieldSettings;
-    [Inject] private IReadOnlyBuildingInfo _buildingInfo;
-    [Inject] private SaveService saveService;
-    [Inject] private ILoadingService _loadingService;
-    [Inject] private CameraController cameraController;
-    [Inject] private EntityLoader EntityLoader;
-    [Inject] private BuildingPositionSystem _buildingPositionSystem;
+    [Inject] IReadOnlyGameFieldSettings gameFieldSettings;
+    [Inject] IReadOnlyBuildingInfo _buildingInfo;
+    [Inject] SaveService saveService;
+    [Inject] ILoadingService _loadingService;
+    [Inject] CameraController cameraController;
+    [Inject] EntityLoader EntityLoader;
+    [Inject] BuildingPositionSystem _buildingPositionSystem;
+    [Inject] FixedStepSimulationSystemGroup fixedStepSimulationSystemGroup;
 
     public void Initialize()
     {
-        Debug.Log("GameController Initialized");
-        Time.fixedDeltaTime = 1 / gameFieldSettings.tickPerSecond;
+        fixedStepSimulationSystemGroup.Timestep = 1 / gameFieldSettings.tickPerSecond;
 
         _buildingPositionSystem.Enabled = true;
         
@@ -27,20 +27,33 @@ public class GameController : IInitializable
 
     public void SpeedUpTick()
     {
-        Time.fixedDeltaTime /= 2;
+        fixedStepSimulationSystemGroup.Timestep  /= 2;
     }
     
     public void SlowDownTick()
     {
-        Time.fixedDeltaTime *= 2;
+        fixedStepSimulationSystemGroup.Timestep  *= 2;
     }
-    
-    public PhantomObject GeneratePhantom(string id)
+   
+    async void LoadGame()
     {
-        return null;
+        await _loadingService.LoadWithProgressAsync(
+            saveService.LoadGameState,
+            LoadGameField
+        );
     }
     
-    public void PlaceBuilding(PosData posData, BuildingPosData buildingPosData)
+    async Task LoadGameField()
+    {
+        var save = saveService.GameState;
+        await EntityLoader.LoadSavedEntitiesAsync(save);
+        
+        cameraController.SetUp(save.camData);
+        cameraController.enabled = true;
+        _buildingPositionSystem.ForceImmediateRebuild();
+    }
+
+   public void PlaceBuilding(PosData posData, BuildingPosData buildingPosData, bool IsPhantom)
     {
         var UnicID = posData.UnicIDHash;
         var save = saveService.GameState;
@@ -57,7 +70,7 @@ public class GameController : IInitializable
                 RecipeIDHash = 0,
             };
             save.buildingLogicDatas.Add(UnicID, logicData);
-            
+
             switch (info.typeOfLogic)
             {
                 case TypeOfLogic.Consuming:
@@ -72,41 +85,20 @@ public class GameController : IInitializable
                     break;
             }
         }
-        Debug.Log("заргестрировал");
+        if (IsPhantom) save.phantomBuildings.Add(UnicID);
         EntityLoader.CreateSavedBuildingEntity(UnicID, save);
         
-        // Помечаем здание как измененное для системы позиций
-        // (нужно будет реализовать в EntityLoader)
-    }
-   
-    async void LoadGame()
-    {
-        await _loadingService.LoadWithProgressAsync(
-            saveService.LoadGameState,
-            LoadGameField
-        );
-    }
-    
-    async Task LoadGameField()
-    {
-        var save = saveService.GameState;
-        await EntityLoader.LoadSavedEntitiesAsync(save);
-        Debug.Log("Game loaded successfully");
-
-        cameraController.SetUp(save.camData);
-        cameraController.enabled = true;
+        _buildingPositionSystem.ForceImmediateRebuild();
     }
 
-   public bool CanBuildHere(Vector2Int position)
+    public bool CanBuildHere(Vector2Int position)
     {
-        _buildingPositionSystem.MarkForRebuild();
+        // Убрали вызов MarkForRebuild - система сама обновляется
         return _buildingPositionSystem.CanBuildHere(new int2(position.x, position.y));
     }
 
     public bool CanBuildHereMany(Vector2Int[] positions)
     {
-        _buildingPositionSystem.MarkForRebuild();
-        
         foreach (var pos in positions)
         {
             if (!_buildingPositionSystem.CanBuildHere(new int2(pos.x, pos.y)))
@@ -117,14 +109,11 @@ public class GameController : IInitializable
 
     public int GetBuildingInThere(Vector2Int position)
     {
-        _buildingPositionSystem.MarkForRebuild();
         return _buildingPositionSystem.GetBuildingInThere(new int2(position.x, position.y));
     }
 
     public int[] GetBuildingInThereMany(Vector2Int[] positions)
     {
-        _buildingPositionSystem.MarkForRebuild();
-        
         List<int> result = new List<int>();
         foreach (var pos in positions)
         {

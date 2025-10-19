@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Unity.Entities;
+using Unity.VisualScripting;
 using UnityEngine;
 using Zenject;
 
@@ -14,7 +15,7 @@ public class EntityLoader
     {
         await CreateSavedBuildingsAsync(gameState);
     }
-    private async Task CreateSavedBuildingsAsync(GameStateData gameState)
+    async Task CreateSavedBuildingsAsync(GameStateData gameState)
     {
         var entityIds = gameState.buildingPosDatas.Keys.ToArray();
         
@@ -41,16 +42,15 @@ public class EntityLoader
         AddSavedVisualComponent(entity, entityId, gameState);
         AddSavedHealthComponent(entity, entityId, gameState);
         AddSavedLogicComponent(entity, entityId, gameState);
-        Debug.Log("Создано");
     }
 
-    private void AddSavedVisualComponent(Entity entity, int entityId, GameStateData gameState)
+    void AddSavedVisualComponent(Entity entity, int entityId, GameStateData gameState)
     {
         if (gameState.posDatas.TryGetValue(entityId, out var posData))
         {
             _entityManager.AddComponentData(entity, posData);
             GameObject gmOnScene;
-            
+
             if (gameState.buildingPosDatas.TryGetValue(entityId, out var bPosData))
             {
                 _entityManager.AddComponentData(entity, bPosData);
@@ -64,7 +64,9 @@ public class EntityLoader
                 gmOnScene = _buildingObjectFactory.CreateRoad(posData, rPosData);
                 _entityManager.AddComponent<RoadTag>(entity);
             }
-            
+            if (gameState.phantomBuildings.Contains(entityId))
+                _entityManager.AddComponent<MakePhantomTag>(entity);
+                
             _entityManager.AddComponentData(entity, new GameObjectReference
             {
                 BuildingOnScene = gmOnScene
@@ -72,13 +74,13 @@ public class EntityLoader
         }
     }
 
-    private void AddSavedHealthComponent(Entity entity, int entityId, GameStateData gameState)
+    void AddSavedHealthComponent(Entity entity, int entityId, GameStateData gameState)
     {
         if (gameState.healthDatas.TryGetValue(entityId, out var healthData))
             _entityManager.AddComponentData(entity, healthData);
     }
 
-    private void AddSavedLogicComponent(Entity entity, int entityId, GameStateData gameState)
+    void AddSavedLogicComponent(Entity entity, int entityId, GameStateData gameState)
     {
         if (gameState.buildingLogicDatas.TryGetValue(entityId, out var logicData))
         {

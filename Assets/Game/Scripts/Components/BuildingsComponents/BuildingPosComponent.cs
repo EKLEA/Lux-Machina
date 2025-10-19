@@ -8,7 +8,6 @@ public struct PosData : IComponentData
 {
     public int BuildingIDHash;
     public int UnicIDHash;
-    public bool IsPhantom;
 }
 [Serializable]
 public struct BuildingPosData : IComponentData
