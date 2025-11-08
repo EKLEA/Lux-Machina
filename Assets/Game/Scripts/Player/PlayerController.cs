@@ -1,14 +1,15 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Zenject;
 
-public class PlayerController : MonoBehaviour
+public class PlayerController : MonoBehaviour,IDisposable
 {
     
     BuildingAction _buildingAction;
     [SerializeField] UIManager manager;
     //[Inject] UIManager UIManager;
-    [SerializeField] InputActionAsset playerInput;
+    [SerializeField] public InputActionAsset playerInput;
     [SerializeField] CameraController cameraController;
     [Inject] IInstantiator instantiator;
     InputActionMap GamePlay;
@@ -21,6 +22,7 @@ public class PlayerController : MonoBehaviour
     InputAction ForceBuilding;
     InputAction Hold;
     RaycastHit hit;
+    
     bool isLoaded = false;
     void Start()
     {
@@ -40,6 +42,7 @@ public class PlayerController : MonoBehaviour
     {
         if (!isLoaded) return;
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        _buildingAction.DrawDebugGridAroundPlayer(transform.position);
         if (Physics.Raycast(ray,out hit))
         {
             
@@ -111,5 +114,10 @@ public class PlayerController : MonoBehaviour
         {
             _buildingAction.RotateBuilding();
         }
+    }
+
+    public void Dispose()
+    {
+        ClearAction();
     }
 }

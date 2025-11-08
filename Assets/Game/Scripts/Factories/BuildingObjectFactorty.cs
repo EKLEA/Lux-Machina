@@ -18,52 +18,49 @@ public class BuildingObjectFactorty
         _instantiator = instantiator;
         _gameFieldSettings = gameFieldSettings;
     }
-    public GameObject CreateBuilding(PosData posData, BuildingPosData buildingPosData)
+    public BuildingOnScene CreateBuilding(int buidlingID, Vector2Int pos,int rotation)
     {
-        var buildingInfo = _buildingInfo.BuildingInfos[posData.BuildingIDHash];
+        var buildingInfo = _buildingInfo.BuildingInfos[buidlingID];
         var buildingPrefab = buildingInfo.prefab;
-        var size = buildingPosData.Rotation % 2 != 0 ?  new Vector3Int(buildingInfo.size.z, buildingInfo.size.y, buildingInfo.size.x):buildingInfo.size;
+        var size = rotation % 2 != 0 ?  new Vector3Int(buildingInfo.size.z, buildingInfo.size.y, buildingInfo.size.x):buildingInfo.size;
         
         var buildingOnScene = _instantiator.InstantiatePrefabForComponent<BuildingOnScene>(
             buildingPrefab,
             CalculateWorldPosition(CenterGridPosition(
-                new Vector2Int(buildingPosData.LeftCornerPos.x, buildingPosData.LeftCornerPos.y),
+                pos,
                size)),
-            GetRotationFromData(buildingPosData.Rotation),
+            GetRotationFromData(rotation),
             null
         );
         ApplyExactScale(buildingOnScene.transform, buildingInfo.size);
-        return buildingOnScene.gameObject;
+        return buildingOnScene;
     }
-    public GameObject CreateRoad(PosData posData, RoadPosData roadPosData)
+   public RoadOnScene CreateRoad(int buildingID, Vector2Int[] points)
     {
-        var buildingInfo = _buildingInfo.BuildingInfos[posData.BuildingIDHash];
-        var buildingPrefab = buildingInfo.prefab;
-        var size = buildingInfo.size;
-
-        var roadOnScene = _instantiator.InstantiatePrefabForComponent<RoadOnScene>(
-            buildingPrefab,
-            CalculateWorldPosition(new Vector3(roadPosData.FirstPoint.x,roadPosData.FirstPoint.y)),
-            quaternion.identity,
-            null
-        );
-        roadOnScene.DrawRoad(SplineState.Passive,
-        (new Vector3(roadPosData.FirstPoint.x * _gameFieldSettings.cellSize, size.y / 2*_gameFieldSettings.cellSize, roadPosData.FirstPoint.y * _gameFieldSettings.cellSize),
-        Quaternion.identity),
-        (new Vector3(roadPosData.EndPoint.x * _gameFieldSettings.cellSize, size.y / 2*_gameFieldSettings.cellSize, roadPosData.EndPoint.y * _gameFieldSettings.cellSize),
-        Quaternion.identity));
-        ApplyExactScale(roadOnScene.transform, size);
-
-        return roadOnScene.gameObject;
+        Debug.Log($"CreateRoad вызван с ID: {buildingID}, точек: {points.Length}");
+        
+        if (!_buildingInfo.BuildingInfos.TryGetValue(buildingID, out var info))
+        {
+            Debug.LogError($"Не найден префаб для buildingID: {buildingID}");
+            return null;
+        }
+        
+        var roadObject = GameObject.Instantiate(info.prefab);
+        var roadOnScene = roadObject.GetComponent<RoadOnScene>();
+        
+        if (roadOnScene != null)
+        {
+            roadOnScene.Init(_gameFieldSettings.cellSize);
+            roadOnScene.GenerateRoadMesh(points);
+            Debug.Log($"Дорога создана: {roadObject.name}");
+        }
+        else
+        {
+            Debug.LogError($"Компонент RoadOnScene не найден на префабе: {roadObject.name}");
+        }
+        
+        return roadOnScene;
     }
-    /*public void Modify(Road road)
-    {
-        var r = road.RoadOnScene;
-        r.Reset();
-        r.SetFirstPointSpline(new Vector3(road.startPoint.x * _gameFieldSettings.cellSize, 0, road.startPoint.y * _gameFieldSettings.cellSize),quaternion.identity);
-        r.SetSecondPointSpline(new Vector3(road.endPoint.x * _gameFieldSettings.cellSize, 0, road.endPoint.y * _gameFieldSettings.cellSize),quaternion.identity);
-        r.DrawSpline(SplineState.Passive);
-    }*/
     void ApplyExactScale(Transform buildingTransform, Vector3Int buildingSize)
     {
         buildingTransform.localScale = _gameFieldSettings.cellSize * (Vector3)buildingSize;
@@ -73,8 +70,8 @@ public class BuildingObjectFactorty
     {
         return pos * _gameFieldSettings.cellSize;
     }
-    
-    Vector3 CenterGridPosition(Vector2Int pos,Vector3Int size)
+
+    Vector3 CenterGridPosition(Vector2Int pos, Vector3 size)
     {
         return new Vector3(
             pos.x + size.x * 0.5f,

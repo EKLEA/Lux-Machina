@@ -13,9 +13,16 @@ public class PhantomObject : MonoBehaviour
     
     public void SetUp(Material trueMat, Material falseMat)
     {
+        Debug.Log($"PhantomObject.SetUp вызван для {gameObject.name}");
+        Debug.Log($"TrueMat: {trueMat != null}, FalseMat: {falseMat != null}");
+        
+
         meshRenderers.AddRange(GetComponentsInChildren<MeshRenderer>(true));
+        
         _trueMat = trueMat;
         _falseMat = falseMat;
+
+        Debug.Log($"Найдено MeshRenderer'ов: {meshRenderers.Count}");
 
         foreach (MeshRenderer mr in meshRenderers)
         {
@@ -40,10 +47,14 @@ public class PhantomObject : MonoBehaviour
             
             mr.materials = phantomMats;
             phantomMaterials.Add(phantomMats);
+            
+            Debug.Log($"Обработан MeshRenderer: {mr.name}, материалов: {originalMats.Length}");
         }
+        
+        Debug.Log($"PhantomObject.SetUp завершен для {gameObject.name}");
     }
-    
-    private Material CreatePhantomMaterial(Material originalMat, Material phantomShaderMat)
+
+    Material CreatePhantomMaterial(Material originalMat, Material phantomShaderMat)
     {
         if (originalMat == null || phantomShaderMat == null) 
             return null;
@@ -54,7 +65,6 @@ public class PhantomObject : MonoBehaviour
         {
             newMat.SetTexture("_MainTex", originalMat.mainTexture);
         }
-        // Для URP
         else if (originalMat.HasProperty("_BaseMap") && newMat.HasProperty("_BaseMap"))
         {
             Texture baseMap = originalMat.GetTexture("_BaseMap");
@@ -83,7 +93,6 @@ public class PhantomObject : MonoBehaviour
                 {
                     newMats[i] = CreatePhantomMaterial(originalMats[i], targetPhantomMat);
                     
-                    // Уничтожаем старый фантомный материал
                     if (currentPhantomMats[i] != null)
                     {
                         if (Application.isPlaying)
@@ -105,11 +114,9 @@ public class PhantomObject : MonoBehaviour
         {
             if (meshRenderers[i] != null)
             {
-                // Восстанавливаем оригинальные материалы
                 meshRenderers[i].sharedMaterials = originalMaterials[i];
             }
             
-            // Уничтожаем фантомные материалы
             foreach (Material mat in phantomMaterials[i])
             {
                 if (mat != null)
@@ -121,7 +128,11 @@ public class PhantomObject : MonoBehaviour
                 }
             }
         }
-        
+
+        meshRenderers.Clear();
+        originalMaterials.Clear();
+        phantomMaterials.Clear();
+
         if (Application.isPlaying)
             Destroy(this);
         else

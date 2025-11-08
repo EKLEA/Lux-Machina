@@ -43,7 +43,7 @@ namespace SplineMeshTools.Core
         [SerializeField] protected Quaternion rotationAdjustment;
         [SerializeField] protected Vector3 scaleAdjustment = Vector3.one;
 
-        protected SplineContainer splineContainer;
+        [SerializeField] protected SplineContainer splineContainer;
         protected MeshFilter meshFilter;
 
         private bool autoGenFlag;
@@ -52,7 +52,6 @@ namespace SplineMeshTools.Core
 
         void OnEnable()
         {
-            splineContainer = GetComponent<SplineContainer>();
             autoGenFlag = autoGenerateMesh;
             if(autoGenerateMesh)
                 Spline.Changed += OnSplineModified;
@@ -276,7 +275,8 @@ namespace SplineMeshTools.Core
 
             if (spline == null || segmentMesh == null)
                 return;
-
+            Debug.Log(splineContainer);
+            Debug.Log(splineContainer.Splines);
             if (splineContainer.Splines.Contains(spline))
                 GenerateMeshAlongSpline();
         }

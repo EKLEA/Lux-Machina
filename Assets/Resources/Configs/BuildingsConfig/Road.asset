@@ -17,10 +17,12 @@ MonoBehaviour:
   title: "\u0414\u043E\u0440\u043E\u0433\u0430"
   description: 
   featureType: 1
-  prefab: {fileID: 2294132654356748183, guid: d438a99d553f26d408c173f5a03210f2, type: 3}
+  prefab: {fileID: 8842215058862250107, guid: d438a99d553f26d408c173f5a03210f2, type: 3}
   buildingType: 2
   actionType: 1
-  size: {x: 0, y: 0, z: 0}
+  size: {x: 1, y: 1, z: 0}
+  typeOfLogic: 0
+  requiredRecipesGroup: 0
   MaxHealth: 15
   TimeToStartRestore: 5
   RestoreHealthPerSecond: 1

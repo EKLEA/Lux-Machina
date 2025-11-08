@@ -1,15 +1,20 @@
 using System.Linq;
+using Unity.Entities;
 using UnityEngine;
 using Zenject;
 
 public class BootStrapperBindings : MonoInstaller
 {
     [SerializeField] LoadingScreen _loadingScreenPrefab;
-    
+
     public override void InstallBindings()
     {
+        Container.Bind<ECSSystemsManager>().AsSingle().NonLazy();
+        var systemsManager = Container.Resolve<ECSSystemsManager>();
+        systemsManager.DisableGameplaySystems();
+        
         BindServices();
-        BindEntryPoint();
+        BindСonfigsPoint();
     }
 
     private void BindServices()
@@ -35,7 +40,7 @@ public class BootStrapperBindings : MonoInstaller
         Container.Bind<ConfigService>().AsSingle();
     }
     
-    private void BindEntryPoint()
+    private void BindСonfigsPoint()
     {
         Container.BindInterfacesAndSelfTo<BootStrapper>().AsSingle().NonLazy();
         

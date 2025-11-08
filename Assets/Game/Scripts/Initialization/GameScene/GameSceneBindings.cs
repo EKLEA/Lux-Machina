@@ -9,7 +9,6 @@ public class GameSceneBindings : MonoInstaller
     
     public override void InstallBindings()
     {
-
         BindServices();
         BindEcsSystems();
         BindGameScene();
@@ -20,24 +19,32 @@ public class GameSceneBindings : MonoInstaller
         var world = World.DefaultGameObjectInjectionWorld;
         if (world == null) return;
 
-        var buildingPositionSystem = world.GetOrCreateSystemManaged<BuildingPositionSystem>();
-        var phantomObjectSystem = world.GetOrCreateSystemManaged<PhantomObjectSystem>();
         
-    
-        Container.Inject(buildingPositionSystem);
-        Container.Inject(phantomObjectSystem);
+        var buildingVisualSystem = world.GetOrCreateSystemManaged<BuildingVisualSystem>();
+        var pathfindingSystem = world.GetOrCreateSystemManaged<PathfindingSystem>();
+        var buildingMapQuerySystem = world.GetOrCreateSystemManaged<PublicBuildingMapSystem>();
+
         
         var fixedSimulationGroup = world.GetOrCreateSystemManaged<FixedStepSimulationSystemGroup>();
-        fixedSimulationGroup.AddSystemToUpdateList(buildingPositionSystem);
-        fixedSimulationGroup.AddSystemToUpdateList(phantomObjectSystem);
-        Container.Bind<FixedStepSimulationSystemGroup>().FromInstance(fixedSimulationGroup).AsSingle();
-        Container.Bind<BuildingPositionSystem>().FromInstance(buildingPositionSystem).AsSingle();
-        Container.Bind<PhantomObjectSystem>().FromInstance(phantomObjectSystem).AsSingle();
-        
-        buildingPositionSystem.Enabled = true;
-        phantomObjectSystem.Enabled = true;
-    }
+        var simulationGroup = world.GetOrCreateSystemManaged<SimulationSystemGroup>();
 
+        
+        Container.Inject(buildingVisualSystem);
+        Container.Inject(pathfindingSystem);
+        Container.Inject(buildingMapQuerySystem);
+
+        
+        Container.Bind<PublicBuildingMapSystem>().FromInstance(buildingMapQuerySystem).AsSingle();
+        Container.Bind<BuildingVisualSystem>().FromInstance(buildingVisualSystem).AsSingle();
+        Container.Bind<PathfindingSystem>().FromInstance(pathfindingSystem).AsSingle();
+        Container.Bind<FixedStepSimulationSystemGroup>().FromInstance(fixedSimulationGroup).AsSingle();
+        Container.Bind<SimulationSystemGroup>().FromInstance(simulationGroup).AsSingle();
+        
+        
+        var ecsSystemsManager = new ECSSystemsManager();
+        Container.Bind<ECSSystemsManager>().FromInstance(ecsSystemsManager).AsSingle();
+    }
+    
     void BindServices()
     {
         SignalBusInstaller.Install(Container);
@@ -50,7 +57,7 @@ public class GameSceneBindings : MonoInstaller
         Container.Bind<CameraController>().FromInstance(cameraController).AsSingle();
         
         playerController.enabled = true;
-        Container.Bind<PlayerController>().FromInstance(playerController).AsSingle();
+        Container.BindInterfacesAndSelfTo<PlayerController>().FromInstance(playerController).AsSingle();
         
         Container.Bind<EntityManager>().FromMethod(GetEntityManager).AsSingle();
         Container.Bind<EntityLoader>().AsSingle();

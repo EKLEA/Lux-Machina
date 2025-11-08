@@ -1,5 +1,6 @@
 
 using System;
+using Unity.Collections;
 using Unity.Entities;
 [Serializable]
 public struct BuildingLogicData : IComponentData
@@ -29,12 +30,12 @@ public struct StorageSlotData : IBufferElementData
 [Serializable]
 public struct InputStorageSlotData
 {
-    public StorageSlotData[] Slots;
+    public DynamicBuffer<StorageSlotData> Slots;
 }
 [Serializable]
 public struct OutputStorageSlotData
 {
-    public StorageSlotData[] Slots; 
+    public DynamicBuffer<StorageSlotData> Slots; 
 }
 
 public struct ProductionAnimationData : IComponentData
@@ -45,6 +46,7 @@ public struct ProductionAnimationData : IComponentData
 public struct ConsumerBuildingTag : IComponentData { }
 public struct ProducerBuildingTag : IComponentData { }
 public struct ProcessorBuildingTag : IComponentData { }
+public struct BuildingModifiedTag : IComponentData { }
 public enum DistributionPriority : int
 {
     Low = 0,

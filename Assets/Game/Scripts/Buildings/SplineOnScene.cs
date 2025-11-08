@@ -9,7 +9,7 @@ using UnityEngine.Splines;
 
 [RequireComponent(typeof(SplineMeshResolution), typeof(SplineBoxColliderGenerator))]
 
-public class SplineObj : MonoBehaviour
+public class SplineOnScene : MonoBehaviour
 {
     Spline spline;
     [SerializeField] protected SplineInstantiate splineInstantiate;

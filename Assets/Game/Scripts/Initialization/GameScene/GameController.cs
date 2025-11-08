@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -13,14 +15,16 @@ public class GameController : IInitializable
     [Inject] ILoadingService _loadingService;
     [Inject] CameraController cameraController;
     [Inject] EntityLoader EntityLoader;
-    [Inject] BuildingPositionSystem _buildingPositionSystem;
+    [Inject] PublicBuildingMapSystem _buildingMapSystem;
     [Inject] FixedStepSimulationSystemGroup fixedStepSimulationSystemGroup;
+    [Inject] PathfindingSystem _pathfindingSystem;
+    [Inject] ECSSystemsManager ecssSystemsManager;
 
     public void Initialize()
     {
         fixedStepSimulationSystemGroup.Timestep = 1 / gameFieldSettings.tickPerSecond;
 
-        _buildingPositionSystem.Enabled = true;
+        _buildingMapSystem.Enabled = true;
         
         LoadGame();
     }
@@ -50,66 +54,86 @@ public class GameController : IInitializable
         
         cameraController.SetUp(save.camData);
         cameraController.enabled = true;
-        _buildingPositionSystem.ForceImmediateRebuild();
+        ecssSystemsManager.EnableGameplaySystems();
     }
 
-   public void PlaceBuilding(PosData posData, BuildingPosData buildingPosData, bool IsPhantom)
+    public void PlaceBuilding(BuildingData buildingData, BuildingPosData buildingPosData, bool isBluePrint)
     {
-        var UnicID = posData.UnicIDHash;
-        var save = saveService.GameState;
-        save.posDatas.Add(UnicID, posData);
-        save.buildingPosDatas.Add(UnicID, buildingPosData);
+        EntityLoader.CreateBuilding(buildingData, buildingPosData, isBluePrint, saveService.GameState);
         
-        var info = _buildingInfo.BuildingInfos[posData.BuildingIDHash];
-        if (info.typeOfLogic != TypeOfLogic.None)
-        {
-            BuildingLogicData logicData = new BuildingLogicData()
-            {
-                Priority = (int)DistributionPriority.Middle,
-                RequiredRecipesGroup = (int)info.requiredRecipesGroup,
-                RecipeIDHash = 0,
-            };
-            save.buildingLogicDatas.Add(UnicID, logicData);
+    }
+    public void PlaceRoad(HashSet<Vector2Int> roadPoints,bool isBluePrint)
+    {
+        
+        Debug.Log("Контроллер нажал");
+          EntityLoader.CreateRoad(roadPoints, isBluePrint, saveService.GameState);
+    }
+    public List<Vector2Int> FilterExistingRoadPoints(List<Vector2Int> positions)
+    {
+        var result = new List<Vector2Int>();
 
-            switch (info.typeOfLogic)
+        foreach (var position in positions)
+        {
+            if (!_buildingMapSystem.IsPositionOccupiedByRoad(new int2(position.x, position.y)))
             {
-                case TypeOfLogic.Consuming:
-                    save.consumerBuildingDatas.Add(UnicID, new ConsumerBuildingData());
-                    break;
-                case TypeOfLogic.Production:
-                    save.producerBuildingDatas.Add(UnicID, new ProducerBuildingData());
-                    break;
-                case TypeOfLogic.Procession:
-                    save.consumerBuildingDatas.Add(UnicID, new ConsumerBuildingData());
-                    save.producerBuildingDatas.Add(UnicID, new ProducerBuildingData());
-                    break;
+                result.Add(position);
             }
         }
-        if (IsPhantom) save.phantomBuildings.Add(UnicID);
-        EntityLoader.CreateSavedBuildingEntity(UnicID, save);
-        
-        _buildingPositionSystem.ForceImmediateRebuild();
+
+
+        return result;
+    }
+    public void RemoveRoadPoints(int entityId, List<Vector2Int> pointsToRemove)
+    {
+       
     }
 
-    public bool CanBuildHere(Vector2Int position)
+   
+   public void RequestPath(Vector2Int start, Vector2Int end, System.Action<List<Vector2Int>> onPathFound)
     {
-        // Убрали вызов MarkForRebuild - система сама обновляется
-        return _buildingPositionSystem.CanBuildHere(new int2(position.x, position.y));
+        _pathfindingSystem.FindBuildingPathAsync(
+            new int2(start.x, start.y), 
+            new int2(end.x, end.y), 
+            (nativePath) =>
+            {
+                var points = new List<Vector2Int>();
+
+                if (nativePath.IsCreated && nativePath.Length > 0)
+                {
+                    for (int i = 0; i < nativePath.Length; i++)
+                    {
+                        var point = nativePath[i];
+                        points.Add(new Vector2Int(point.x, point.y));
+                    }
+
+                    nativePath.Dispose();
+                }
+                else
+                {
+                    points.Add(start);
+                    points.Add(end);
+                }
+
+                onPathFound?.Invoke(points);
+            }
+        );
     }
 
-    public bool CanBuildHereMany(Vector2Int[] positions)
+    public bool CanBuildHereMany(List<Vector2Int> positions, bool isRoad)
     {
-        foreach (var pos in positions)
-        {
-            if (!_buildingPositionSystem.CanBuildHere(new int2(pos.x, pos.y)))
-                return false;
-        }
-        return true;
+
+        var nativeCells = new NativeArray<int2>(positions.Count, Allocator.Temp);
+        for (int i = 0; i < positions.Count; i++)
+            nativeCells[i] = new int2(positions[i].x, positions[i].y);
+
+        bool canBuild = _buildingMapSystem.CanBuildAt(nativeCells, isRoad);
+        nativeCells.Dispose();
+        return canBuild;
     }
 
     public int GetBuildingInThere(Vector2Int position)
     {
-        return _buildingPositionSystem.GetBuildingInThere(new int2(position.x, position.y));
+        return _buildingMapSystem.GetBuildingAt(new int2(position.x, position.y));
     }
 
     public int[] GetBuildingInThereMany(Vector2Int[] positions)
@@ -117,7 +141,7 @@ public class GameController : IInitializable
         List<int> result = new List<int>();
         foreach (var pos in positions)
         {
-            int buildingId = _buildingPositionSystem.GetBuildingInThere(new int2(pos.x, pos.y));
+            int buildingId = _buildingMapSystem.GetBuildingAt(new int2(pos.x, pos.y));
             if (buildingId != -1)
                 result.Add(buildingId);
         }

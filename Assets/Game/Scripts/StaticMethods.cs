@@ -1,4 +1,6 @@
-public static class StringHash
+
+using UnityEngine;
+public static class StaticMethods
 {
     public static int GetStableHashCode(this string str)
     {
@@ -18,4 +20,13 @@ public static class StringHash
             return hash1 + (hash2 * 1566083941);
         }
     }
+    public const float Epsilon = 0.00001f;
+
+    public static bool AreCollinear(Vector2 v1, Vector2 v2)
+    {
+         float crossProduct = v1.x * v2.y - v1.y * v2.x;
+        
+        return Mathf.Abs(crossProduct) < 0.0001f;
+    }
+    
 }

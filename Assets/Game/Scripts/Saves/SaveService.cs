@@ -68,8 +68,9 @@ public class SaveService : IGameStateSaver
     GameStateData GenerateDefault()
     {
         var save = new GameStateData();
-        save.posDatas = new();
-        save. roadPosDatas= new();
+        save.buildingDatas = new();
+        save. roadPoints= new();
+        save. phantomPoints= new();
         save. buildingPosDatas= new();
         save.healthDatas= new();
         save.inputSlotDatas= new();
@@ -87,9 +88,9 @@ public class SaveService : IGameStateSaver
             CamPosition = new Vector3(0, 5, -5),
         };
         var hash = "Core".GetStableHashCode();
-        save.posDatas.Add(hash, new PosData
+        save.buildingDatas.Add(hash, new BuildingData
         {
-            UnicIDHash = hash,
+            UniqueIDHash = hash,
             BuildingIDHash = hash,
         });
         var size = buildingInfo.BuildingInfos[hash].size;
