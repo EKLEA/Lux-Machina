@@ -8,7 +8,7 @@ using Unity.Mathematics;
 using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
-[UpdateAfter(typeof(MapSystem))] 
+[UpdateAfter(typeof(MapSystem))]
 public partial struct RoadSystem : ISystem
 {
     EntityQuery _createRoadsQuery;
@@ -17,19 +17,19 @@ public partial struct RoadSystem : ISystem
     EntityQuery _mapUpdateQuery;
     NativeParallelHashMap<int2, Entity> roadMap;
     int roadHash;
-    
+
     public void OnCreate(ref SystemState state)
     {
         roadHash = "Road".GetStableHashCode();
         roadMap = new NativeParallelHashMap<int2, Entity>(1000, Allocator.Persistent);
         _createRoadsQuery = new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<ProcessBuildingEventComponent, CreateRoadSegmentsTag>()
+            .WithAll<CreateBuildingEventComponent, CreateRoadSegmentsTag>()
             .WithAllRW<MapPointData>()
             .WithNone<BluePrint>()
             .Build(ref state);
-            
+
         _createBluePrintRoadsQuery = new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<ProcessBuildingEventComponent, CreateRoadSegmentsTag, BluePrint>()
+            .WithAll<CreateBuildingEventComponent, CreateRoadSegmentsTag, BluePrint>()
             .WithAllRW<MapPointData>()
             .Build(ref state);
         _removePointsQuery = new EntityQueryBuilder(Allocator.Temp)
@@ -42,34 +42,36 @@ public partial struct RoadSystem : ISystem
     }
 
     [BurstCompile]
-    void ResizeRoadDictionary(ref SystemState state, int newCapacity)
+    void ResizeRoadDictionary(int newCapacity)
     {
         if (roadMap.Capacity >= newCapacity)
             return;
 
-        var newRoadDictionary = new NativeParallelHashMap<int2, Entity>(newCapacity, Allocator.Persistent);
+        var newRoadDictionary = new NativeParallelHashMap<int2, Entity>(
+            newCapacity,
+            Allocator.Persistent
+        );
 
         foreach (var pair in roadMap)
         {
             newRoadDictionary.TryAdd(pair.Key, pair.Value);
         }
 
-        
         var oldMap = roadMap;
         roadMap = newRoadDictionary;
         oldMap.Dispose();
     }
-
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         if (roadMap.Count() > roadMap.Capacity * 0.8f)
         {
-            ResizeRoadDictionary(ref state, roadMap.Capacity * 2);
+            ResizeRoadDictionary(roadMap.Capacity * 2);
         }
 
-        if (!SystemAPI.HasSingleton<BuildingMap>()) return;
+        if (!SystemAPI.HasSingleton<BuildingMap>())
+            return;
 
         var buildingMapRW = SystemAPI.GetSingletonRW<BuildingMap>();
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
@@ -77,20 +79,20 @@ public partial struct RoadSystem : ISystem
         try
         {
             state.Dependency.Complete();
-            
+
             if (!_removePointsQuery.IsEmpty)
             {
                 RemoveRoads(ref state, ecb, buildingMapRW.ValueRO);
             }
-            
-           if (!_createRoadsQuery.IsEmpty || !_createBluePrintRoadsQuery.IsEmpty)
+
+            if (!_createRoadsQuery.IsEmpty || !_createBluePrintRoadsQuery.IsEmpty)
             {
-                
-                var entityCount = (!_createRoadsQuery.IsEmpty ? _createRoadsQuery : _createBluePrintRoadsQuery).CalculateEntityCount();
+                var entityCount = (
+                    !_createRoadsQuery.IsEmpty ? _createRoadsQuery : _createBluePrintRoadsQuery
+                ).CalculateEntityCount();
                 var estimatedPoints = entityCount * 100;
                 using var uniquePoints = new NativeList<int2>(estimatedPoints, Allocator.TempJob);
 
-                
                 bool isBlueprint = !_createBluePrintRoadsQuery.IsEmpty;
                 var queryToUse = isBlueprint ? _createBluePrintRoadsQuery : _createRoadsQuery;
 
@@ -99,7 +101,7 @@ public partial struct RoadSystem : ISystem
                     RoadMap = roadMap,
                     ecb = ecb.AsParallelWriter(),
                     UniquePointsWriter = uniquePoints.AsParallelWriter(),
-                    IsBlueprint = isBlueprint
+                    IsBlueprint = isBlueprint,
                 };
 
                 var collectHandle = collectJob.Schedule(queryToUse, state.Dependency);
@@ -110,12 +112,12 @@ public partial struct RoadSystem : ISystem
                     CreateNewRoadsFromPoints(ref state, uniquePoints, isBlueprint);
                 }
             }
-            
+
             if (!_mapUpdateQuery.IsEmpty)
             {
                 UpdateRoadClustering(ref state, ecb, buildingMapRW.ValueRO);
             }
-            
+
             ecb.Playback(state.EntityManager);
         }
         finally
@@ -123,15 +125,24 @@ public partial struct RoadSystem : ISystem
             ecb.Dispose();
         }
     }
-   
+
     [BurstCompile]
-    void UpdateRoadClustering(ref SystemState state, EntityCommandBuffer ecb, BuildingMap buildingMap)
+    void UpdateRoadClustering(
+        ref SystemState state,
+        EntityCommandBuffer ecb,
+        BuildingMap buildingMap
+    )
     {
-        var phantomFlags = new NativeParallelHashMap<Entity, byte>(roadMap.Count(), Allocator.TempJob);
+        var phantomFlags = new NativeParallelHashMap<Entity, byte>(
+            roadMap.Count(),
+            Allocator.TempJob
+        );
         foreach (var kv in roadMap)
         {
             var roadEntity = kv.Value;
-            byte isPhantom = state.EntityManager.HasComponent<PhantomTag>(roadEntity) ? (byte)1 : (byte)0;
+            byte isPhantom = state.EntityManager.HasComponent<PhantomTag>(roadEntity)
+                ? (byte)1
+                : (byte)0;
             phantomFlags.TryAdd(roadEntity, isPhantom);
         }
 
@@ -143,12 +154,12 @@ public partial struct RoadSystem : ISystem
 
         var clusterStarts = new NativeList<int2>(Allocator.TempJob);
         var allClusterPoints = new NativeList<int2>(Allocator.TempJob);
-        
+
         var clusterJob = new UniversalClusterJob
         {
             InputPoints = allRoadPoints,
             ClusterStarts = clusterStarts,
-            AllClusterPoints = allClusterPoints
+            AllClusterPoints = allClusterPoints,
         };
         clusterJob.Schedule().Complete();
 
@@ -157,7 +168,7 @@ public partial struct RoadSystem : ISystem
             ClusterStarts = clusterStarts,
             AllClusterPoints = allClusterPoints,
             RoadMap = roadMap,
-            Ecb = ecb.AsParallelWriter()
+            Ecb = ecb.AsParallelWriter(),
         };
         assignClusterJob.Schedule().Complete();
 
@@ -168,11 +179,10 @@ public partial struct RoadSystem : ISystem
             BuildingMap = buildingMap.CellEntity,
             RoadMap = roadMap,
             PhantomFlags = phantomFlags,
-            Ecb = ecb.AsParallelWriter()
+            Ecb = ecb.AsParallelWriter(),
         };
         assignToBuildingsJob.Schedule().Complete();
 
-        
         var mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
         if (state.EntityManager.HasComponent<UpdateMapTag>(mapEntity))
         {
@@ -184,6 +194,7 @@ public partial struct RoadSystem : ISystem
         clusterStarts.Dispose();
         allClusterPoints.Dispose();
     }
+
     [BurstCompile]
     void RemoveRoads(ref SystemState state, EntityCommandBuffer ecb, BuildingMap buildingMap)
     {
@@ -193,7 +204,7 @@ public partial struct RoadSystem : ISystem
         {
             roadMap = roadMap,
             roadsToModify = roadsToModify,
-            Ecb = ecb
+            Ecb = ecb,
         };
         collectRemoveJob.Schedule(_removePointsQuery, state.Dependency).Complete();
 
@@ -202,7 +213,7 @@ public partial struct RoadSystem : ISystem
             roadsToModify.Dispose();
             return;
         }
-        
+
         var roadsToDelete = new NativeList<Entity>(Allocator.TempJob);
         var roadsToUpdate = new NativeList<Entity>(Allocator.TempJob);
         var roadsUpdateData = new NativeList<NativeList<int2>>(Allocator.TempJob);
@@ -214,25 +225,31 @@ public partial struct RoadSystem : ISystem
             Ecb = ecb,
             RoadsToDelete = roadsToDelete,
             RoadsToUpdate = roadsToUpdate,
-            RoadsUpdateData = roadsUpdateData
+            RoadsUpdateData = roadsUpdateData,
         };
         prepareJob.Schedule(state.Dependency).Complete();
 
-        ApplyRoadModifications(ref state,roadsToDelete, roadsToUpdate, roadsUpdateData, ecb);
+        ApplyRoadModifications(ref state, roadsToDelete, roadsToUpdate, roadsUpdateData, ecb);
 
         roadsToModify.Dispose();
         roadsToDelete.Dispose();
         roadsToUpdate.Dispose();
-        foreach (var data in roadsUpdateData) data.Dispose();
+        foreach (var data in roadsUpdateData)
+            data.Dispose();
         roadsUpdateData.Dispose();
     }
 
-    
-   void CreateNewRoadsFromPoints(ref SystemState state, NativeList<int2> uniquePoints, bool isBluePrint)
+    void CreateNewRoadsFromPoints(
+        ref SystemState state,
+        NativeList<int2> uniquePoints,
+        bool isBluePrint
+    )
     {
-        Debug.Log($"CreateNewRoadsFromPoints ВХОД: isBluePrint={isBluePrint}, точек={uniquePoints.Length}");
-        
-        if (uniquePoints.IsEmpty) 
+        Debug.Log(
+            $"CreateNewRoadsFromPoints ВХОД: isBluePrint={isBluePrint}, точек={uniquePoints.Length}"
+        );
+
+        if (uniquePoints.IsEmpty)
         {
             Debug.Log("Нет точек для создания дорог");
             return;
@@ -240,24 +257,30 @@ public partial struct RoadSystem : ISystem
 
         using var clusterStarts = new NativeList<int2>(Allocator.TempJob);
         using var allClusterPoints = new NativeList<int2>(Allocator.TempJob);
-        
+
         var clusterJob = new UniversalClusterJob
         {
             InputPoints = uniquePoints,
             ClusterStarts = clusterStarts,
-            AllClusterPoints = allClusterPoints
+            AllClusterPoints = allClusterPoints,
         };
         clusterJob.Schedule().Complete();
-        
-        Debug.Log($"После кластеризации: кластеров={clusterStarts.Length}, всех точек={allClusterPoints.Length}");
+
+        Debug.Log(
+            $"После кластеризации: кластеров={clusterStarts.Length}, всех точек={allClusterPoints.Length}"
+        );
         Debug.Log($"Вызываем CreateRoadEntitiesFromClusters с isBluePrint={isBluePrint}");
-        
+
         CreateRoadEntitiesFromClusters(ref state, clusterStarts, allClusterPoints, isBluePrint);
     }
-        
+
     [BurstCompile]
-    void CreateRoadEntitiesFromClusters(ref SystemState state, NativeList<int2> clusterStarts, 
-        NativeList<int2> allClusterPoints, bool isBluePrint)
+    void CreateRoadEntitiesFromClusters(
+        ref SystemState state,
+        NativeList<int2> clusterStarts,
+        NativeList<int2> allClusterPoints,
+        bool isBluePrint
+    )
     {
         var entityManager = state.EntityManager;
 
@@ -265,27 +288,24 @@ public partial struct RoadSystem : ISystem
         {
             int startIndex = clusterStarts[clusterId].x;
             int count = clusterStarts[clusterId].y;
-            
+
             var clusterEntity = entityManager.CreateEntity();
-            
-            
+
             entityManager.AddComponent<RoadTag>(clusterEntity);
             entityManager.AddComponent<CreateVisualTag>(clusterEntity);
-            entityManager.AddComponentData<BuildingData>(clusterEntity, new BuildingData
-            {
-                BuildingIDHash = roadHash,
-                UniqueIDHash = clusterEntity.Index
-            });
+            entityManager.AddComponentData<BuildingData>(
+                clusterEntity,
+                new BuildingData { BuildingIDHash = roadHash, UniqueIDHash = clusterEntity.Index }
+            );
             entityManager.AddComponent<AddToMapTag>(clusterEntity);
-            
-            
-            if (isBluePrint) 
+
+            if (isBluePrint)
             {
                 entityManager.AddComponent<MakePhantomTag>(clusterEntity);
             }
-            
+
             var buffer = entityManager.AddBuffer<MapPointData>(clusterEntity);
-            
+
             for (int i = 0; i < count; i++)
             {
                 var point = allClusterPoints[startIndex + i];
@@ -293,10 +313,16 @@ public partial struct RoadSystem : ISystem
                 roadMap.TryAdd(point, clusterEntity);
             }
         }
-}
+    }
+
     [BurstCompile]
-    void ApplyRoadModifications(ref SystemState state,NativeList<Entity> roadsToDelete, NativeList<Entity> roadsToUpdate,
-     NativeList<NativeList<int2>> roadsUpdateData, EntityCommandBuffer ecb)
+    void ApplyRoadModifications(
+        ref SystemState state,
+        NativeList<Entity> roadsToDelete,
+        NativeList<Entity> roadsToUpdate,
+        NativeList<NativeList<int2>> roadsUpdateData,
+        EntityCommandBuffer ecb
+    )
     {
         foreach (var roadEntity in roadsToDelete)
         {
@@ -315,7 +341,7 @@ public partial struct RoadSystem : ISystem
             {
                 InputPoints = remainingPoints,
                 ClusterStarts = clusterStarts,
-                AllClusterPoints = allClusterPoints
+                AllClusterPoints = allClusterPoints,
             };
             clusterJob.Schedule().Complete();
 
@@ -337,15 +363,24 @@ public partial struct RoadSystem : ISystem
             }
             else
             {
-                CreateNewRoadEntitiesFromClusters(ref state, clusterStarts, allClusterPoints, false);
+                CreateNewRoadEntitiesFromClusters(
+                    ref state,
+                    clusterStarts,
+                    allClusterPoints,
+                    false
+                );
                 ecb.AddComponent<DestroyEntityTag>(roadEntity);
             }
         }
     }
 
-
     [BurstCompile]
-    void CreateNewRoadEntitiesFromClusters(ref SystemState state, NativeList<int2> clusterStarts, NativeList<int2> allClusterPoints, bool isBluePrint)
+    void CreateNewRoadEntitiesFromClusters(
+        ref SystemState state,
+        NativeList<int2> clusterStarts,
+        NativeList<int2> allClusterPoints,
+        bool isBluePrint
+    )
     {
         var entityManager = state.EntityManager;
 
@@ -368,7 +403,6 @@ public partial struct RoadSystem : ISystem
         }
     }
 
-
     [BurstCompile]
     public void OnDestroy(ref SystemState state)
     {
@@ -377,7 +411,7 @@ public partial struct RoadSystem : ISystem
             roadMap.Dispose();
         }
     }
-    
+
     [BurstCompile]
     public partial struct GetNewPoints : IJobEntity
     {
@@ -386,12 +420,16 @@ public partial struct RoadSystem : ISystem
         public EntityCommandBuffer.ParallelWriter ecb;
         public bool IsBlueprint;
 
-        public void Execute(Entity entity, [EntityIndexInQuery] int entityIndexInQuery, 
-            in ProcessBuildingEventComponent eventC, in CreateRoadSegmentsTag seg, 
-            in DynamicBuffer<MapPointData> points)
+        public void Execute(
+            Entity entity,
+            [EntityIndexInQuery] int entityIndexInQuery,
+            in CreateBuildingEventComponent eventC,
+            in CreateRoadSegmentsTag seg,
+            in DynamicBuffer<MapPointData> points
+        )
         {
             bool anyPointAdded = false;
-            
+
             foreach (var p in points)
             {
                 if (IsBlueprint || !RoadMap.ContainsKey(p.Value))
@@ -401,25 +439,30 @@ public partial struct RoadSystem : ISystem
                 }
             }
 
-            
             ecb.RemoveComponent<CreateRoadSegmentsTag>(entityIndexInQuery, entity);
             ecb.RemoveComponent<MapPointData>(entityIndexInQuery, entity);
-            
+
             if (anyPointAdded)
             {
                 ecb.AddComponent<UpdateMapTag>(entityIndexInQuery, entity);
             }
         }
     }
-        
+
     public partial struct RemovePointsJob : IJobEntity
     {
         public NativeParallelHashMap<int2, Entity> roadMap;
         public EntityCommandBuffer Ecb;
+
         [NativeDisableParallelForRestriction]
         public NativeParallelMultiHashMap<Entity, int2> roadsToModify;
 
-        public void Execute(Entity entity, in ProcessMapEventComponent eventC, in RemoveMapPointsTag tag, in DynamicBuffer<MapPointData> points)
+        public void Execute(
+            Entity entity,
+            in ProcessMapEventComponent eventC,
+            in RemoveMapPointsTag tag,
+            in DynamicBuffer<MapPointData> points
+        )
         {
             foreach (var pointData in points)
             {
@@ -433,8 +476,8 @@ public partial struct RoadSystem : ISystem
             Ecb.RemoveComponent<MapPointData>(entity);
         }
     }
-    
-   [BurstCompile]
+
+    [BurstCompile]
     public struct PrepareRoadModificationsJob : IJob
     {
         public NativeParallelMultiHashMap<Entity, int2> RoadsToModify;
@@ -455,18 +498,19 @@ public partial struct RoadSystem : ISystem
 
             foreach (var roadEntity in uniqueRoads)
             {
-                
                 var pointBuffer = Ecb.SetBuffer<MapPointData>(roadEntity);
                 var pointsToRemove = new NativeHashSet<int2>(10, Allocator.Temp);
-                
+
                 foreach (var point in RoadsToModify.GetValuesForKey(roadEntity))
                 {
                     pointsToRemove.Add(point);
                 }
 
-                
-                var remainingPoints = new NativeList<int2>(math.max(pointBuffer.Length, 1), Allocator.Temp);
-                
+                var remainingPoints = new NativeList<int2>(
+                    math.max(pointBuffer.Length, 1),
+                    Allocator.Temp
+                );
+
                 foreach (var pointData in pointBuffer)
                 {
                     if (!pointsToRemove.Contains(pointData.Value))
@@ -475,7 +519,6 @@ public partial struct RoadSystem : ISystem
                     }
                 }
 
-                
                 foreach (var pointData in pointBuffer)
                 {
                     if (pointsToRemove.Contains(pointData.Value))
@@ -491,7 +534,7 @@ public partial struct RoadSystem : ISystem
                 else
                 {
                     RoadsToUpdate.Add(roadEntity);
-                    
+
                     if (RoadsUpdateData.Capacity <= RoadsUpdateData.Length)
                     {
                         RoadsUpdateData.Capacity = math.max(RoadsUpdateData.Capacity * 2, 4);
@@ -505,12 +548,18 @@ public partial struct RoadSystem : ISystem
             uniqueRoads.Dispose();
         }
     }
+
     [BurstCompile]
     public partial struct AssignClusterIdsToRoadsJob : IJob
     {
-        [ReadOnly] public NativeList<int2> ClusterStarts;
-        [ReadOnly] public NativeList<int2> AllClusterPoints;
-        [ReadOnly] public NativeParallelHashMap<int2, Entity> RoadMap;
+        [ReadOnly]
+        public NativeList<int2> ClusterStarts;
+
+        [ReadOnly]
+        public NativeList<int2> AllClusterPoints;
+
+        [ReadOnly]
+        public NativeParallelHashMap<int2, Entity> RoadMap;
         public EntityCommandBuffer.ParallelWriter Ecb;
 
         public void Execute()
@@ -519,7 +568,7 @@ public partial struct RoadSystem : ISystem
             {
                 int startIndex = ClusterStarts[clusterId].x;
                 int count = ClusterStarts[clusterId].y;
-                
+
                 for (int i = 0; i < count; i++)
                 {
                     var point = AllClusterPoints[startIndex + i];
@@ -536,11 +585,20 @@ public partial struct RoadSystem : ISystem
     [BurstCompile]
     public partial struct AssignClusterIdsToBuildingsJob : IJob
     {
-        [ReadOnly] public NativeList<int2> ClusterStarts;
-        [ReadOnly] public NativeList<int2> AllClusterPoints;
-        [ReadOnly] public NativeParallelHashMap<int2, Entity> BuildingMap;
-        [ReadOnly] public NativeParallelHashMap<int2, Entity> RoadMap;
-        [ReadOnly] public NativeParallelHashMap<Entity, byte> PhantomFlags;
+        [ReadOnly]
+        public NativeList<int2> ClusterStarts;
+
+        [ReadOnly]
+        public NativeList<int2> AllClusterPoints;
+
+        [ReadOnly]
+        public NativeParallelHashMap<int2, Entity> BuildingMap;
+
+        [ReadOnly]
+        public NativeParallelHashMap<int2, Entity> RoadMap;
+
+        [ReadOnly]
+        public NativeParallelHashMap<Entity, byte> PhantomFlags;
         public EntityCommandBuffer.ParallelWriter Ecb;
 
         public void Execute()
@@ -549,11 +607,11 @@ public partial struct RoadSystem : ISystem
             {
                 int startIndex = ClusterStarts[clusterId].x;
                 int count = ClusterStarts[clusterId].y;
-                
+
                 for (int i = 0; i < count; i++)
                 {
                     var roadPoint = AllClusterPoints[startIndex + i];
-                    
+
                     for (int x = -1; x <= 1; x++)
                     {
                         for (int y = -1; y <= 1; y++)
@@ -564,10 +622,11 @@ public partial struct RoadSystem : ISystem
                                 var buildingEntity = BuildingMap[checkPoint];
                                 if (buildingEntity != Entity.Null)
                                 {
-                                    
-                                    Ecb.AddComponent(0, buildingEntity, new ClusterId { 
-                                        Value = clusterId,
-                                    });
+                                    Ecb.AddComponent(
+                                        0,
+                                        buildingEntity,
+                                        new ClusterId { Value = clusterId }
+                                    );
                                 }
                             }
                         }
@@ -580,13 +639,15 @@ public partial struct RoadSystem : ISystem
     [BurstCompile]
     public struct UniversalClusterJob : IJob
     {
-        [ReadOnly] public NativeList<int2> InputPoints;
-        public NativeList<int2> ClusterStarts; 
-        public NativeList<int2> AllClusterPoints; 
+        [ReadOnly]
+        public NativeList<int2> InputPoints;
+        public NativeList<int2> ClusterStarts;
+        public NativeList<int2> AllClusterPoints;
 
         public void Execute()
         {
-            if (InputPoints.IsEmpty) return;
+            if (InputPoints.IsEmpty)
+                return;
 
             var pointSet = new NativeHashSet<int2>(InputPoints.Length, Allocator.Temp);
             var visited = new NativeHashSet<int2>(InputPoints.Length, Allocator.Temp);
@@ -597,10 +658,11 @@ public partial struct RoadSystem : ISystem
 
             foreach (var point in InputPoints)
             {
-                if (visited.Contains(point)) continue;
+                if (visited.Contains(point))
+                    continue;
 
                 int startIndex = AllClusterPoints.Length;
-                
+
                 queue.Enqueue(point);
                 visited.Add(point);
 
@@ -623,8 +685,12 @@ public partial struct RoadSystem : ISystem
             queue.Dispose();
         }
 
-        void CheckNeighbor(int2 neighbor, NativeHashSet<int2> pointSet,
-            NativeHashSet<int2> visited, NativeQueue<int2> queue)
+        void CheckNeighbor(
+            int2 neighbor,
+            NativeHashSet<int2> pointSet,
+            NativeHashSet<int2> visited,
+            NativeQueue<int2> queue
+        )
         {
             if (pointSet.Contains(neighbor) && !visited.Contains(neighbor))
             {

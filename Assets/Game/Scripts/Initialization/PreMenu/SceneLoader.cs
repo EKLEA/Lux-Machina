@@ -7,7 +7,7 @@ public class SceneLoader
     {
         var operation = SceneManager.LoadSceneAsync(sceneName);
         operation.allowSceneActivation = false;
-        
+
         while (!operation.isDone)
         {
             if (operation.progress >= 0.9f)

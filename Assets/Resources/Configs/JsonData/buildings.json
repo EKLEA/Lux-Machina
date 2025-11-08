@@ -1,0 +1,42 @@
+﻿{
+    "buildings": [
+        {
+            "id": "Core",
+            "title": "Ядро",
+            "description": "выфывф",
+            "iconPath": "core",
+            "prefabPath": "core",
+            "buildingType": 1,
+            "actionType": 0,
+            "size": {
+                "x": 2,
+                "y": 2,
+                "z": 2
+            },
+            "typeOfLogic": 0,
+            "requiredRecipesGroup": 0,
+            "maxHealth": 100.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 20.0
+        },
+        {
+            "id": "Road",
+            "title": "Дорога",
+            "description": "ыфвывф",
+            "iconPath": "road",
+            "prefabPath": "road",
+            "buildingType": 2,
+            "actionType": 1,
+            "size": {
+                "x": 1,
+                "y": 1,
+                "z": 1
+            },
+            "typeOfLogic": 0,
+            "requiredRecipesGroup": 0,
+            "maxHealth": 100.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 20.0
+        }
+    ]
+}

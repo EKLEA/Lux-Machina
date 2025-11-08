@@ -1,0 +1,10 @@
+id,title,description,iconPath,maxInStack
+iron_ore,Железная руда,Базовая железная руда,iron_ore,50
+wood,Дерево,Деревянные бревна,wood,100
+coal,Уголь,Топливо для печей,coal,64
+iron_ingot,Железный слиток,Обработанное железо,iron_ingot,100
+stick,Палка,Деревянная палка,stick,200
+pickaxe,Кирка,Железная кирка,pickaxe,1
+axe,Топор,Железный топор,axe,1
+copper_ore,Медная руда,Базовая медная руда,copper_ore,50
+copper_ingot,Медный слиток,Обработанная медь,copper_ingot,100

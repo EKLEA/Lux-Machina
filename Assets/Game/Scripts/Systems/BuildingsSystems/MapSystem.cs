@@ -6,8 +6,8 @@ using Unity.Mathematics;
 using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
-[UpdateAfter(typeof(PathfindingSystem))] 
-[UpdateBefore(typeof(RoadSystem))] 
+[UpdateAfter(typeof(PathfindingSystem))]
+[UpdateBefore(typeof(RoadSystem))]
 public partial struct MapSystem : ISystem
 {
     EntityQuery _addBuildingPointsToMap;
@@ -18,21 +18,22 @@ public partial struct MapSystem : ISystem
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
-        
         BuildingMapEntity = state.EntityManager.CreateEntity();
-        state.EntityManager.AddComponentData(BuildingMapEntity, new BuildingMap
-        {
-            CellMapBuildings = new NativeParallelHashMap<int2, int>(1000, Allocator.Persistent),
-            CellMapIDs = new NativeParallelHashMap<int2, int>(1000, Allocator.Persistent),
-            CellEntity = new NativeParallelHashMap<int2, Entity>(1000, Allocator.Persistent)
-        });
+        state.EntityManager.AddComponentData(
+            BuildingMapEntity,
+            new BuildingMap
+            {
+                CellMapBuildings = new NativeParallelHashMap<int2, int>(1000, Allocator.Persistent),
+                CellMapIDs = new NativeParallelHashMap<int2, int>(1000, Allocator.Persistent),
+                CellEntity = new NativeParallelHashMap<int2, Entity>(1000, Allocator.Persistent),
+            }
+        );
 
-        
         _addBuildingPointsToMap = new EntityQueryBuilder(Allocator.Temp)
             .WithAll<BuildingData, AddToMapTag>()
             .WithAll<MapPointData>()
             .Build(ref state);
-            
+
         _removeBuildingPointsfromMap = new EntityQueryBuilder(Allocator.Temp)
             .WithAll<ProcessMapEventComponent, RemoveMapPointsTag>()
             .WithAll<MapPointData>()
@@ -49,11 +50,16 @@ public partial struct MapSystem : ISystem
         if (mapData.CellMapBuildings.Capacity >= newCapacity)
             return;
 
-        var newCellBuildMap = new NativeParallelHashMap<int2, int>(newCapacity, Allocator.Persistent);
+        var newCellBuildMap = new NativeParallelHashMap<int2, int>(
+            newCapacity,
+            Allocator.Persistent
+        );
         var newCellIDMap = new NativeParallelHashMap<int2, int>(newCapacity, Allocator.Persistent);
-        var newCellEntity = new NativeParallelHashMap<int2, Entity>(newCapacity, Allocator.Persistent);
+        var newCellEntity = new NativeParallelHashMap<int2, Entity>(
+            newCapacity,
+            Allocator.Persistent
+        );
 
-        
         foreach (var pair in mapData.CellMapBuildings)
             newCellBuildMap.TryAdd(pair.Key, pair.Value);
         foreach (var pair in mapData.CellMapIDs)
@@ -61,22 +67,19 @@ public partial struct MapSystem : ISystem
         foreach (var pair in mapData.CellEntity)
             newCellEntity.TryAdd(pair.Key, pair.Value);
 
-        
         var oldBuildings = mapData.CellMapBuildings;
         var oldIDs = mapData.CellMapIDs;
         var oldEntities = mapData.CellEntity;
 
-        
         var newBuildingMap = new BuildingMap
         {
             CellMapBuildings = newCellBuildMap,
             CellMapIDs = newCellIDMap,
-            CellEntity = newCellEntity
+            CellEntity = newCellEntity,
         };
 
         state.EntityManager.SetComponentData(BuildingMapEntity, newBuildingMap);
 
-        
         if (oldBuildings.IsCreated)
             oldBuildings.Dispose();
         if (oldIDs.IsCreated)
@@ -84,78 +87,79 @@ public partial struct MapSystem : ISystem
         if (oldEntities.IsCreated)
             oldEntities.Dispose();
     }
+
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        if (!_isInitialized) return;
+        if (!_isInitialized)
+            return;
 
         var buildingMapRW = SystemAPI.GetSingletonRW<BuildingMap>();
-        
-        if (buildingMapRW.ValueRO.CellMapBuildings.GetCount() > 
-            buildingMapRW.ValueRO.CellMapBuildings.Capacity * 0.8f)
+
+        if (
+            buildingMapRW.ValueRO.CellMapBuildings.GetCount()
+            > buildingMapRW.ValueRO.CellMapBuildings.Capacity * 0.8f
+        )
         {
             ResizeMap(ref state, buildingMapRW.ValueRO.CellMapBuildings.Capacity * 2);
         }
-        
+
         bool isUpdated = false;
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
 
-        
         if (!_addBuildingPointsToMap.IsEmptyIgnoreFilter)
         {
             var AddPointsToMapJob = new AddPointsToMapJob
             {
-                buildingMap = buildingMapRW.ValueRW.CellMapBuildings, 
-                idMap = buildingMapRW.ValueRW.CellMapIDs,  
-                ecb = ecb.AsParallelWriter()
+                buildingMap = buildingMapRW.ValueRW.CellMapBuildings,
+                idMap = buildingMapRW.ValueRW.CellMapIDs,
+                ecb = ecb.AsParallelWriter(),
             };
-            
-            
-            state.Dependency = AddPointsToMapJob.Schedule(_addBuildingPointsToMap, state.Dependency);
+
+            state.Dependency = AddPointsToMapJob.Schedule(
+                _addBuildingPointsToMap,
+                state.Dependency
+            );
             isUpdated = true;
         }
 
-        
         if (!_removeBuildingPointsfromMap.IsEmptyIgnoreFilter)
         {
             var removeJob = new RemovePointsFromMapJob
             {
                 buildingMap = buildingMapRW.ValueRW.CellMapBuildings,
                 idMap = buildingMapRW.ValueRW.CellMapIDs,
-                ecb = ecb.AsParallelWriter()
+                ecb = ecb.AsParallelWriter(),
             };
 
-            
             state.Dependency = removeJob.Schedule(_removeBuildingPointsfromMap, state.Dependency);
             isUpdated = true;
         }
 
-        
         state.Dependency.Complete();
-        
+
         if (isUpdated)
         {
             ecb.Playback(state.EntityManager);
             state.EntityManager.AddComponentData(BuildingMapEntity, new UpdateMapTag());
         }
-        
+
         ecb.Dispose();
     }
 
     [BurstCompile]
     public void OnDestroy(ref SystemState state)
     {
-        if (!_isInitialized) return;
+        if (!_isInitialized)
+            return;
 
-        
-        
         if (state.EntityManager.Exists(BuildingMapEntity))
         {
             var mapData = state.EntityManager.GetComponentData<BuildingMap>(BuildingMapEntity);
-            
+
             if (mapData.CellMapBuildings.IsCreated)
                 mapData.CellMapBuildings.Dispose();
-                
+
             if (mapData.CellMapIDs.IsCreated)
                 mapData.CellMapIDs.Dispose();
 
@@ -173,14 +177,18 @@ public partial struct MapSystem : ISystem
         public NativeParallelHashMap<int2, int> idMap;
         public EntityCommandBuffer.ParallelWriter ecb;
 
-        public void Execute(Entity entity, in BuildingData buildingData, in AddToMapTag tag, in DynamicBuffer<MapPointData> points)
+        public void Execute(
+            Entity entity,
+            in BuildingData buildingData,
+            in AddToMapTag tag,
+            in DynamicBuffer<MapPointData> points
+        )
         {
             bool addedPoint = false;
             foreach (var point in points)
             {
                 if (!buildingMap.ContainsKey(point.Value) && !idMap.ContainsKey(point.Value))
                 {
-                    
                     if (buildingMap.TryAdd(point.Value, buildingData.BuildingIDHash))
                     {
                         idMap.TryAdd(point.Value, buildingData.UniqueIDHash);
@@ -190,8 +198,8 @@ public partial struct MapSystem : ISystem
             }
             if (addedPoint)
             {
-                 ecb.RemoveComponent<AddToMapTag>(0, entity);
-                 ecb.AddComponent<UpdateMapTag>(0, entity);
+                ecb.RemoveComponent<AddToMapTag>(0, entity);
+                ecb.AddComponent<UpdateMapTag>(0, entity);
             }
         }
     }
@@ -201,9 +209,14 @@ public partial struct MapSystem : ISystem
     {
         public NativeParallelHashMap<int2, int> buildingMap;
         public NativeParallelHashMap<int2, int> idMap;
-        public EntityCommandBuffer.ParallelWriter ecb; 
-        
-        public void Execute(Entity entity, in ProcessMapEventComponent eventC, in RemoveMapPointsTag tag, in DynamicBuffer<MapPointData> points)
+        public EntityCommandBuffer.ParallelWriter ecb;
+
+        public void Execute(
+            Entity entity,
+            in ProcessMapEventComponent eventC,
+            in RemoveMapPointsTag tag,
+            in DynamicBuffer<MapPointData> points
+        )
         {
             bool removedPoints = false;
             foreach (var point in points)
@@ -219,7 +232,7 @@ public partial struct MapSystem : ISystem
                     removedPoints = true;
                 }
             }
-            if (removedPoints) 
+            if (removedPoints)
                 ecb.AddComponent<UpdateMapTag>(0, entity);
         }
     }

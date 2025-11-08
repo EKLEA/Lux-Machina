@@ -29,7 +29,6 @@ public class LoadingService : ILoadingService
 
     public async Task LoadWithProgressAsync(params Func<Task>[] loadTasks)
     {
-
         if (_isFirstLoad)
         {
             await ShowBlackScreenForce(true);
@@ -55,6 +54,8 @@ public class LoadingService : ILoadingService
     }
 
     public async Task ShowBlackScreenForce(bool b) => await _loadingScreen.ShowBlackScreen(b);
+
     public async Task ShowLoadingScreen() => await _loadingScreen.ShowLoadingScreen();
+
     public async Task HideLoadingScreen() => await _loadingScreen.Hide(false);
 }

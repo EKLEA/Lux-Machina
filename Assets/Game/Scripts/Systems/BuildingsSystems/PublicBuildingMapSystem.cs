@@ -1,20 +1,15 @@
-
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
 public partial class PublicBuildingMapSystem : SystemBase
 {
-
     protected override void OnCreate()
     {
         base.OnCreate();
     }
 
-    protected override void OnUpdate()
-    {
-        
-    }
+    protected override void OnUpdate() { }
 
     public bool CanBuildAt(NativeArray<int2> positions, bool isRoad)
     {
@@ -31,22 +26,18 @@ public partial class PublicBuildingMapSystem : SystemBase
             {
                 if (isRoad)
                 {
-                    
                     if (!IsRoadBuilding(existingBuildingID))
-                        return false; 
+                        return false;
                 }
                 else
                 {
-                    
                     return false;
                 }
             }
-            
         }
 
         return true;
     }
-
 
     public int GetBuildingAt(int2 position)
     {
@@ -55,7 +46,9 @@ public partial class PublicBuildingMapSystem : SystemBase
         if (!SystemAPI.TryGetSingleton<BuildingMap>(out var buildingMap))
             return -1;
 
-        return buildingMap.CellMapBuildings.TryGetValue(position, out var buildingID) ? buildingID : -1;
+        return buildingMap.CellMapBuildings.TryGetValue(position, out var buildingID)
+            ? buildingID
+            : -1;
     }
 
     public int GetUniqueIDAt(int2 position)
@@ -77,7 +70,7 @@ public partial class PublicBuildingMapSystem : SystemBase
 
         if (buildingMap.CellMapBuildings.TryGetValue(position, out var buildingID))
         {
-            return !IsRoadBuilding(buildingID); 
+            return !IsRoadBuilding(buildingID);
         }
 
         return false;
@@ -92,7 +85,7 @@ public partial class PublicBuildingMapSystem : SystemBase
 
         if (buildingMap.CellMapBuildings.TryGetValue(position, out var buildingID))
         {
-            return IsRoadBuilding(buildingID); 
+            return IsRoadBuilding(buildingID);
         }
 
         return false;

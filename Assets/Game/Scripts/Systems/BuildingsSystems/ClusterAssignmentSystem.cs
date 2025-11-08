@@ -1,5 +1,5 @@
-using Unity.Entities;
 using Unity.Collections;
+using Unity.Entities;
 using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
@@ -8,23 +8,29 @@ public partial class ClusterAssignmentSystem : SystemBase
 {
     protected override void OnUpdate()
     {
-        foreach (var (building, clusterId, entity) in SystemAPI.Query<GameObjectReference, ClusterId>()
-                     .WithAll<BuildingPosData>()
-                     .WithEntityAccess()
-                     .WithChangeFilter<ClusterId>())
+        foreach (
+            var (building, clusterId, entity) in SystemAPI
+                .Query<GameObjectReference, ClusterId>()
+                .WithAll<BuildingPosData>()
+                .WithEntityAccess()
+                .WithChangeFilter<ClusterId>()
+        )
         {
-            if (clusterId.Value != -1) 
+            if (clusterId.Value != -1)
             {
                 AssignBuildingCluster(building.gameObject, clusterId);
             }
         }
 
-        foreach (var (road, clusterId, entity) in SystemAPI.Query<GameObjectReference, ClusterId>()
-                     .WithAll<RoadTag>()
-                     .WithEntityAccess()
-                     .WithChangeFilter<ClusterId>()) 
+        foreach (
+            var (road, clusterId, entity) in SystemAPI
+                .Query<GameObjectReference, ClusterId>()
+                .WithAll<RoadTag>()
+                .WithEntityAccess()
+                .WithChangeFilter<ClusterId>()
+        )
         {
-            if (clusterId.Value != -1) 
+            if (clusterId.Value != -1)
             {
                 AssignRoadCluster(road.gameObject, clusterId);
             }
@@ -37,7 +43,6 @@ public partial class ClusterAssignmentSystem : SystemBase
         {
             building.clusterID = clusterId.Value;
             Debug.Log($"Building {building.id} assigned to cluster {clusterId.Value}");
-            
         }
     }
 
@@ -47,7 +52,6 @@ public partial class ClusterAssignmentSystem : SystemBase
         {
             road.clusterID = clusterId.Value;
             Debug.Log($"Road {road.id} assigned to cluster {clusterId.Value}");
-            
         }
     }
 }

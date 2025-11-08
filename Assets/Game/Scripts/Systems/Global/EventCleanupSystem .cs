@@ -13,10 +13,11 @@ public partial struct EventCleanupSystem : ISystem
         ecb.Playback(state.EntityManager);
         ecb.Dispose();
     }
+
     // void CleanEmptyEntities(ref SystemState state, EntityCommandBuffer ecb)
     // {
     //     var query = new EntityQueryBuilder(Allocator.Temp)
-    //         .WithNone<IComponentData, IBufferElementData>() 
+    //         .WithNone<IComponentData, IBufferElementData>()
     //         .Build(ref state);
 
     //     var entities = query.ToEntityArray(Allocator.Temp);
@@ -28,12 +29,14 @@ public partial struct EventCleanupSystem : ISystem
     // }
     void CleanProcessedBuildingEvents(ref SystemState state, EntityCommandBuffer ecb)
     {
-        foreach (var (_, entity) in SystemAPI.Query<ProcessBuildingEventComponent>()
-           .WithNone<AddToMapTag, CreateVisualTag>() 
-           .WithEntityAccess())
+        foreach (
+            var (_, entity) in SystemAPI
+                .Query<CreateBuildingEventComponent>()
+                .WithNone<AddToMapTag, CreateVisualTag>()
+                .WithEntityAccess()
+        )
         {
             ecb.DestroyEntity(entity);
         }
     }
-    
 }

@@ -1,0 +1,9 @@
+id,groupId,inputItems,outputItems,craftTime,recipeSprite,buildingId
+smelt_iron,0,iron_ore:3,coal:1,iron_ingot:1,5.0,smelt_iron,furnace
+smelt_copper,0,copper_ore:3,coal:1,copper_ingot:1,4.0,smelt_copper,furnace
+craft_pickaxe,1,iron_ingot:3,stick:2,pickaxe:1,3.0,pickaxe,workshop
+craft_axe,1,iron_ingot:2,stick:1,wood:1,axe:1,2.5,axe,workshop
+craft_stick,1,wood:2,stick:4,1.0,stick,workshop
+craft_iron_gear,1,iron_ingot:2,iron_gear:1,2.0,iron_gear,workshop
+assemble_motor,2,iron_ingot:5,copper_ingot:3,iron_gear:2,electric_motor:1,8.0,electric_motor,assembler
+generate_power,0,coal:1,,10.0,power_generation,generator

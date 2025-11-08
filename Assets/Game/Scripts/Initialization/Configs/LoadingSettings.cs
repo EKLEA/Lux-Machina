@@ -1,4 +1,3 @@
-
 using UnityEngine;
 
 public interface IReadOnlyLoadingSettings
@@ -15,7 +14,8 @@ public class LoadingSettings : IReadOnlyLoadingSettings
     public float TimeOfFade { get; private set; }
 
     public float Smoothness { get; private set; }
-    public LoadingSettings(Sprite[] loadingImages,float timeOfFade,float smoothness )
+
+    public LoadingSettings(Sprite[] loadingImages, float timeOfFade, float smoothness)
     {
         LoadingImages = loadingImages;
         TimeOfFade = timeOfFade;

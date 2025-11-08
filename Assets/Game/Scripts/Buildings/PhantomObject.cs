@@ -7,18 +7,17 @@ public class PhantomObject : MonoBehaviour
     List<MeshRenderer> meshRenderers = new();
     List<Material[]> originalMaterials = new();
     List<Material[]> phantomMaterials = new();
-    
+
     Material _trueMat;
     Material _falseMat;
-    
+
     public void SetUp(Material trueMat, Material falseMat)
     {
         Debug.Log($"PhantomObject.SetUp вызван для {gameObject.name}");
         Debug.Log($"TrueMat: {trueMat != null}, FalseMat: {falseMat != null}");
-        
 
         meshRenderers.AddRange(GetComponentsInChildren<MeshRenderer>(true));
-        
+
         _trueMat = trueMat;
         _falseMat = falseMat;
 
@@ -26,11 +25,12 @@ public class PhantomObject : MonoBehaviour
 
         foreach (MeshRenderer mr in meshRenderers)
         {
-            if (mr == null) continue;
-            
+            if (mr == null)
+                continue;
+
             Material[] originalMats = mr.sharedMaterials;
             Material[] phantomMats = new Material[originalMats.Length];
-            
+
             Material[] originalCopies = new Material[originalMats.Length];
             for (int i = 0; i < originalMats.Length; i++)
             {
@@ -38,30 +38,34 @@ public class PhantomObject : MonoBehaviour
                     originalCopies[i] = originalMats[i];
             }
             originalMaterials.Add(originalCopies);
-            
+
             for (int i = 0; i < originalMats.Length; i++)
             {
                 if (originalMats[i] != null)
                     phantomMats[i] = CreatePhantomMaterial(originalMats[i], _trueMat);
             }
-            
+
             mr.materials = phantomMats;
             phantomMaterials.Add(phantomMats);
-            
+
             Debug.Log($"Обработан MeshRenderer: {mr.name}, материалов: {originalMats.Length}");
         }
-        
+
         Debug.Log($"PhantomObject.SetUp завершен для {gameObject.name}");
     }
 
     Material CreatePhantomMaterial(Material originalMat, Material phantomShaderMat)
     {
-        if (originalMat == null || phantomShaderMat == null) 
+        if (originalMat == null || phantomShaderMat == null)
             return null;
-            
+
         Material newMat = new Material(phantomShaderMat);
-        
-        if (originalMat.HasProperty("_MainTex") && newMat.HasProperty("_MainTex") && originalMat.mainTexture != null)
+
+        if (
+            originalMat.HasProperty("_MainTex")
+            && newMat.HasProperty("_MainTex")
+            && originalMat.mainTexture != null
+        )
         {
             newMat.SetTexture("_MainTex", originalMat.mainTexture);
         }
@@ -71,28 +75,29 @@ public class PhantomObject : MonoBehaviour
             if (baseMap != null)
                 newMat.SetTexture("_BaseMap", baseMap);
         }
-        
+
         return newMat;
     }
-    
+
     public void CanBuild(bool canBuild)
     {
         Material targetPhantomMat = canBuild ? _trueMat : _falseMat;
-        
+
         for (int mrIndex = 0; mrIndex < meshRenderers.Count; mrIndex++)
         {
-            if (meshRenderers[mrIndex] == null) continue;
-            
+            if (meshRenderers[mrIndex] == null)
+                continue;
+
             Material[] currentPhantomMats = phantomMaterials[mrIndex];
             Material[] originalMats = originalMaterials[mrIndex];
             Material[] newMats = new Material[currentPhantomMats.Length];
-            
+
             for (int i = 0; i < currentPhantomMats.Length; i++)
             {
                 if (originalMats[i] != null)
                 {
                     newMats[i] = CreatePhantomMaterial(originalMats[i], targetPhantomMat);
-                    
+
                     if (currentPhantomMats[i] != null)
                     {
                         if (Application.isPlaying)
@@ -102,12 +107,12 @@ public class PhantomObject : MonoBehaviour
                     }
                 }
             }
-            
+
             phantomMaterials[mrIndex] = newMats;
             meshRenderers[mrIndex].materials = newMats;
         }
     }
-    
+
     public void UnPhantom()
     {
         for (int i = 0; i < meshRenderers.Count; i++)
@@ -116,7 +121,7 @@ public class PhantomObject : MonoBehaviour
             {
                 meshRenderers[i].sharedMaterials = originalMaterials[i];
             }
-            
+
             foreach (Material mat in phantomMaterials[i])
             {
                 if (mat != null)

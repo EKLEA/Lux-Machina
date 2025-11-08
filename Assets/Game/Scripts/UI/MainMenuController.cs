@@ -5,12 +5,21 @@ using Zenject;
 
 public class MainMenuController : MonoBehaviour
 {
-    [SerializeField] CanvasGroup[] Screens;
-    [Inject] LoadingSettings loadingSettings;
+    [SerializeField]
+    CanvasGroup[] Screens;
+
+    [Inject]
+    LoadingSettings loadingSettings;
     CanvasGroup currScreen;
-    [Inject] SceneLoader _sceneLoader;
-    [Inject] SaveService saveService;
-    [Inject] ILoadingService loadingService;
+
+    [Inject]
+    SceneLoader _sceneLoader;
+
+    [Inject]
+    SaveService saveService;
+
+    [Inject]
+    ILoadingService loadingService;
     private bool isTransitioning = false;
 
     void Awake()
@@ -27,16 +36,18 @@ public class MainMenuController : MonoBehaviour
             }
         }
     }
+
     public async void LoadGameAsync(int index)
     {
         await loadingService.ShowBlackScreenForce(false);
         saveService.saveIndex = index;
         await _sceneLoader.LoadSceneAsync("GameScene");
     }
-    
+
     public async void ChangeScreenTo(CanvasGroup nextScreen)
     {
-        if (isTransitioning) return;
+        if (isTransitioning)
+            return;
 
         isTransitioning = true;
         await ChangeScreenFade(currScreen, nextScreen);
@@ -51,6 +62,7 @@ public class MainMenuController : MonoBehaviour
         to.gameObject.SetActive(true);
         await Fader(to);
     }
+
     async Task Fader(CanvasGroup screen)
     {
         float duration = loadingSettings.TimeOfFade;

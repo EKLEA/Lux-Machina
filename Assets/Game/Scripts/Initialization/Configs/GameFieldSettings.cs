@@ -11,13 +11,17 @@ public interface IReadOnlyGameFieldSettings
 
 public class GameFieldSettings : IReadOnlyGameFieldSettings
 {
-    public  float cellSize{ get; private set; }
+    public float cellSize { get; private set; }
 
-    public int tickPerSecond{ get; private set; }
+    public int tickPerSecond { get; private set; }
 
-    public DistributionPriority defaultDistributionPriority{ get;  set; }
+    public DistributionPriority defaultDistributionPriority { get; set; }
 
-    public GameFieldSettings(float cellSize,int tickPerSecond,DistributionPriority distributionPriority)
+    public GameFieldSettings(
+        float cellSize,
+        int tickPerSecond,
+        DistributionPriority distributionPriority
+    )
     {
         this.tickPerSecond = tickPerSecond;
         this.cellSize = cellSize;

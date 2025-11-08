@@ -8,11 +8,20 @@ using Zenject;
 
 public class BuildingAction
 {
-    [Inject] IReadOnlyBuildingInfo _buildingInfo;
-    [Inject] IReadOnlyGameFieldSettings _gameFieldSettings;
-    [Inject] BuildingObjectFactorty _buildingObjectFactorty;
-    [Inject] PhantomObjectFactory _phantomObjectFactory;
-    [Inject] GameController _gameController;
+    [Inject]
+    IReadOnlyBuildingInfo _buildingInfo;
+
+    [Inject]
+    IReadOnlyGameFieldSettings _gameFieldSettings;
+
+    [Inject]
+    BuildingObjectFactorty _buildingObjectFactorty;
+
+    [Inject]
+    PhantomObjectFactory _phantomObjectFactory;
+
+    [Inject]
+    GameController _gameController;
 
     public event Action OnActionDone;
     public bool IsAction;
@@ -59,6 +68,7 @@ public class BuildingAction
         CreatePreview();
         IsAction = true;
     }
+
     public void DrawDebugGridAroundPlayer(Vector3 playerPosition, int radius = 10)
     {
         int centerX = Mathf.FloorToInt(playerPosition.x / _gameFieldSettings.cellSize);
@@ -71,19 +81,37 @@ public class BuildingAction
                 Vector2Int cell = new Vector2Int(x, z);
                 Vector3 center = GetCellWorldCenter(cell);
 
-                bool canBuildHere = _gameController.CanBuildHereMany(new List<Vector2Int> { cell },posData is TempRoadPosData);
+                bool canBuildHere = _gameController.CanBuildHereMany(
+                    new List<Vector2Int> { cell },
+                    posData is TempRoadPosData
+                );
 
                 Color color = canBuildHere ? Color.green : Color.red;
 
-                Debug.DrawLine(center - Vector3.forward * 0.2f, center + Vector3.forward * 0.2f, color, 0.1f);
-                Debug.DrawLine(center - Vector3.right * 0.2f, center + Vector3.right * 0.2f, color, 0.1f);
+                Debug.DrawLine(
+                    center - Vector3.forward * 0.2f,
+                    center + Vector3.forward * 0.2f,
+                    color,
+                    0.1f
+                );
+                Debug.DrawLine(
+                    center - Vector3.right * 0.2f,
+                    center + Vector3.right * 0.2f,
+                    color,
+                    0.1f
+                );
             }
         }
     }
+
     Vector3 GetCellWorldCenter(Vector2Int cell)
     {
         float half = _gameFieldSettings.cellSize * 0.5f;
-        return new Vector3(cell.x * _gameFieldSettings.cellSize + half, 0.05f, cell.y * _gameFieldSettings.cellSize + half);
+        return new Vector3(
+            cell.x * _gameFieldSettings.cellSize + half,
+            0.05f,
+            cell.y * _gameFieldSettings.cellSize + half
+        );
     }
 
     Vector3 GetCellsCentroid(IEnumerable<Vector2Int> cells)
@@ -109,7 +137,7 @@ public class BuildingAction
                 BuildingIDHash = buildingID,
                 LeftCornerPos = currPos,
                 Rotation = 0,
-                Size = building.size
+                Size = building.size,
             };
         }
         else
@@ -119,7 +147,7 @@ public class BuildingAction
             {
                 IsPhantom = true,
                 BuildingIDHash = buildingID,
-                Points = new List<Vector2Int>()
+                Points = new List<Vector2Int>(),
             };
         }
     }
@@ -133,9 +161,16 @@ public class BuildingAction
         }
 
         if (posData is TempBuildingPosData bPos)
-            buildingOnScene = _buildingObjectFactorty.CreateBuilding(bPos.BuildingIDHash, bPos.LeftCornerPos, rotation);
+            buildingOnScene = _buildingObjectFactorty.CreateBuilding(
+                bPos.BuildingIDHash,
+                bPos.LeftCornerPos,
+                rotation
+            );
         else if (posData is TempRoadPosData rPos)
-            buildingOnScene = _buildingObjectFactorty.CreateRoad(rPos.BuildingIDHash, rPos.Points.ToArray());
+            buildingOnScene = _buildingObjectFactorty.CreateRoad(
+                rPos.BuildingIDHash,
+                rPos.Points.ToArray()
+            );
 
         if (buildingOnScene != null)
         {
@@ -149,7 +184,8 @@ public class BuildingAction
 
     public void Update(Vector3 pos, bool force)
     {
-        if (posData == null) return;
+        if (posData == null)
+            return;
         currPos = new Vector2Int(
             Mathf.FloorToInt(pos.x / _gameFieldSettings.cellSize),
             Mathf.FloorToInt(pos.z / _gameFieldSettings.cellSize)
@@ -163,8 +199,10 @@ public class BuildingAction
     void UpdateSimpleBuilding(Vector3 pos, bool force)
     {
         var buildingPosData = posData as TempBuildingPosData;
-        var size = rotation % 2 != 0 ? new Vector2Int(buildingPosData.Size.z, buildingPosData.Size.x)
-                                     : new Vector2Int(buildingPosData.Size.x, buildingPosData.Size.z);
+        var size =
+            rotation % 2 != 0
+                ? new Vector2Int(buildingPosData.Size.z, buildingPosData.Size.x)
+                : new Vector2Int(buildingPosData.Size.x, buildingPosData.Size.z);
 
         int x = size.x % 2 == 0 ? currPos.x - size.x / 2 + 1 : currPos.x - size.x / 2;
         int y = size.y % 2 == 0 ? currPos.y - size.y / 2 + 1 : currPos.y - size.y / 2;
@@ -201,36 +239,38 @@ public class BuildingAction
             return;
         }
 
-        if (currPos == lastRoadPoint) return;
+        if (currPos == lastRoadPoint)
+            return;
 
         // Сохраняем локальный снимок точек для коллбэка
         var lastPoint = lastRoadPoint;
-        _gameController.RequestPath(lastPoint, currPos, pathList =>
-        {
-            if (pathList == null || pathList.Count == 0)
-                pathList = new List<Vector2Int> { lastPoint, currPos };
+        _gameController.RequestPath(
+            lastPoint,
+            currPos,
+            pathList =>
+            {
+                if (pathList == null || pathList.Count == 0)
+                    pathList = new List<Vector2Int> { lastPoint, currPos };
 
-            visualPoints.Clear();
-            visualPoints.Add(lastPoint);
-            visualPoints.AddRange(pathList.Skip(1));
+                visualPoints.Clear();
+                visualPoints.Add(lastPoint);
+                visualPoints.AddRange(pathList.Skip(1));
 
-            UpdatePhantomVisual(visualPoints);
+                UpdatePhantomVisual(visualPoints);
 
-            // Локальная проверка CanBuild для этого сегмента
-            bool canBuildSegment = _gameController.CanBuildHereMany(visualPoints, true);
-            phantomObject?.CanBuild(canBuildSegment || force);
-        });
+                // Локальная проверка CanBuild для этого сегмента
+                bool canBuildSegment = _gameController.CanBuildHereMany(visualPoints, true);
+                phantomObject?.CanBuild(canBuildSegment || force);
+            }
+        );
     }
-
-
 
     void UpdatePhantomVisual(List<Vector2Int> points)
     {
-
-
         if (phantomObject != null)
             phantomObject.transform.position = GetCellsCentroid(points);
-        else return;
+        else
+            return;
         if (buildingOnScene is RoadOnScene roadOnScene)
             roadOnScene.GenerateRoadMesh(points.ToArray());
     }
@@ -240,13 +280,15 @@ public class BuildingAction
         if (!(cachedPos == currPos && rotation == cachedRot))
         {
             var data = posData as TempBuildingPosData;
-            var size = rotation % 2 != 0 ? new Vector2Int(data.Size.z, data.Size.x)
-                                         : new Vector2Int(data.Size.x, data.Size.z);
+            var size =
+                rotation % 2 != 0
+                    ? new Vector2Int(data.Size.z, data.Size.x)
+                    : new Vector2Int(data.Size.x, data.Size.z);
 
             visualPoints.Clear();
             for (int x = 0; x < size.x; x++)
-                for (int y = 0; y < size.y; y++)
-                    visualPoints.Add(data.LeftCornerPos + new Vector2Int(x, y));
+            for (int y = 0; y < size.y; y++)
+                visualPoints.Add(data.LeftCornerPos + new Vector2Int(x, y));
         }
         return visualPoints.ToArray();
     }
@@ -258,21 +300,23 @@ public class BuildingAction
     void PlaceOnePointBuilding(bool manyPoint, bool force)
     {
         var data = posData as TempBuildingPosData;
-        if (!force && !CanBuild(false)) return;
+        if (!force && !CanBuild(false))
+            return;
 
-        if (phantomObject != null) UnityEngine.Object.Destroy(phantomObject.gameObject);
+        if (phantomObject != null)
+            UnityEngine.Object.Destroy(phantomObject.gameObject);
 
         _gameController.PlaceBuilding(
             new BuildingData
             {
                 UniqueIDHash = Guid.NewGuid().ToString().GetStableHashCode(),
-                BuildingIDHash = data.BuildingIDHash
+                BuildingIDHash = data.BuildingIDHash,
             },
             new BuildingPosData
             {
                 LeftCornerPos = new int2(data.LeftCornerPos.x, data.LeftCornerPos.y),
                 Size = new int2(data.Size.x, data.Size.z),
-                Rotation = data.Rotation
+                Rotation = data.Rotation,
             },
             data.IsPhantom
         );
@@ -289,7 +333,6 @@ public class BuildingAction
         }
     }
 
-  
     void PlaceRoadBuilding(bool manyPoint, bool force)
     {
         var roadData = posData as TempRoadPosData;
@@ -309,7 +352,7 @@ public class BuildingAction
         roadData.Points = new List<Vector2Int>(visualPoints);
         Debug.Log("бУилдинг нажал");
         _gameController.PlaceRoad(roadData.Points.ToHashSet(), roadData.IsPhantom);
-        
+
         if (!manyPoint)
         {
             ClearData();
@@ -328,11 +371,8 @@ public class BuildingAction
         }
     }
 
-
     bool CanBuild(bool isRoad)
     {
-        
-
         var pts = getPoints();
         if (pts == null)
         {
@@ -352,6 +392,7 @@ public class BuildingAction
             phantomObject.transform.rotation = Quaternion.Euler(0, rotation * 90f, 0f);
         }
     }
+
     public void Back()
     {
         var roadData = posData as TempRoadPosData;
@@ -403,14 +444,30 @@ public class BuildingAction
         lastRoadPoint = Vector2Int.zero;
         visualPoints.Clear();
 
-        if (phantomObject != null) UnityEngine.Object.Destroy(phantomObject.gameObject);
-        if (buildingOnScene != null) UnityEngine.Object.Destroy(buildingOnScene.gameObject);
+        if (phantomObject != null)
+            UnityEngine.Object.Destroy(phantomObject.gameObject);
+        if (buildingOnScene != null)
+            UnityEngine.Object.Destroy(buildingOnScene.gameObject);
 
         posData = null;
         IsAction = false;
     }
 
-    class TempPosData { public int BuildingIDHash; public bool IsPhantom; }
-    class TempBuildingPosData : TempPosData { public Vector2Int LeftCornerPos; public int Rotation; public Vector3Int Size; }
-    class TempRoadPosData : TempPosData { public List<Vector2Int> Points; }
+    class TempPosData
+    {
+        public int BuildingIDHash;
+        public bool IsPhantom;
+    }
+
+    class TempBuildingPosData : TempPosData
+    {
+        public Vector2Int LeftCornerPos;
+        public int Rotation;
+        public Vector3Int Size;
+    }
+
+    class TempRoadPosData : TempPosData
+    {
+        public List<Vector2Int> Points;
+    }
 }

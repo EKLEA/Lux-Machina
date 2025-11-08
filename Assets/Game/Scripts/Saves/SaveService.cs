@@ -7,13 +7,18 @@ using Zenject;
 
 public class SaveService : IGameStateSaver
 {
-    [Inject] IReadOnlyBuildingInfo buildingInfo;
+    [Inject]
+    IReadOnlyBuildingInfo buildingInfo;
     string SavePath;
     public int saveIndex;
     public GameStateData GameState { get; private set; }
+
     public async Task LoadGameState()
     {
-        SavePath = Path.Combine(Application.persistentDataPath, string.Format("savegame{0}.json", saveIndex));
+        SavePath = Path.Combine(
+            Application.persistentDataPath,
+            string.Format("savegame{0}.json", saveIndex)
+        );
         try
         {
             if (!File.Exists(SavePath))
@@ -31,7 +36,6 @@ public class SaveService : IGameStateSaver
                 GameStateData loadedData = JsonUtility.FromJson<GameStateData>(jsonData);
                 Debug.Log("Игра загружена успешно");
             }
-
         }
         catch (System.Exception e)
         {
@@ -39,6 +43,7 @@ public class SaveService : IGameStateSaver
             GameState = GenerateDefault();
         }
     }
+
     public async Task SaveGameState()
     {
         try
@@ -57,6 +62,7 @@ public class SaveService : IGameStateSaver
             Debug.LogError($"Ошибка сохранения: {e.Message}");
         }
     }
+
     public void DeleteSave()
     {
         if (File.Exists(SavePath))
@@ -65,21 +71,18 @@ public class SaveService : IGameStateSaver
             Debug.Log("Сохранение удалено");
         }
     }
+
     GameStateData GenerateDefault()
     {
         var save = new GameStateData();
         save.buildingDatas = new();
-        save. roadPoints= new();
-        save. phantomPoints= new();
-        save. buildingPosDatas= new();
-        save.healthDatas= new();
-        save.inputSlotDatas= new();
-        save.outPutSlotDatas= new();
-        save.buildingLogicDatas= new();
-        save.consumerBuildingDatas= new();
-        save. producerBuildingDatas= new();
+        save.roadPoints = new();
+        save.phantomPoints = new();
         save.buildingPosDatas = new();
-        save.consumerBuildingDatas = new();
+        save.healthDatas = new();
+        save.innerSlotDatas = new();
+        save.outputSlotDatas = new();
+        save.buildingLogicDatas = new();
         save.producerBuildingDatas = new();
         save.phantomBuildings = new();
         save.camData = new PlayerCamData()
@@ -88,21 +91,24 @@ public class SaveService : IGameStateSaver
             CamPosition = new Vector3(0, 5, -5),
         };
         var hash = "Core".GetStableHashCode();
-        save.buildingDatas.Add(hash, new BuildingData
-        {
-            UniqueIDHash = hash,
-            BuildingIDHash = hash,
-        });
+        save.buildingDatas.Add(
+            hash,
+            new BuildingData { UniqueIDHash = hash, BuildingIDHash = hash }
+        );
         var size = buildingInfo.BuildingInfos[hash].size;
-        save.buildingPosDatas.Add(hash, new BuildingPosData
-        {
-            LeftCornerPos = new int2(-1, -1),
-            Rotation = 1,
-            Size = new int2(size.x, size.z)
-        });
+        save.buildingPosDatas.Add(
+            hash,
+            new BuildingPosData
+            {
+                LeftCornerPos = new int2(-1, -1),
+                Rotation = 1,
+                Size = new int2(size.x, size.z),
+            }
+        );
         return save;
     }
 }
+
 public interface IGameStateSaver
 {
     public Task SaveGameState();

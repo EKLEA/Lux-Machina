@@ -8,23 +8,31 @@ using UnityEngine;
 using UnityEngine.Splines;
 
 [RequireComponent(typeof(SplineMeshResolution), typeof(SplineBoxColliderGenerator))]
-
 public class SplineOnScene : MonoBehaviour
 {
     Spline spline;
-    [SerializeField] protected SplineInstantiate splineInstantiate;
-    [SerializeField] protected SplineContainer splineContainer;
+
+    [SerializeField]
+    protected SplineInstantiate splineInstantiate;
+
+    [SerializeField]
+    protected SplineContainer splineContainer;
     public SplineMeshResolution resolution;
-    [SerializeField] protected SplineBoxColliderGenerator splineBoxColliderGenerator;
+
+    [SerializeField]
+    protected SplineBoxColliderGenerator splineBoxColliderGenerator;
+
     public void Initialize()
     {
         spline = splineContainer[0];
         splineBoxColliderGenerator.GenerateAndAssignMesh();
     }
+
     public float GetLenght()
     {
         return spline.GetLength();
     }
+
     public void SetFirstPointSpline(Vector3 pos, Quaternion rot)
     {
         Vector3 localPos = splineContainer.transform.InverseTransformPoint(pos);
@@ -45,6 +53,7 @@ public class SplineOnScene : MonoBehaviour
         resolution.GenerateMeshAlongSpline();
         splineBoxColliderGenerator.GenerateAndAssignMesh();
     }
+
     public void Reset()
     {
         spline[0] = new BezierKnot(Vector3.zero, Vector3.zero, Vector3.zero);
@@ -52,20 +61,22 @@ public class SplineOnScene : MonoBehaviour
         DrawSpline(SplineState.Active);
     }
 }
+
 public enum SplineState
 {
     Active,
-    Passive
+    Passive,
 }
+
 public static class SplineExtensons
 {
-    public static int GetResolution(this SplineState type,Spline spline)
+    public static int GetResolution(this SplineState type, Spline spline)
     {
         return type switch
         {
-            SplineState.Active=>2,
-            SplineState.Passive=>math.max((int)(spline.GetLength()/5),1),
-            _=>2
+            SplineState.Active => 2,
+            SplineState.Passive => math.max((int)(spline.GetLength() / 5), 1),
+            _ => 2,
         };
     }
 }
