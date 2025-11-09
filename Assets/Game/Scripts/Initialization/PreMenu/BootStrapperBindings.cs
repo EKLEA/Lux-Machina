@@ -1,12 +1,14 @@
 using System.Linq;
 using Unity.Entities;
 using UnityEngine;
+using UnityEngine.UI;
 using Zenject;
 
 public class BootStrapperBindings : MonoInstaller
 {
     [SerializeField]
     LoadingScreen _loadingScreenPrefab;
+    [SerializeField] Button button;
 
     public override void InstallBindings()
     {
@@ -20,10 +22,8 @@ public class BootStrapperBindings : MonoInstaller
 
     void BindServices()
     {
-        Container
-            .Bind<LoadingSettings>()
-            .FromMethod(f =>
-                Resources
+        Container .Bind<LoadingSettings>().FromMethod(f =>
+                     Resources
                     .LoadAll<LoadingSettingsSO>("Game/")
                     .Select(ls => new LoadingSettings(
                         ls.LoadingImages,
@@ -48,6 +48,7 @@ public class BootStrapperBindings : MonoInstaller
             )
             .AsSingle()
             .NonLazy();
+        Container.Bind<Button>().FromInstance(button).AsSingle();
         Container.Bind<IReadOnlyLoadingSettings>().To<LoadingSettings>().FromResolve();
         Container.Bind<IReadOnlyGameFieldSettings>().To<GameFieldSettings>().FromResolve();
         var loadingScreen = Container.InstantiatePrefabForComponent<LoadingScreen>(
@@ -84,6 +85,10 @@ public class BootStrapperBindings : MonoInstaller
             .AsSingle();
         Container
             .Bind<IReadOnlyRecipeInfo>()
+            .FromMethod(ctx => ctx.Container.Resolve<ConfigService>())
+            .AsSingle();
+        Container
+            .Bind<IReadOnlyTypeBuildingButtonInfo>()
             .FromMethod(ctx => ctx.Container.Resolve<ConfigService>())
             .AsSingle();
     }

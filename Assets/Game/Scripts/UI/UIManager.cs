@@ -1,12 +1,20 @@
 using System;
 using UnityEngine;
+using Zenject;
 
 public class UIManager : MonoBehaviour
 {
-    public event Action<string> OnInfoInvoked;
 
-    public void InvokeInfo(string id)
+    //создание фабрик и назначение окон, регулировка открытия окон
+    [SerializeField] ButtonsHandler buttonsHandler;
+
+    public void Initialize()
     {
-        OnInfoInvoked?.Invoke(id);
+        buttonsHandler.Initialize();
+    }
+
+    public void OpenWindow(UIScreen uIScreen)
+    {
+        uIScreen.Open();
     }
 }

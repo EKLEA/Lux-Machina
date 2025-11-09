@@ -39,7 +39,6 @@ public class RecipeConfig
     public List<RecipeIngredient> outputItems = new List<RecipeIngredient>();
     public float craftTime;
     public string recipeSpritePath;
-    public string buildingId;
 }
 
 [Serializable]
@@ -51,10 +50,11 @@ public class RecipeIngredient
 
 public enum BuildingsTypes : int
 {
-    Production = 0,
-    Enegry = 1,
-    Logistic = 2,
-    Defence = 3,
+    Special = 0,
+    Production = 1,
+    Enegry = 2,
+    Logistic = 3,
+    Defence = 4,
 }
 
 public enum ActionType : int

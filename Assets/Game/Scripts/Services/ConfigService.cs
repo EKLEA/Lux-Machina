@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,12 +8,14 @@ public class ConfigService
     : IReadOnlyBuildingInfo,
         IReadOnlyItemsInfo,
         IReadOnlyMaterialInfo,
-        IReadOnlyRecipeInfo
+        IReadOnlyRecipeInfo,
+        IReadOnlyTypeBuildingButtonInfo
 {
     public Dictionary<int, ItemConfig> ItemsInfos { get; private set; }
     public Dictionary<int, BuildingConfig> BuildingInfos { get; private set; }
     public Dictionary<string, Material> MaterialInfos { get; private set; }
     public Dictionary<int, RecipeConfig> RecipeInfos { get; private set; }
+    public Dictionary<int, string> TypeBuildingButtonConfig { get; private set; }
 
     Dictionary<int, Sprite> _spriteCache = new Dictionary<int, Sprite>();
     Dictionary<int, GameObject> _prefabCache = new Dictionary<int, GameObject>();
@@ -23,6 +26,7 @@ public class ConfigService
         BuildingInfos = new Dictionary<int, BuildingConfig>();
         MaterialInfos = new Dictionary<string, Material>();
         RecipeInfos = new Dictionary<int, RecipeConfig>();
+        TypeBuildingButtonConfig=new Dictionary<int, string>();
     }
 
     public async Task LoadConfigs()
@@ -31,6 +35,7 @@ public class ConfigService
         LoadBuildings();
         LoadMaterials();
         LoadRecipes();
+        LoadTypeBuildingButtons();
 
         Debug.Log(
             $"Configs loaded: {ItemsInfos.Count} items, {BuildingInfos.Count} buildings, {MaterialInfos.Count} materials, {RecipeInfos.Count} recipes"
@@ -48,6 +53,13 @@ public class ConfigService
         Debug.Log($"Loaded {allMaterials.Length} materials from Resources/Materials");
     }
 
+    void LoadTypeBuildingButtons()
+    {
+        foreach (var t in Enum.GetValues(typeof(BuildingsTypes)))
+        {
+            TypeBuildingButtonConfig[(int)t] = t.ToString();
+        }
+    }
     void LoadItems()
     {
         var wrapper = LoadJson<ItemConfigList>("Configs/JsonData/items");
@@ -134,6 +146,13 @@ public class ConfigService
             return null;
 
         return GetOrLoadSprite($"Items/{item.iconPath}");
+    }
+    public Sprite GetBuildingTypeBTSprite(int path)
+    {
+        if (!TypeBuildingButtonConfig.TryGetValue(path, out var info) || string.IsNullOrEmpty(info))
+            return null;
+
+        return GetOrLoadSprite($"BuildingTypesBT/{info}");
     }
 
     public Sprite GetBuildingSprite(int buildingId)
@@ -295,3 +314,10 @@ public interface IReadOnlyRecipeInfo
     List<RecipeConfig> GetRecipesByGroup(int groupId);
     Sprite GetRecipeSprite(int recipeId);
 }
+public interface IReadOnlyTypeBuildingButtonInfo
+{
+
+    public Dictionary<int, string> TypeBuildingButtonConfig { get; }
+    Sprite GetBuildingTypeBTSprite(int type);
+}
+

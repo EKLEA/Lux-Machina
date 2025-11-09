@@ -6,7 +6,7 @@
             "description": "выфывф",
             "iconPath": "core",
             "prefabPath": "core",
-            "buildingType": 1,
+            "buildingType": 0,
             "actionType": 0,
             "size": {
                 "x": 2,
@@ -25,7 +25,7 @@
             "description": "ыфвывф",
             "iconPath": "road",
             "prefabPath": "road",
-            "buildingType": 2,
+            "buildingType": 3,
             "actionType": 1,
             "size": {
                 "x": 1,

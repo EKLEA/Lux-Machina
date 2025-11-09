@@ -9,35 +9,26 @@ using Zenject;
 
 public class GameController : IInitializable
 {
-    [Inject]
-    IReadOnlyGameFieldSettings gameFieldSettings;
+    [Inject] IReadOnlyGameFieldSettings gameFieldSettings;
 
-    [Inject]
-    IReadOnlyBuildingInfo _buildingInfo;
+    [Inject] IReadOnlyBuildingInfo _buildingInfo;
 
-    [Inject]
-    SaveService saveService;
+    [Inject] SaveService saveService;
 
-    [Inject]
-    ILoadingService _loadingService;
+    [Inject] ILoadingService _loadingService;
 
-    [Inject]
-    CameraController cameraController;
+    [Inject] CameraController cameraController;
 
-    [Inject]
-    EntityLoader EntityLoader;
+    [Inject] EntityLoader EntityLoader;
 
-    [Inject]
-    PublicBuildingMapSystem _buildingMapSystem;
+    [Inject] PublicBuildingMapSystem _buildingMapSystem;
 
-    [Inject]
-    FixedStepSimulationSystemGroup fixedStepSimulationSystemGroup;
+    [Inject] FixedStepSimulationSystemGroup fixedStepSimulationSystemGroup;
 
-    [Inject]
-    PathfindingSystem _pathfindingSystem;
+    [Inject] PathfindingSystem _pathfindingSystem;
 
-    [Inject]
-    ECSSystemsManager ecssSystemsManager;
+    [Inject] ECSSystemsManager ecssSystemsManager;
+    [Inject] UIManager UIManager;
 
     public void Initialize()
     {
@@ -71,6 +62,8 @@ public class GameController : IInitializable
         cameraController.SetUp(save.camData);
         cameraController.enabled = true;
         ecssSystemsManager.EnableGameplaySystems();
+        UIManager.Initialize();
+        await Task.Yield();
     }
 
     public void PlaceBuilding(

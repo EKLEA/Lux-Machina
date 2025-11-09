@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEditor;
+using System;
 
 public class CsvTableParserEditor : EditorWindow
 {
@@ -79,6 +80,8 @@ public class CsvTableParserEditor : EditorWindow
             Debug.LogError($"Parse error: {ex.Message}\n{ex.StackTrace}");
         }
     }
+
+   
 
     private void ParseItems(string csvText)
     {
@@ -209,7 +212,6 @@ public class CsvTableParserEditor : EditorWindow
                         outputItems = ParseIngredientString(row[3]),
                         craftTime = float.Parse(row[4]),
                         recipeSpritePath = row[5],
-                        buildingId = row[6],
                     }
                 );
             }

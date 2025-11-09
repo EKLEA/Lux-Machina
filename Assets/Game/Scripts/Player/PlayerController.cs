@@ -7,18 +7,13 @@ public class PlayerController : MonoBehaviour, IDisposable
 {
     BuildingAction _buildingAction;
 
-    [SerializeField]
-    UIManager manager;
 
-    //[Inject] UIManager UIManager;
-    [SerializeField]
-    public InputActionAsset playerInput;
+    [SerializeField] ConstructionButtonHandler handler;
+    [SerializeField]  InputActionAsset playerInput;
 
-    [SerializeField]
-    CameraController cameraController;
+    [SerializeField] CameraController cameraController;
 
-    [Inject]
-    IInstantiator instantiator;
+    [Inject] IInstantiator instantiator;
     InputActionMap GamePlay;
     InputActionMap UI;
     InputActionMap Building;
@@ -45,7 +40,7 @@ public class PlayerController : MonoBehaviour, IDisposable
         BindMaps();
         BindBuildingActions();
         Building.Disable();
-        manager.OnInfoInvoked += SetUpAction;
+        handler.onBuildingSelected += SetUpAction;
     }
 
     void Update()
@@ -83,9 +78,9 @@ public class PlayerController : MonoBehaviour, IDisposable
         Hold = Building.FindAction("Hold");
     }
 
-    public void SetUpAction(string buildingID)
+    public void SetUpAction(int buildingID)
     {
-        _buildingAction.SetUp(buildingID.GetStableHashCode());
+        _buildingAction.SetUp(buildingID);
         Building.Enable();
         _buildingAction.OnActionDone += ClearAction;
         PlacePoint.performed += OnPlacePointPerformed;

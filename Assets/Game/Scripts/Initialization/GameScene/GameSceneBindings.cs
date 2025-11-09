@@ -9,6 +9,8 @@ public class GameSceneBindings : MonoInstaller
 
     [SerializeField]
     CameraController cameraController;
+    [SerializeField]
+    UIManager UIManager;
 
     public override void InstallBindings()
     {
@@ -69,6 +71,9 @@ public class GameSceneBindings : MonoInstaller
 
         Container.Bind<EntityManager>().FromMethod(GetEntityManager).AsSingle();
         Container.Bind<EntityLoader>().AsSingle();
+
+        Container.Bind<UIManager>().FromInstance(UIManager).AsSingle();
+        
         Container.BindInterfacesAndSelfTo<GameController>().AsSingle().NonLazy();
     }
 
