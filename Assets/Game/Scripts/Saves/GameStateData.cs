@@ -10,10 +10,11 @@ public class GameStateData
     public HashSet<int2> phantomPoints;
     public Dictionary<int, BuildingPosData> buildingPosDatas;
     public Dictionary<int, HealthData> healthDatas;
-    public Dictionary<int, List<InnerStorageSlotData>> innerSlotDatas;
-    public Dictionary<int, List<OutputStorageSlotData>> outputSlotDatas;
-    public Dictionary<int, BuildingLogicData> buildingLogicDatas;
-    public Dictionary<int, ProducerBuildingData> producerBuildingDatas;
+    public Dictionary<int, List<SlotData>> SlotDatas;
+    public Dictionary<int, HasOutputSlots> outputSlots;
+    public Dictionary<int, HasOutputSlots> inputSlots;
+    public Dictionary<int, BuildingWorkWithItemsLogicData> buildingWorkWithItemsLogicDatas;
+    public Dictionary<int, ProcessBuildingData> processBuildingDatas;
     public HashSet<int> phantomBuildings;
     public PlayerCamData camData;
 }

@@ -13,15 +13,12 @@ public class PhantomObject : MonoBehaviour
 
     public void SetUp(Material trueMat, Material falseMat)
     {
-        Debug.Log($"PhantomObject.SetUp вызван для {gameObject.name}");
-        Debug.Log($"TrueMat: {trueMat != null}, FalseMat: {falseMat != null}");
 
         meshRenderers.AddRange(GetComponentsInChildren<MeshRenderer>(true));
 
         _trueMat = trueMat;
         _falseMat = falseMat;
 
-        Debug.Log($"Найдено MeshRenderer'ов: {meshRenderers.Count}");
 
         foreach (MeshRenderer mr in meshRenderers)
         {
@@ -48,10 +45,8 @@ public class PhantomObject : MonoBehaviour
             mr.materials = phantomMats;
             phantomMaterials.Add(phantomMats);
 
-            Debug.Log($"Обработан MeshRenderer: {mr.name}, материалов: {originalMats.Length}");
         }
 
-        Debug.Log($"PhantomObject.SetUp завершен для {gameObject.name}");
     }
 
     Material CreatePhantomMaterial(Material originalMat, Material phantomShaderMat)

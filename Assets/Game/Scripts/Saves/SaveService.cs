@@ -80,10 +80,11 @@ public class SaveService : IGameStateSaver
         save.phantomPoints = new();
         save.buildingPosDatas = new();
         save.healthDatas = new();
-        save.innerSlotDatas = new();
-        save.outputSlotDatas = new();
-        save.buildingLogicDatas = new();
-        save.producerBuildingDatas = new();
+        save.SlotDatas = new();
+        save.inputSlots = new();
+        save.outputSlots = new();
+        save.buildingWorkWithItemsLogicDatas = new();
+        save.processBuildingDatas = new();
         save.phantomBuildings = new();
         save.camData = new PlayerCamData()
         {

@@ -65,10 +65,10 @@ public enum ActionType : int
 
 public enum TypeOfLogic : int
 {
-    None = 0,
-    Production = 1,
-    Consuming = 2,
-    Procession = 3,
+    None=0,
+    WorkWithItems = 1,
+    CollectInfo = 2,
+    Unlock=3,
 }
 
 public enum RequiredRecipesGroup : int

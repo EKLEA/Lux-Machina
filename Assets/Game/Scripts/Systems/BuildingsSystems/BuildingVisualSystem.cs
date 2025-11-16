@@ -189,6 +189,7 @@ public partial class BuildingVisualSystem : SystemBase
         ecb.RemoveComponent<BluePrint>(entity);
         ecb.AddComponent(building, new AssignLogicTag());
         ecb.AddComponent(building, new AssignHealthTag());
+        ecb.AddComponent(building, new AssignToCluster());
     }
 
     void CreateRoadVisual(

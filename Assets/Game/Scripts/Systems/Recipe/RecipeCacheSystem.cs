@@ -13,6 +13,7 @@ public partial struct RecipeCacheSystem : ISystem
         _isInitialized = false;
     }
 
+    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         if (!_isInitialized)
@@ -23,7 +24,16 @@ public partial struct RecipeCacheSystem : ISystem
     }
 
     [BurstCompile]
-    public void OnDestroy(ref SystemState state) { }
+    public void OnDestroy(ref SystemState state)
+    {
+        foreach (var (recipeCache, entity) in SystemAPI.Query<RecipeCache>().WithEntityAccess())
+        {
+            if (recipeCache.Recipes.IsCreated)
+            {
+                recipeCache.Recipes.Dispose();
+            }
+        }
+    }
 
     private void InitializeRecipeCache(ref SystemState state)
     {

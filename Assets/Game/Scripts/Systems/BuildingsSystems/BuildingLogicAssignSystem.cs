@@ -16,61 +16,50 @@ public partial class BuildingLogicAssignSystem : SystemBase
     protected override void OnUpdate()
     {
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
-        foreach (
-            var (buildingLogicData, entity) in SystemAPI
-                .Query<BuildingData>()
-                .WithAll<AssignLogicTag>()
-                .WithNone<ConsumerBuildingTag, ProducerBuildingTag, ProcessorBuildingTag>()
-                .WithEntityAccess()
-        )
+        
+        foreach (var (buildingLogicData, entity) in SystemAPI
+            .Query<BuildingData>()
+            .WithAll<AssignLogicTag>()
+            .WithNone<HasInputSlots, HasOutputSlots>()
+            .WithEntityAccess())
         {
             AssignLogic(entity, buildingLogicData, ecb);
         }
-        ;
 
-        foreach (
-            var (buildingLogicData, recipe, entity) in SystemAPI
-                .Query<BuildingLogicData, ChangeRecipeData>()
-                .WithAny<ConsumerBuildingTag, ProducerBuildingTag, ProcessorBuildingTag>()
-                .WithEntityAccess()
-        )
+        foreach (var (buildingData, recipe, entity) in SystemAPI
+            .Query<BuildingWorkWithItemsLogicData, ChangeRecipeData>()
+            .WithAll<ProcessBuildingData>()
+            .WithAny<HasInputSlots, HasOutputSlots>()
+            .WithEntityAccess())
         {
-            ChangeRecipe(entity, buildingLogicData, recipe, ecb);
+            ChangeRecipe(entity, buildingData, recipe, ecb);
         }
-        ;
-        foreach (
-            var (changeSlotData, entity) in SystemAPI
-                .Query<ChangeInnerSlotCapacityData>()
-                .WithAll<BuildingLogicData>()
-                .WithAny<ConsumerBuildingTag, ProcessorBuildingTag>()
-                .WithEntityAccess()
-        )
+
+        foreach (var (changeSlotData, entity) in SystemAPI
+            .Query<ChangeSlotCapacityData>()
+            .WithAll<BuildingWorkWithItemsLogicData>()
+            .WithAny<HasInputSlots, HasOutputSlots>()
+            .WithEntityAccess())
         {
-            ChangeInnerSlotCapacity(entity, changeSlotData);
+            ChangeSlotCapacity(entity, changeSlotData);
         }
-        ;
-        foreach (
-            var (changeSlotData, entity) in SystemAPI
-                .Query<ChangeOutputSlotCapacityData>()
-                .WithAll<BuildingLogicData>()
-                .WithAny<ProducerBuildingTag, ProcessorBuildingTag>()
-                .WithEntityAccess()
-        )
+
+        foreach (var (data, entity) in SystemAPI
+            .Query<ChangePriorityData>()
+            .WithAll<BuildingWorkWithItemsLogicData>()
+            .WithAny<HasInputSlots, HasOutputSlots>()
+            .WithEntityAccess())
         {
-            ChangeOutputSlotCapacity(entity, changeSlotData);
+            ChangePriority(entity, data, ecb);
         }
-        ;
-        foreach (
-            var (buildingLogicData, data, entity) in SystemAPI
-                .Query<BuildingLogicData, ChangePriorityData>()
-                .WithAll<BuildingLogicData>()
-                .WithAny<ConsumerBuildingTag, ProducerBuildingTag, ProcessorBuildingTag>()
-                .WithEntityAccess()
-        )
+        foreach (var (data, entity) in SystemAPI
+            .Query<ChangeBuildingCountOfPackData>()
+            .WithAll<BuildingWorkWithItemsLogicData>()
+            .WithAny<HasInputSlots, HasOutputSlots>()
+            .WithEntityAccess())
         {
-            ChangePriority(entity, buildingLogicData, data, ecb);
+            ChangeBuildingCountOfPack(entity, data, ecb);
         }
-        ;
 
         ecb.Playback(EntityManager);
         ecb.Dispose();
@@ -79,261 +68,252 @@ public partial class BuildingLogicAssignSystem : SystemBase
     void AssignLogic(Entity entity, BuildingData buildingData, EntityCommandBuffer ecb)
     {
         var info = buildingInfo.BuildingInfos[buildingData.BuildingIDHash];
-        if (!(info.typeOfLogic == TypeOfLogic.None))
+        if (info.typeOfLogic != TypeOfLogic.None)
         {
-            ecb.AddComponent(
-                entity,
-                new BuildingLogicData
-                {
-                    Priority = (int)DistributionPriority.Middle,
-                    RecipeIDHash = 0,
-                    RequiredRecipesGroup = (int)info.requiredRecipesGroup,
-                }
-            );
-
-            ecb.AddComponent(
-                entity,
-                new AnimationData
-                {
-                    AnimationProgress = 0,
-                    AnimationState = (int)BuildingAnimationState.Disconnected,
-                }
-            );
             switch (info.typeOfLogic)
             {
-                case TypeOfLogic.Procession:
-                    ecb.AddComponent<ProcessorBuildingTag>(entity);
-                    break;
-                case TypeOfLogic.Production:
-                    ecb.AddComponent<ProducerBuildingTag>(entity);
-                    break;
-                case TypeOfLogic.Consuming:
-                    ecb.AddComponent<ConsumerBuildingTag>(entity);
+                case TypeOfLogic.WorkWithItems:
+                    ecb.AddComponent(entity, new BuildingWorkWithItemsLogicData
+                    {
+                        Priority = (int)DistributionPriority.Middle,
+                        RequiredRecipesGroup = (int)info.requiredRecipesGroup,
+                        CountOfPack = 5
+                    });
                     break;
             }
+            ecb.AddComponent(entity, new AnimationData
+            {
+                AnimationProgress = 0,
+                AnimationState = (int)BuildingAnimationState.Disconnected,
+            });
             ecb.RemoveComponent<AssignLogicTag>(entity);
         }
     }
 
     void ChangeRecipe(
         Entity entity,
-        BuildingLogicData buildingData,
+        BuildingWorkWithItemsLogicData buildingData,
         ChangeRecipeData recipeData,
-        EntityCommandBuffer ecb
-    )
+        EntityCommandBuffer ecb)
     {
-        if (
-            recipeInfo.RecipeInfos.ContainsKey(recipeData.newRecipeID)
-            && recipeInfo.RecipeInfos[recipeData.newRecipeID].groupId
-                == buildingData.RequiredRecipesGroup
-        )
+        if (recipeInfo.RecipeInfos.TryGetValue(recipeData.newRecipeID, out RecipeConfig recipe) 
+            && recipe.groupId == buildingData.RequiredRecipesGroup)
         {
-            var recipe = recipeInfo.RecipeInfos[recipeData.newRecipeID];
-            BuildingLogicData newData = new BuildingLogicData
+            using (var removedItems = new NativeHashMap<int, SlotData>(1000, Allocator.Temp))
             {
-                Priority = buildingData.Priority,
-                RequiredRecipesGroup = buildingData.RequiredRecipesGroup,
-                RecipeIDHash = recipeData.newRecipeID,
-            };
-            ecb.SetComponent(entity, newData);
-            if (
-                EntityManager.HasComponent<ConsumerBuildingTag>(entity)
-                || EntityManager.HasComponent<ProcessorBuildingTag>(entity)
-            )
-            {
-                if (EntityManager.HasBuffer<InnerStorageSlotData>(entity))
+                if (EntityManager.HasBuffer<SlotData>(entity))
                 {
-                    var rBuff = EntityManager.GetBuffer<InnerStorageSlotData>(entity);
-                    NativeHashMap<int, InnerStorageSlotData> datas = new NativeHashMap<
-                        int,
-                        InnerStorageSlotData
-                    >(rBuff.Length, Allocator.TempJob);
-                    foreach (var r in rBuff)
-                        datas.Add(r.ItemId, r);
-                    ecb.RemoveComponent<InnerStorageSlotData>(entity);
+                    var buff = EntityManager.GetBuffer<SlotData>(entity);
+                    CollectItemsFromSlots(entity, buff, removedItems);
+                }
 
-                    var inBuffer = ecb.AddBuffer<InnerStorageSlotData>(entity);
-                    foreach (var inn in recipe.inputItems)
-                    {
-                        var id = inn.itemId;
-                        var capacity = 100;
-                        var count = 0;
-                        if (datas.ContainsKey(id))
-                        {
-                            capacity = datas[id].Capacity;
-                            count = datas[id].Count;
-                            datas.Remove(id);
-                        }
-                        inBuffer.Add(
-                            new InnerStorageSlotData
-                            {
-                                ItemId = id,
-                                Count = count,
-                                Capacity = capacity,
-                            }
-                        );
-                    }
-                    if (datas.Count > 0)
-                    {
-                        var en = ecb.CreateEntity();
-                        ecb.AddComponent<DistribureRemovedItems>(en);
-                        var dbf = ecb.AddBuffer<OutputStorageSlotData>(en);
-                        foreach (var d in datas)
-                            dbf.Add(
-                                new OutputStorageSlotData
-                                {
-                                    ItemId = d.Value.ItemId,
-                                    Count = d.Value.Count,
-                                    Capacity = d.Value.Capacity,
-                                }
-                            );
-                    }
-                    datas.Dispose();
-                }
-                else
+                ProcessBuildingData newData = new()
                 {
-                    foreach (var inn in recipe.inputItems)
-                    {
-                        var inBuffer = ecb.AddBuffer<InnerStorageSlotData>(entity);
-                        inBuffer.Add(
-                            new InnerStorageSlotData
-                            {
-                                ItemId = inn.itemId,
-                                Count = 0,
-                                Capacity = 100,
-                            }
-                        );
-                    }
-                }
-            }
-            if (
-                EntityManager.HasComponent<ProducerBuildingTag>(entity)
-                || EntityManager.HasComponent<ProcessorBuildingTag>(entity)
-            )
-            {
-                if (EntityManager.HasBuffer<OutputStorageSlotData>(entity))
-                {
-                    var rBuff = EntityManager.GetBuffer<OutputStorageSlotData>(entity);
+                    RecipeIDHash = recipeData.newRecipeID,
+                    TimeToProduceNext = recipe.craftTime,
+                    CurrTime = 0
+                };
 
-                    NativeHashMap<int, OutputStorageSlotData> datas = new NativeHashMap<
-                        int,
-                        OutputStorageSlotData
-                    >(rBuff.Length, Allocator.TempJob);
-                    foreach (var r in rBuff)
-                        datas.Add(r.ItemId, r);
-                    ecb.RemoveComponent<OutputStorageSlotData>(entity);
+                if (EntityManager.HasBuffer<SlotData>(entity))
+                    ecb.RemoveComponent<SlotData>(entity);
+                if (EntityManager.HasComponent<HasInputSlots>(entity))
+                    ecb.RemoveComponent<HasInputSlots>(entity);
+                if (EntityManager.HasComponent<HasOutputSlots>(entity))
+                    ecb.RemoveComponent<HasOutputSlots>(entity);
+                if (EntityManager.HasComponent<DistribureRemovedItems>(entity))
+                    ecb.RemoveComponent<DistribureRemovedItems>(entity);
 
-                    var inBuffer = ecb.AddBuffer<OutputStorageSlotData>(entity);
-                    foreach (var inn in recipe.outputItems)
-                    {
-                        var id = inn.itemId;
-                        var capacity = 100;
-                        var count = 0;
-                        if (datas.ContainsKey(id))
-                        {
-                            capacity = datas[id].Capacity;
-                            count = datas[id].Count;
-                            datas.Remove(id);
-                        }
-                        inBuffer.Add(
-                            new OutputStorageSlotData
-                            {
-                                ItemId = id,
-                                Count = count,
-                                Capacity = capacity,
-                            }
-                        );
-                    }
-                    if (datas.Count > 0)
-                    {
-                        var en = ecb.CreateEntity();
-                        ecb.AddComponent<DistribureRemovedItems>(en);
-                        var dbf = ecb.AddBuffer<OutputStorageSlotData>(en);
-                        foreach (var d in datas)
-                            dbf.Add(d.Value);
-                    }
-                    datas.Dispose();
-                    ecb.SetComponent(
-                        entity,
-                        new ProducerBuildingData
-                        {
-                            TimeToProduceNext = recipe.craftTime,
-                            CurrTime = 0,
-                        }
-                    );
-                }
-                else
-                {
-                    foreach (var inn in recipe.inputItems)
-                    {
-                        var inBuffer = ecb.AddBuffer<OutputStorageSlotData>(entity);
-                        inBuffer.Add(
-                            new OutputStorageSlotData
-                            {
-                                ItemId = inn.itemId,
-                                Count = 0,
-                                Capacity = 100,
-                            }
-                        );
-                    }
-                    ecb.AddComponent(
-                        entity,
-                        new ProducerBuildingData
-                        {
-                            TimeToProduceNext = recipe.craftTime,
-                            CurrTime = 0,
-                        }
-                    );
-                }
+                var newBuff = ecb.AddBuffer<SlotData>(entity);
+                int currentIndex = 0;
+
+                if (recipe.inputItems.Count > 0)
+                    currentIndex = CreateInputSlots(recipe, buildingData, removedItems, newBuff, currentIndex, ecb, entity);
+
+                if (recipe.outputItems.Count > 0)
+                    currentIndex = CreateOutputSlots(recipe, buildingData, removedItems, newBuff, currentIndex, ecb, entity);
+
+                if (!removedItems.IsEmpty)
+                    CreateRemovedItemsSlots(removedItems, newBuff, currentIndex, ecb, entity);
+                
+                ecb.SetComponent(entity, newData);
             }
             ecb.RemoveComponent<ChangeRecipeData>(entity);
         }
     }
 
-    void ChangeInnerSlotCapacity(
-        Entity entity,
-        ChangeInnerSlotCapacityData changeInnerSlotCapacityData
-    )
+    private void CollectItemsFromSlots(Entity entity, DynamicBuffer<SlotData> buff, NativeHashMap<int, SlotData> removedItems)
     {
-        var bf = EntityManager.GetBuffer<InnerStorageSlotData>(entity);
-        if (bf.Length > changeInnerSlotCapacityData.SlotID)
+        if (EntityManager.HasComponent<HasInputSlots>(entity))
         {
-            var slot = bf[changeInnerSlotCapacityData.SlotID];
-            slot.Capacity = changeInnerSlotCapacityData.newCapacity;
-            bf[changeInnerSlotCapacityData.SlotID] = slot;
+            var hIn = EntityManager.GetComponentData<HasInputSlots>(entity);
+            CollectFromRange(buff, hIn.StartIND, hIn.EndIND, removedItems);
+        }
+
+        if (EntityManager.HasComponent<HasOutputSlots>(entity))
+        {
+            var hOut = EntityManager.GetComponentData<HasOutputSlots>(entity);
+            CollectFromRange(buff, hOut.StartIND, hOut.EndIND, removedItems);
+        }
+
+        if (EntityManager.HasComponent<DistribureRemovedItems>(entity))
+        {
+            var dist = EntityManager.GetComponentData<DistribureRemovedItems>(entity);
+            CollectFromRange(buff, dist.StartIND, dist.EndIND, removedItems);
         }
     }
 
-    void ChangeOutputSlotCapacity(
-        Entity entity,
-        ChangeOutputSlotCapacityData changeOutputSlotCapacityData
-    )
+    private void CollectFromRange(DynamicBuffer<SlotData> buff, int start, int end, NativeHashMap<int, SlotData> removedItems)
     {
-        var bf = EntityManager.GetBuffer<OutputStorageSlotData>(entity);
-        if (bf.Length > changeOutputSlotCapacityData.SlotID)
+        for (int i = start; i < end; i++)
         {
-            var slot = bf[changeOutputSlotCapacityData.SlotID];
-            slot.Capacity = changeOutputSlotCapacityData.newCapacity;
-            bf[changeOutputSlotCapacityData.SlotID] = slot;
-        }
-    }
-
-    void ChangePriority(
-        Entity entity,
-        BuildingLogicData buildingData,
-        ChangePriorityData data,
-        EntityCommandBuffer ecb
-    )
-    {
-        if (Enum.IsDefined(typeof(DistributionPriority), data.newPriorityID))
-        {
-            BuildingLogicData newData = new BuildingLogicData
+            if (buff[i].Count > 0)
             {
-                Priority = data.newPriorityID,
-                RequiredRecipesGroup = buildingData.RequiredRecipesGroup,
-                RecipeIDHash = buildingData.RecipeIDHash,
-            };
-            ecb.SetComponent(entity, newData);
+                int itemId = buff[i].ItemId;
+                if (removedItems.TryGetValue(itemId, out SlotData data))
+                {
+                    data.Count += buff[i].Count;
+                    removedItems[itemId] = data;
+                }
+                else
+                {
+                    removedItems.Add(itemId, buff[i]);
+                }
+            }
+        }
+    }
+
+    private int CreateInputSlots(
+        RecipeConfig recipe,
+        BuildingWorkWithItemsLogicData buildingData,
+        NativeHashMap<int, SlotData> removedItems,
+        DynamicBuffer<SlotData> newBuff,
+        int startIndex,
+        EntityCommandBuffer ecb,
+        Entity entity)
+    {
+        var inputSlots = new HasInputSlots
+        {
+            StartIND = startIndex,
+            EndIND = startIndex + recipe.inputItems.Count
+        };
+
+        for (int i = 0; i < recipe.inputItems.Count; i++)
+        {
+            var inputItem = recipe.inputItems[i];
+            int count = 0;
+            
+            if (removedItems.TryGetValue(inputItem.itemId, out SlotData existingItem))
+            {
+                count = existingItem.Count;
+                removedItems.Remove(inputItem.itemId);
+            }
+
+            newBuff.Add(new SlotData
+            {
+                ItemId = inputItem.itemId,
+                Capacity = inputItem.amount * buildingData.CountOfPack,
+                Count = count
+            });
+        }
+
+        ecb.AddComponent(entity, inputSlots);
+        return inputSlots.EndIND;
+    }
+
+    private int CreateOutputSlots(
+        RecipeConfig recipe,
+        BuildingWorkWithItemsLogicData buildingData,
+        NativeHashMap<int, SlotData> removedItems,
+        DynamicBuffer<SlotData> newBuff,
+        int startIndex,
+        EntityCommandBuffer ecb,
+        Entity entity)
+    {
+        var outputSlots = new HasOutputSlots
+        {
+            StartIND = startIndex,
+            EndIND = startIndex + recipe.outputItems.Count
+        };
+
+        for (int i = 0; i < recipe.outputItems.Count; i++)
+        {
+            var outputItem = recipe.outputItems[i];
+            int count = 0;
+            
+            if (removedItems.TryGetValue(outputItem.itemId, out SlotData existingItem))
+            {
+                count = existingItem.Count;
+                removedItems.Remove(outputItem.itemId);
+            }
+
+            newBuff.Add(new SlotData
+            {
+                ItemId = outputItem.itemId,
+                Capacity = outputItem.amount * buildingData.CountOfPack,
+                Count = count
+            });
+        }
+
+        ecb.AddComponent(entity, outputSlots);
+        return outputSlots.EndIND;
+    }
+
+    private void CreateRemovedItemsSlots(
+        NativeHashMap<int, SlotData> removedItems,
+        DynamicBuffer<SlotData> newBuff,
+        int startIndex,
+        EntityCommandBuffer ecb,
+        Entity entity)
+    {
+        int count = 0;
+        foreach (var item in removedItems)
+        {
+            newBuff.Add(new SlotData
+            {
+                ItemId = item.Value.ItemId,
+                Capacity = 999,
+                Count = item.Value.Count
+            });
+            count++;
+        }
+
+        ecb.AddComponent(entity, new DistribureRemovedItems
+        {
+            StartIND = startIndex,
+            EndIND = startIndex + count
+        });
+    }
+
+    void ChangeSlotCapacity(Entity entity, ChangeSlotCapacityData changeSlotCapacityData)
+    {
+        if (EntityManager.HasBuffer<SlotData>(entity))
+        {
+            var bf = EntityManager.GetBuffer<SlotData>(entity);
+            if (changeSlotCapacityData.SlotIND >= 0 && changeSlotCapacityData.SlotIND < bf.Length)
+            {
+                var slot = bf[changeSlotCapacityData.SlotIND];
+                slot.Capacity = changeSlotCapacityData.newCapacity;
+                bf[changeSlotCapacityData.SlotIND] = slot;
+            }
+        }
+    }
+
+    void ChangePriority(Entity entity, ChangePriorityData priorityData, EntityCommandBuffer ecb)
+    {
+        if (Enum.IsDefined(typeof(DistributionPriority), priorityData.newPriorityID))
+        {
+            var data = EntityManager.GetComponentData<BuildingWorkWithItemsLogicData>(entity);
+            data.Priority = priorityData.newPriorityID;
+            ecb.SetComponent(entity, data);
+        }
+    }
+    void ChangeBuildingCountOfPack(Entity entity, ChangeBuildingCountOfPackData countOfPackDataData, EntityCommandBuffer ecb)
+    {
+        if (countOfPackDataData.newCountOfPack>1)
+        {
+            var data = EntityManager.GetComponentData<BuildingWorkWithItemsLogicData>(entity);
+            data.CountOfPack = countOfPackDataData.newCountOfPack;
+            ecb.SetComponent(entity, data);
         }
     }
 }

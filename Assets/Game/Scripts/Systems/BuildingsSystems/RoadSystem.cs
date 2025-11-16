@@ -15,6 +15,7 @@ public partial struct RoadSystem : ISystem
     EntityQuery _createBluePrintRoadsQuery;
     EntityQuery _removePointsQuery;
     EntityQuery _mapUpdateQuery;
+     EntityQuery _assignToClusterQuery;
     NativeParallelHashMap<int2, Entity> roadMap;
     int roadHash;
 
@@ -39,6 +40,9 @@ public partial struct RoadSystem : ISystem
         _mapUpdateQuery = new EntityQueryBuilder(Allocator.Temp)
             .WithAll<BuildingMap, UpdateMapTag>()
             .Build(ref state);
+     _assignToClusterQuery = new EntityQueryBuilder(Allocator.Temp)
+        .WithAll<AssignToCluster, GameObjectReference>() 
+        .Build(ref state);
     }
 
     [BurstCompile]
@@ -79,6 +83,11 @@ public partial struct RoadSystem : ISystem
         try
         {
             state.Dependency.Complete();
+
+            if (!_assignToClusterQuery.IsEmpty)
+            {
+                AssignClustersToNewBuildings(ref state, ecb, buildingMapRW.ValueRO);
+            }
 
             if (!_removePointsQuery.IsEmpty)
             {
@@ -195,6 +204,78 @@ public partial struct RoadSystem : ISystem
         allClusterPoints.Dispose();
     }
 
+    void AssignClustersToNewBuildings(
+    ref SystemState state,
+    EntityCommandBuffer ecb,
+    BuildingMap buildingMap
+    )
+     {
+        var allRoadPoints = new NativeList<int2>(roadMap.Count(), Allocator.TempJob);
+        foreach (var point in roadMap)
+        {
+            allRoadPoints.Add(point.Key);
+        }
+
+        var clusterStarts = new NativeList<int2>(Allocator.TempJob);
+        var allClusterPoints = new NativeList<int2>(Allocator.TempJob);
+
+        var clusterJob = new UniversalClusterJob
+        {
+            InputPoints = allRoadPoints,
+            ClusterStarts = clusterStarts,
+            AllClusterPoints = allClusterPoints,
+        };
+        clusterJob.Schedule().Complete();
+
+        var clusterMap = new NativeParallelHashMap<int2, int>(allClusterPoints.Length, Allocator.Temp);
+        for (int clusterId = 0; clusterId < clusterStarts.Length; clusterId++)
+        {
+            int startIndex = clusterStarts[clusterId].x;
+            int count = clusterStarts[clusterId].y;
+
+            for (int i = 0; i < count; i++)
+            {
+                var point = allClusterPoints[startIndex + i];
+                clusterMap.TryAdd(point, clusterId);
+            }
+        }
+
+        foreach (var (assignTag, entity) in SystemAPI.Query<AssignToCluster>().WithEntityAccess())
+        {
+            if (state.EntityManager.HasComponent<BuildingPosData>(entity))
+            {
+                var buildingPos = state.EntityManager.GetComponentData<BuildingPosData>(entity);
+                var buildingPoint = new int2((int)buildingPos.LeftCornerPos.x, (int)buildingPos.LeftCornerPos.y);
+                bool clusterAssigned = false;
+
+                for (int x = -1; x <= 1 && !clusterAssigned; x++)
+                {
+                    for (int y = -1; y <= 1 && !clusterAssigned; y++)
+                    {
+                        var checkPoint = buildingPoint + new int2(x, y);
+                        if (clusterMap.TryGetValue(checkPoint, out int clusterId))
+                        {
+                            ecb.AddComponent(entity, new ClusterId { Value = clusterId });
+                            clusterAssigned = true;
+                        }
+                    }
+                }
+
+                if (!clusterAssigned)
+                {
+                    ecb.AddComponent(entity, new ClusterId { Value = -1 });
+                }
+            }
+
+            ecb.RemoveComponent<AssignToCluster>(entity);
+        }
+
+        allRoadPoints.Dispose();
+        clusterStarts.Dispose();
+        allClusterPoints.Dispose();
+        clusterMap.Dispose();
+    }
+
     [BurstCompile]
     void RemoveRoads(ref SystemState state, EntityCommandBuffer ecb, BuildingMap buildingMap)
     {
@@ -245,13 +326,9 @@ public partial struct RoadSystem : ISystem
         bool isBluePrint
     )
     {
-        Debug.Log(
-            $"CreateNewRoadsFromPoints ВХОД: isBluePrint={isBluePrint}, точек={uniquePoints.Length}"
-        );
 
         if (uniquePoints.IsEmpty)
         {
-            Debug.Log("Нет точек для создания дорог");
             return;
         }
 
@@ -266,10 +343,6 @@ public partial struct RoadSystem : ISystem
         };
         clusterJob.Schedule().Complete();
 
-        Debug.Log(
-            $"После кластеризации: кластеров={clusterStarts.Length}, всех точек={allClusterPoints.Length}"
-        );
-        Debug.Log($"Вызываем CreateRoadEntitiesFromClusters с isBluePrint={isBluePrint}");
 
         CreateRoadEntitiesFromClusters(ref state, clusterStarts, allClusterPoints, isBluePrint);
     }
@@ -603,6 +676,8 @@ public partial struct RoadSystem : ISystem
 
         public void Execute()
         {
+            var clusterMap = new NativeParallelHashMap<int2, int>(AllClusterPoints.Length, Allocator.Temp);
+            
             for (int clusterId = 0; clusterId < ClusterStarts.Length; clusterId++)
             {
                 int startIndex = ClusterStarts[clusterId].x;
@@ -610,29 +685,39 @@ public partial struct RoadSystem : ISystem
 
                 for (int i = 0; i < count; i++)
                 {
-                    var roadPoint = AllClusterPoints[startIndex + i];
-
-                    for (int x = -1; x <= 1; x++)
-                    {
-                        for (int y = -1; y <= 1; y++)
-                        {
-                            var checkPoint = roadPoint + new int2(x, y);
-                            if (BuildingMap.ContainsKey(checkPoint))
-                            {
-                                var buildingEntity = BuildingMap[checkPoint];
-                                if (buildingEntity != Entity.Null)
-                                {
-                                    Ecb.AddComponent(
-                                        0,
-                                        buildingEntity,
-                                        new ClusterId { Value = clusterId }
-                                    );
-                                }
-                            }
-                        }
-                    }
+                    var point = AllClusterPoints[startIndex + i];
+                    clusterMap.TryAdd(point, clusterId);
                 }
             }
+
+            int assignedCount = 0;
+            foreach (var buildingPair in BuildingMap)
+            {
+                var buildingPoint = buildingPair.Key;
+                var buildingEntity = buildingPair.Value;
+                
+                if (buildingEntity == Entity.Null) continue;
+
+                bool assigned = false;
+                for (int x = -1; x <= 1; x++)
+                {
+                    for (int y = -1; y <= 1; y++)
+                    {
+                        var checkPoint = buildingPoint + new int2(x, y);
+                        
+                        if (clusterMap.TryGetValue(checkPoint, out int clusterId))
+                        {
+                            Ecb.AddComponent(0, buildingEntity, new ClusterId { Value = clusterId });
+                            assigned = true;
+                            assignedCount++;
+                            break; 
+                        }
+                    }
+                    if (assigned) break;
+                }
+            }
+
+            clusterMap.Dispose();
         }
     }
 
@@ -671,10 +756,10 @@ public partial struct RoadSystem : ISystem
                     var current = queue.Dequeue();
                     AllClusterPoints.Add(current);
 
-                    CheckNeighbor(current + new int2(1, 0), pointSet, visited, queue);
-                    CheckNeighbor(current + new int2(-1, 0), pointSet, visited, queue);
-                    CheckNeighbor(current + new int2(0, 1), pointSet, visited, queue);
-                    CheckNeighbor(current + new int2(0, -1), pointSet, visited, queue);
+                    CheckNeighbor(current + new int2(1, 0), pointSet, visited, queue);  
+                    CheckNeighbor(current + new int2(-1, 0), pointSet, visited, queue); 
+                    CheckNeighbor(current + new int2(0, 1), pointSet, visited, queue);  
+                    CheckNeighbor(current + new int2(0, -1), pointSet, visited, queue); 
                 }
 
                 ClusterStarts.Add(new int2(startIndex, AllClusterPoints.Length - startIndex));

@@ -3,35 +3,29 @@ using Unity.Collections;
 using Unity.Entities;
 
 [Serializable]
-public struct BuildingLogicData : IComponentData
+public struct BuildingWorkWithItemsLogicData : IComponentData
 {
     public int Priority;
-    public int RecipeIDHash;
     public int RequiredRecipesGroup;
+    public int CountOfPack;
 }
 
 [Serializable]
-public struct ProducerBuildingData : IComponentData
+public struct ProcessBuildingData : IComponentData
 {
+    public int RecipeIDHash;
     public float TimeToProduceNext;
     public float CurrTime;
 }
 
 [Serializable]
-public struct InnerStorageSlotData : IBufferElementData
+public struct SlotData : IBufferElementData
 {
     public int ItemId;
     public int Count;
     public int Capacity;
 }
-
-public struct OutputStorageSlotData : IBufferElementData
-{
-    public int ItemId;
-    public int Count;
-    public int Capacity;
-}
-
+#region change
 public struct ChangeRecipeData : IComponentData
 {
     public int newRecipeID;
@@ -42,31 +36,40 @@ public struct ChangePriorityData : IComponentData
     public int newPriorityID;
 }
 
-public struct ChangeInnerSlotCapacityData : IComponentData
+public struct ChangeSlotCapacityData : IComponentData
 {
-    public int SlotID;
+    public int SlotIND;
     public int newCapacity;
 }
-
-public struct ChangeOutputSlotCapacityData : IComponentData
+public struct ChangeBuildingCountOfPackData : IComponentData
 {
-    public int SlotID;
-    public int newCapacity;
+    public int newCountOfPack;
 }
+#endregion chage
 
-public struct DistribureRemovedItems : IComponentData { }
+
 
 public struct AnimationData : IComponentData
 {
     public float AnimationProgress;
     public int AnimationState;
 }
+public struct HasInputSlots: IComponentData
+{
+    public int StartIND;
+    public int EndIND;
+}
 
-public struct ConsumerBuildingTag : IComponentData { }
-
-public struct ProducerBuildingTag : IComponentData { }
-
-public struct ProcessorBuildingTag : IComponentData { }
+public struct HasOutputSlots : IComponentData
+{
+    public int StartIND;
+    public int EndIND;
+}
+public struct DistribureRemovedItems : IComponentData
+{
+     public int StartIND;
+    public int EndIND;
+}
 
 public enum DistributionPriority : int
 {
