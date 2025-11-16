@@ -1,417 +1,357 @@
-// using Unity.Burst;
-// using Unity.Collections;
-// using Unity.Entities;
-// using Unity.Jobs;
-// using Unity.Mathematics;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Entities;
+using Unity.Jobs;
+using Unity.Mathematics;
 
-// [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
-// [BurstCompile]
-// public partial struct ItemDistributionSystem : ISystem
-// {
-//     [BurstCompile]
-//     public void OnUpdate(ref SystemState state)
-//     {
-//         if (!SystemAPI.TryGetSingleton<RecipeCache>(out var recipeCache))
-//             return;
+[UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
+[BurstCompile]
+public partial struct ItemDistributionSystem : ISystem
+{
+    EntityQuery _mapUpdateQuery;
+    EntityQuery _consumersQuery;
+    EntityQuery _producersQuery;
+    EntityQuery _unnecessaryItemsQuery;
+    EntityQuery _recipeProcessingQuery;
 
-//         ProduceResources(ref state, recipeCache.Recipes);
+    [BurstCompile]
+    public void OnCreate(ref SystemState state)
+    {
+        _mapUpdateQuery = new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<BuildingMap, UpdateMapTag>()
+            .Build(ref state);
 
-//         ProcessRecipes(ref state, recipeCache.Recipes);
+        _consumersQuery = new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<ClusterId, HasInputSlots, CanResoucesBeAddedTag, SlotData, BuildingWorkWithItemsLogicData>()
+            .Build(ref state);
 
-//         DistributeResourcesByClusters(ref state);
-//     }
+        _producersQuery = new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<ClusterId, HasOutputSlots, CanResoucesBeRemovedTag, SlotData>()
+            .Build(ref state);
 
-//     [BurstCompile]
-//     private void ProduceResources(
-//         ref SystemState state,
-//         NativeHashMap<int, BurstRecipe> recipeCache
-//     )
-//     {
-//         var ecb = new EntityCommandBuffer(Allocator.TempJob);
+        _unnecessaryItemsQuery = new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<ClusterId, DistribureRemovedItems, SlotData>()
+            .Build(ref state);
 
-//         foreach (
-//             var (producerData, logicData, outputBuffer, entity) in SystemAPI
-//                 .Query<
-//                     RefRW<ProducerBuildingData>,
-//                     RefRO<BuildingLogicData>,
-//                     DynamicBuffer<OutputStorageSlotData>
-//                 >()
-//                 .WithAll<ProducerBuildingTag>()
-//                 .WithEntityAccess()
-//         )
-//         {
-//             producerData.ValueRW.CurrTime += SystemAPI.Time.DeltaTime;
+        _recipeProcessingQuery = new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<ProcessBuildingData, ConnectedToEnegry, SlotData>()
+            .WithAny<HasInputSlots, HasOutputSlots>()
+            .Build(ref state);
+    }
 
-//             if (producerData.ValueRW.CurrTime >= producerData.ValueRW.TimeToProduceNext)
-//             {
-//                 producerData.ValueRW.CurrTime = 0;
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        if (!SystemAPI.TryGetSingleton<RecipeCache>(out var recipeCache))
+            return;
 
-//                 if (
-//                     logicData.ValueRO.RecipeIDHash != 0
-//                     && recipeCache.TryGetValue(logicData.ValueRO.RecipeIDHash, out var recipe)
-//                 )
-//                 {
-//                     ProduceFromRecipe(outputBuffer, recipe);
-//                 }
+        var ecb = new EntityCommandBuffer(Allocator.TempJob);
 
-//                 ecb.SetComponent(entity, producerData.ValueRO);
-//             }
-//         }
+        
+        var processRecipesJob = new ProcessRecipesJob
+        {
+            DeltaTime = SystemAPI.Time.DeltaTime,
+            RecipeCache = recipeCache.Recipes,
+            Ecb = ecb.AsParallelWriter()
+        };
+        state.Dependency = processRecipesJob.Schedule(_recipeProcessingQuery, state.Dependency);
 
-//         ecb.Playback(state.EntityManager);
-//         ecb.Dispose();
-//     }
+        
+        if (!_mapUpdateQuery.IsEmptyIgnoreFilter)
+        {
+            state.Dependency.Complete();
 
-//     [BurstCompile]
-//     private void ProcessRecipes(ref SystemState state, NativeHashMap<int, BurstRecipe> recipeCache)
-//     {
-//         var ecb = new EntityCommandBuffer(Allocator.TempJob);
+            
+            var clusters = new NativeHashSet<int>(100, Allocator.Temp);
+            foreach (var cluster in SystemAPI.Query<RefRO<ClusterId>>().WithAll<BuildingWorkWithItemsLogicData>())
+            {
+                clusters.Add(cluster.ValueRO.Value);
+            }
 
-//         foreach (
-//             var (producerData, logicData, inputBuffer, outputBuffer, entity) in SystemAPI
-//                 .Query<
-//                     RefRW<ProducerBuildingData>,
-//                     RefRO<BuildingLogicData>,
-//                     DynamicBuffer<InnerStorageSlotData>,
-//                     DynamicBuffer<OutputStorageSlotData>
-//                 >()
-//                 .WithAll<ProcessorBuildingTag>()
-//                 .WithEntityAccess()
-//         )
-//         {
-//             producerData.ValueRW.CurrTime += SystemAPI.Time.DeltaTime;
+            
+            foreach (int clusterId in clusters)
+            {
+                ProcessClusterSync(ref state, clusterId, ecb);
+            }
 
-//             if (producerData.ValueRW.CurrTime >= producerData.ValueRW.TimeToProduceNext)
-//             {
-//                 producerData.ValueRW.CurrTime = 0;
+            clusters.Dispose();
+        }
 
-//                 if (
-//                     logicData.ValueRO.RecipeIDHash != 0
-//                     && recipeCache.TryGetValue(logicData.ValueRO.RecipeIDHash, out var recipe)
-//                 )
-//                 {
-//                     if (CanCraftRecipe(inputBuffer, recipe))
-//                     {
-//                         CraftRecipe(inputBuffer, outputBuffer, recipe);
-//                     }
-//                 }
+        ecb.Playback(state.EntityManager);
+        ecb.Dispose();
+    }
 
-//                 ecb.SetComponent(entity, producerData.ValueRO);
-//             }
-//         }
+    [BurstCompile]
+    void ProcessClusterSync(ref SystemState state, int clusterId, EntityCommandBuffer ecb)
+    {
+        var consumers = GetConsumersInClusterSync(ref state, clusterId);
+        if (consumers.Length == 0)
+            return;
 
-//         ecb.Playback(state.EntityManager);
-//         ecb.Dispose();
-//     }
+        var producers = GetProducersInClusterSync(ref state, clusterId);
+        var unnecessaryItems = GetUnnecessaryItemsInClusterSync(ref state, clusterId);
 
-//     [BurstCompile]
-//     private void DistributeResourcesByClusters(ref SystemState state)
-//     {
-//         var clusters = GetUniqueClusters(ref state);
+        DistributeResourcesSync(ref state, consumers, producers, unnecessaryItems, ecb);
 
-//         foreach (int clusterId in clusters)
-//         {
-//             ProcessCluster(ref state, clusterId);
-//         }
+        consumers.Dispose();
+        producers.Dispose();
+        unnecessaryItems.Dispose();
+    }
 
-//         clusters.Dispose();
-//     }
+    [BurstCompile]
+    NativeList<Entity> GetConsumersInClusterSync(ref SystemState state, int clusterId)
+    {
+        var consumers = new NativeList<Entity>(Allocator.Temp);
 
-//     [BurstCompile]
-//     private NativeHashSet<int> GetUniqueClusters(ref SystemState state)
-//     {
-//         var clusters = new NativeHashSet<int>(100, Allocator.Temp);
+        foreach (var (cluster, entity) in SystemAPI.Query<RefRO<ClusterId>>()
+            .WithAll<HasInputSlots, BuildingWorkWithItemsLogicData, SlotData>()
+            .WithAll<CanResoucesBeAddedTag>()
+            .WithEntityAccess())
+        {
+            if (cluster.ValueRO.Value == clusterId)
+                consumers.Add(entity);
+        }
 
-//         foreach (
-//             var cluster in SystemAPI
-//                 .Query<RefRO<ClusterId>>()
-//                 .WithAll<InnerStorageSlotData>()
-//                 .WithAny<ConsumerBuildingTag, ProcessorBuildingTag>()
-//         )
-//         {
-//             clusters.Add(cluster.ValueRO.Value);
-//         }
+        return SortConsumersByPrioritySync(ref state, consumers);
+    }
 
-//         return clusters;
-//     }
+    [BurstCompile]
+    NativeList<Entity> GetProducersInClusterSync(ref SystemState state, int clusterId)
+    {
+        var producers = new NativeList<Entity>(Allocator.Temp);
 
-//     [BurstCompile]
-//     private void ProcessCluster(ref SystemState state, int clusterId)
-//     {
-//         var consumers = GetConsumersInCluster(ref state, clusterId);
-//         if (consumers.Length == 0)
-//             return;
+        foreach (var (cluster, entity) in SystemAPI.Query<RefRO<ClusterId>>()
+            .WithAll<HasOutputSlots, CanResoucesBeRemovedTag, SlotData>()
+            .WithEntityAccess())
+        {
+            if (cluster.ValueRO.Value == clusterId)
+                producers.Add(entity);
+        }
 
-//         var producers = GetProducersInCluster(ref state, clusterId);
-//         if (producers.Length == 0)
-//             return;
+        return producers;
+    }
+    
+    [BurstCompile]
+    NativeList<Entity> GetUnnecessaryItemsInClusterSync(ref SystemState state, int clusterId)
+    {
+        var entities = new NativeList<Entity>(Allocator.Temp);
 
-//         DistributeResources(ref state, producers, consumers);
+        foreach (var (cluster, entity) in SystemAPI.Query<RefRO<ClusterId>>()
+            .WithAll<DistribureRemovedItems, SlotData>()
+            .WithEntityAccess())
+        {
+            if (cluster.ValueRO.Value == clusterId)
+                entities.Add(entity);
+        }
 
-//         consumers.Dispose();
-//         producers.Dispose();
-//     }
+        return entities;
+    }
 
-//     [BurstCompile]
-//     private NativeList<Entity> GetConsumersInCluster(ref SystemState state, int clusterId)
-//     {
-//         var consumers = new NativeList<Entity>(Allocator.Temp);
+    [BurstCompile]
+    NativeList<Entity> SortConsumersByPrioritySync(ref SystemState state, NativeList<Entity> consumers)
+    {
+        if (consumers.Length <= 1)
+            return consumers;
 
-//         foreach (
-//             var (cluster, buffer, entity) in SystemAPI
-//                 .Query<RefRO<ClusterId>, DynamicBuffer<InnerStorageSlotData>>()
-//                 .WithAny<ConsumerBuildingTag, ProcessorBuildingTag>()
-//                 .WithEntityAccess()
-//         )
-//         {
-//             if (cluster.ValueRO.Value == clusterId)
-//                 consumers.Add(entity);
-//         }
+        var priorityBuckets = new NativeArray<NativeList<Entity>>(5, Allocator.Temp);
+        for (int i = 0; i < priorityBuckets.Length; i++)
+            priorityBuckets[i] = new NativeList<Entity>(Allocator.Temp);
 
-//         return SortConsumersByPriority(ref state, consumers);
-//     }
+        foreach (var consumer in consumers)
+        {
+            var priority = state.EntityManager.GetComponentData<BuildingWorkWithItemsLogicData>(consumer).Priority;
+            int bucketIndex = math.clamp(priority, 0, priorityBuckets.Length - 1);
+            priorityBuckets[bucketIndex].Add(consumer);
+        }
 
-//     [BurstCompile]
-//     private NativeList<Entity> GetProducersInCluster(ref SystemState state, int clusterId)
-//     {
-//         var producers = new NativeList<Entity>(Allocator.Temp);
+        var sortedConsumers = new NativeList<Entity>(consumers.Length, Allocator.Temp);
+        for (int i = priorityBuckets.Length - 1; i >= 0; i--)
+        {
+            sortedConsumers.AddRange(priorityBuckets[i].AsArray());
+            priorityBuckets[i].Dispose();
+        }
 
-//         foreach (
-//             var (cluster, buffer, entity) in SystemAPI
-//                 .Query<RefRO<ClusterId>, DynamicBuffer<OutputStorageSlotData>>()
-//                 .WithAny<ProducerBuildingTag, ProcessorBuildingTag>()
-//                 .WithEntityAccess()
-//         )
-//         {
-//             if (cluster.ValueRO.Value == clusterId)
-//                 producers.Add(entity);
-//         }
+        priorityBuckets.Dispose();
+        consumers.Dispose();
+        return sortedConsumers;
+    }
 
-//         return producers;
-//     }
+    [BurstCompile]
+    void DistributeResourcesSync(
+        ref SystemState state,
+        NativeList<Entity> consumers,
+        NativeList<Entity> producers,
+        NativeList<Entity> unnecessaryItems,
+        EntityCommandBuffer ecb
+    )
+    {
+        
+        foreach (var rem in unnecessaryItems)
+        {
+            var outputBuffer = state.EntityManager.GetBuffer<SlotData>(rem);
+            var dr = state.EntityManager.GetComponentData<DistribureRemovedItems>(rem);
 
-//     [BurstCompile]
-//     private NativeList<Entity> SortConsumersByPriority(
-//         ref SystemState state,
-//         NativeList<Entity> consumers
-//     )
-//     {
-//         if (consumers.Length <= 1)
-//             return consumers;
+            for (int slotIndex = dr.StartIND; slotIndex < dr.EndIND; slotIndex++)
+            {
+                var outputSlot = outputBuffer[slotIndex];
+                if (outputSlot.Count <= 0) continue;
 
-//         var priorityBuckets = new NativeArray<NativeList<Entity>>(5, Allocator.Temp);
+                int remainingItems = outputSlot.Count;
+                foreach (var consumer in consumers)
+                {
+                    if (remainingItems <= 0) break;
+                    remainingItems = TransferItemsToConsumerSync(ref state, consumer, outputSlot.ItemId, remainingItems);
+                }
+                outputSlot.Count = remainingItems;
+                outputBuffer[slotIndex] = outputSlot;
+            }
+        }
 
-//         for (int i = 0; i < priorityBuckets.Length; i++)
-//         {
-//             priorityBuckets[i] = new NativeList<Entity>(Allocator.Temp);
-//         }
+        
+        foreach (var producer in producers)
+        {
+            var outputBuffer = state.EntityManager.GetBuffer<SlotData>(producer);
+            var od = state.EntityManager.GetComponentData<HasOutputSlots>(producer);
 
-//         foreach (var consumer in consumers)
-//         {
-//             var priority = SystemAPI.GetComponent<BuildingLogicData>(consumer).Priority;
-//             int bucketIndex = math.clamp(priority, 0, priorityBuckets.Length - 1);
-//             priorityBuckets[bucketIndex].Add(consumer);
-//         }
+            for (int slotIndex = od.StartIND; slotIndex < od.EndIND; slotIndex++)
+            {
+                var outputSlot = outputBuffer[slotIndex];
+                if (outputSlot.Count <= 0) continue;
 
-//         var sortedConsumers = new NativeList<Entity>(consumers.Length, Allocator.Temp);
-//         for (int i = priorityBuckets.Length - 1; i >= 0; i--)
-//         {
-//             sortedConsumers.AddRange(priorityBuckets[i].AsArray());
-//             priorityBuckets[i].Dispose();
-//         }
+                int remainingItems = outputSlot.Count;
+                foreach (var consumer in consumers)
+                {
+                    if (remainingItems <= 0) break;
+                    remainingItems = TransferItemsToConsumerSync(ref state, consumer, outputSlot.ItemId, remainingItems);
+                }
+                outputSlot.Count = remainingItems;
+                outputBuffer[slotIndex] = outputSlot;
+            }
+        }
+    }
 
-//         priorityBuckets.Dispose();
-//         consumers.Dispose();
-//         return sortedConsumers;
-//     }
+    [BurstCompile]
+    int TransferItemsToConsumerSync(ref SystemState state, Entity consumer, int itemId, int availableItems)
+    {
+        var inputBuffer = state.EntityManager.GetBuffer<SlotData>(consumer);
+        var id = state.EntityManager.GetComponentData<HasInputSlots>(consumer);
 
-//     [BurstCompile]
-//     private void DistributeResources(
-//         ref SystemState state,
-//         NativeList<Entity> producers,
-//         NativeList<Entity> consumers
-//     )
-//     {
-//         foreach (var producer in producers)
-//         {
-//             var outputBuffer = SystemAPI.GetBuffer<OutputStorageSlotData>(producer);
+        for (int i = id.StartIND; i < id.EndIND; i++)
+        {
+            if (availableItems <= 0) break;
 
-//             for (int slotIndex = 0; slotIndex < outputBuffer.Length; slotIndex++)
-//             {
-//                 var outputSlot = outputBuffer[slotIndex];
-//                 if (outputSlot.Count <= 0)
-//                     continue;
+            var inputSlot = inputBuffer[i];
+            if (inputSlot.ItemId == 0 || inputSlot.ItemId == itemId)
+            {
+                if (inputSlot.ItemId == 0)
+                {
+                    inputSlot.ItemId = itemId;
+                }
 
-//                 int remainingItems = outputSlot.Count;
+                int freeSpace = inputSlot.Capacity - inputSlot.Count;
+                if (freeSpace > 0)
+                {
+                    int itemsToTransfer = math.min(availableItems, freeSpace);
+                    inputSlot.Count += itemsToTransfer;
+                    availableItems -= itemsToTransfer;
+                    inputBuffer[i] = inputSlot;
+                }
+            }
+        }
+        return availableItems;
+    }
 
-//                 foreach (var consumer in consumers)
-//                 {
-//                     if (remainingItems <= 0)
-//                         break;
+    [BurstCompile]
+    partial struct ProcessRecipesJob : IJobEntity
+    {
+        public float DeltaTime;
+        [ReadOnly] public NativeHashMap<int, BurstRecipe> RecipeCache;
+        public EntityCommandBuffer.ParallelWriter Ecb;
 
-//                     var inputBuffer = SystemAPI.GetBuffer<InnerStorageSlotData>(consumer);
-//                     remainingItems = TransferItemsToConsumer(
-//                         inputBuffer,
-//                         outputSlot.ItemId,
-//                         remainingItems
-//                     );
-//                 }
+       void Execute(Entity entity, [EntityIndexInQuery] int entityIndex, ref ProcessBuildingData processData, 
+           in DynamicBuffer<SlotData> slotBuff, in HasInputSlots hasInput, in HasOutputSlots hasOutput)
+        {
+            if (processData.RecipeIDHash != 0 && RecipeCache.TryGetValue(processData.RecipeIDHash, out var recipe))
+            {
+                if (CanCraftRecipe(entity, slotBuff, recipe, hasInput, hasOutput, entityIndex))
+                {
+                    processData.CurrTime += DeltaTime;
 
-//                 outputSlot.Count = remainingItems;
-//                 outputBuffer[slotIndex] = outputSlot;
-//             }
-//         }
-//     }
+                    if (processData.CurrTime >= processData.TimeToProduceNext)
+                    {
+                        CraftRecipe(entity, slotBuff, recipe, hasInput, hasOutput, Ecb, entityIndex);
+                        processData.CurrTime = 0;
+                    }
+                }
+            }
+        }
 
-//     [BurstCompile]
-//     private int TransferItemsToConsumer(
-//         DynamicBuffer<InnerStorageSlotData> inputBuffer,
-//         int itemId,
-//         int availableItems
-//     )
-//     {
-//         for (int i = 0; i < inputBuffer.Length; i++)
-//         {
-//             if (availableItems <= 0)
-//                 break;
+        bool CanCraftRecipe(Entity entity, in DynamicBuffer<SlotData> slotBuff, BurstRecipe recipe, 
+                        in HasInputSlots hasInput, in HasOutputSlots hasOutput, int entityIndex)
+        {
+            
+            if (slotBuff.Length > hasInput.EndIND)
+            {
+                for (int i = hasInput.StartIND; i < hasInput.EndIND; i++)
+                    if (slotBuff[i].Count < recipe.InputItems[i - hasInput.StartIND].Amount)
+                        return false;
+            }
 
-//             var inputSlot = inputBuffer[i];
+            
+            if (slotBuff.Length > hasOutput.EndIND)
+            {
+                for (int i = hasOutput.StartIND; i < hasOutput.EndIND; i++)
+                    if (slotBuff[i].Capacity - slotBuff[i].Count < recipe.OutputItems[i - hasOutput.StartIND].Amount)
+                        return false;
+            }
 
-//             if (inputSlot.ItemId == 0 || inputSlot.ItemId == itemId)
-//             {
-//                 if (inputSlot.ItemId == 0)
-//                 {
-//                     inputSlot.ItemId = itemId;
-//                 }
+            Ecb.AddComponent<CanAnimateTag>(entityIndex, entity);
+            return true;
+        }
 
-//                 int freeSpace = inputSlot.Capacity - inputSlot.Count;
-//                 if (freeSpace > 0)
-//                 {
-//                     int itemsToTransfer = math.min(availableItems, freeSpace);
-//                     inputSlot.Count += itemsToTransfer;
-//                     availableItems -= itemsToTransfer;
+        void CraftRecipe(Entity entity, in DynamicBuffer<SlotData> slotBuff, BurstRecipe recipe, 
+                        in HasInputSlots hasInput, in HasOutputSlots hasOutput, 
+                        EntityCommandBuffer.ParallelWriter ecb, int entityIndex)
+        {
+            
+            
+            if (slotBuff.Length > hasInput.EndIND)
+            {
+                for (int i = hasInput.StartIND; i < hasInput.EndIND; i++)
+                {
+                    var slotIndex = i;
+                    var amount = recipe.InputItems[i - hasInput.StartIND].Amount;
+                    ecb.AppendToBuffer(entityIndex, entity, new SlotModification 
+                    { 
+                        SlotIndex = slotIndex,
+                        ItemId = -1, 
+                        Amount = amount
+                    });
+                }
+            }
 
-//                     inputBuffer[i] = inputSlot;
-//                 }
-//             }
-//         }
+            
+            if (slotBuff.Length > hasOutput.EndIND)
+            {
+                for (int i = hasOutput.StartIND; i < hasOutput.EndIND; i++)
+                {
+                    var slotIndex = i;
+                    var amount = recipe.OutputItems[i - hasOutput.StartIND].Amount;
+                    ecb.AppendToBuffer(entityIndex, entity, new SlotModification 
+                    { 
+                        SlotIndex = slotIndex,
+                        ItemId = recipe.OutputItems[i - hasOutput.StartIND].ItemId,
+                        Amount = amount
+                    });
+                }
+            }
+        }
+    }
+}
 
-//         return availableItems;
-//     }
-
-//     [BurstCompile]
-//     private void ProduceFromRecipe(
-//         DynamicBuffer<OutputStorageSlotData> outputBuffer,
-//         BurstRecipe recipe
-//     )
-//     {
-//         for (int i = 0; i < recipe.OutputItems.Length; i++)
-//         {
-//             var outputItem = recipe.OutputItems[i];
-//             AddItemsToOutput(outputBuffer, outputItem.ItemId, outputItem.Amount);
-//         }
-//     }
-
-//     [BurstCompile]
-//     private bool CanCraftRecipe(DynamicBuffer<InnerStorageSlotData> inputBuffer, BurstRecipe recipe)
-//     {
-//         for (int i = 0; i < recipe.InputItems.Length; i++)
-//         {
-//             var inputItem = recipe.InputItems[i];
-//             int totalAvailable = 0;
-
-//             foreach (var slot in inputBuffer)
-//             {
-//                 if (slot.ItemId == inputItem.ItemId)
-//                     totalAvailable += slot.Count;
-//             }
-
-//             if (totalAvailable < inputItem.Amount)
-//                 return false;
-//         }
-//         return true;
-//     }
-
-//     [BurstCompile]
-//     private void CraftRecipe(
-//         DynamicBuffer<InnerStorageSlotData> inputBuffer,
-//         DynamicBuffer<OutputStorageSlotData> outputBuffer,
-//         BurstRecipe recipe
-//     )
-//     {
-//         for (int i = 0; i < recipe.InputItems.Length; i++)
-//         {
-//             var inputItem = recipe.InputItems[i];
-//             RemoveItemsFromInput(inputBuffer, inputItem.ItemId, inputItem.Amount);
-//         }
-
-//         for (int i = 0; i < recipe.OutputItems.Length; i++)
-//         {
-//             var outputItem = recipe.OutputItems[i];
-//             AddItemsToOutput(outputBuffer, outputItem.ItemId, outputItem.Amount);
-//         }
-//     }
-
-//     [BurstCompile]
-//     private void RemoveItemsFromInput(
-//         DynamicBuffer<InnerStorageSlotData> inputBuffer,
-//         int itemId,
-//         int amount
-//     )
-//     {
-//         for (int i = 0; i < inputBuffer.Length && amount > 0; i++)
-//         {
-//             var slot = inputBuffer[i];
-//             if (slot.ItemId == itemId)
-//             {
-//                 int itemsToRemove = math.min(amount, slot.Count);
-//                 slot.Count -= itemsToRemove;
-//                 amount -= itemsToRemove;
-
-//                 if (slot.Count == 0)
-//                     slot.ItemId = 0;
-
-//                 inputBuffer[i] = slot;
-//             }
-//         }
-//     }
-
-//     [BurstCompile]
-//     private void AddItemsToOutput(
-//         DynamicBuffer<OutputStorageSlotData> outputBuffer,
-//         int itemId,
-//         int amount
-//     )
-//     {
-//         for (int i = 0; i < outputBuffer.Length; i++)
-//         {
-//             var slot = outputBuffer[i];
-//             if (slot.ItemId == itemId)
-//             {
-//                 int freeSpace = slot.Capacity - slot.Count;
-//                 int itemsToAdd = math.min(amount, freeSpace);
-//                 slot.Count += itemsToAdd;
-//                 outputBuffer[i] = slot;
-//                 amount -= itemsToAdd;
-//                 if (amount <= 0)
-//                     break;
-//             }
-//         }
-
-//         if (amount > 0)
-//         {
-//             for (int i = 0; i < outputBuffer.Length && amount > 0; i++)
-//             {
-//                 var slot = outputBuffer[i];
-//                 if (slot.ItemId == 0)
-//                 {
-//                     slot.ItemId = itemId;
-//                     int itemsToAdd = math.min(amount, slot.Capacity);
-//                     slot.Count = itemsToAdd;
-//                     outputBuffer[i] = slot;
-//                     amount -= itemsToAdd;
-//                 }
-//             }
-//         }
-//     }
-// }
+public struct SlotModification : IBufferElementData
+{
+    public int SlotIndex;
+    public int ItemId; 
+    public int Amount;
+}

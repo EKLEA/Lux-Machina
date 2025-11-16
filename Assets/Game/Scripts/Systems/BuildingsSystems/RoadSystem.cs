@@ -40,9 +40,9 @@ public partial struct RoadSystem : ISystem
         _mapUpdateQuery = new EntityQueryBuilder(Allocator.Temp)
             .WithAll<BuildingMap, UpdateMapTag>()
             .Build(ref state);
-     _assignToClusterQuery = new EntityQueryBuilder(Allocator.Temp)
-        .WithAll<AssignToCluster, GameObjectReference>() 
-        .Build(ref state);
+        _assignToClusterQuery = new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<AssignToCluster, GameObjectReference>() 
+            .Build(ref state);
     }
 
     [BurstCompile]

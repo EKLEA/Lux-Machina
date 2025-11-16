@@ -19,7 +19,7 @@ public partial class BuildingVisualSystem : SystemBase
 
     Dictionary<int, GameObject> _buildingVisuals = new Dictionary<int, GameObject>();
     Dictionary<int, RoadOnScene> _roadVisuals = new Dictionary<int, RoadOnScene>();
-
+   
     protected override void OnCreate() { }
 
     protected override void OnUpdate()
@@ -190,6 +190,7 @@ public partial class BuildingVisualSystem : SystemBase
         ecb.AddComponent(building, new AssignLogicTag());
         ecb.AddComponent(building, new AssignHealthTag());
         ecb.AddComponent(building, new AssignToCluster());
+        ecb.AddComponent(building, new AddEntitiesToMapTag());
     }
 
     void CreateRoadVisual(
@@ -216,6 +217,8 @@ public partial class BuildingVisualSystem : SystemBase
 
         _roadVisuals[buildingData.UniqueIDHash] = roadOnScene;
         ecb.AddComponent(entity, new GameObjectReference { gameObject = roadOnScene });
+        
+        ecb.AddComponent(entity, new AddEntitiesToMapTag());
         foreach (var p in roadPoints)
             map.TryAdd(p.Value, entity);
         ecb.RemoveComponent<CreateVisualTag>(entity);

@@ -49,17 +49,15 @@ public struct ChangeBuildingCountOfPackData : IComponentData
 
 
 
-public struct AnimationData : IComponentData
-{
-    public float AnimationProgress;
-    public int AnimationState;
-}
+public struct CanAnimateTag : IComponentData{}
 public struct HasInputSlots: IComponentData
 {
     public int StartIND;
     public int EndIND;
 }
 
+public struct CanResoucesBeAddedTag: IComponentData{}
+public struct CanResoucesBeRemovedTag: IComponentData{}
 public struct HasOutputSlots : IComponentData
 {
     public int StartIND;
@@ -67,7 +65,7 @@ public struct HasOutputSlots : IComponentData
 }
 public struct DistribureRemovedItems : IComponentData
 {
-     public int StartIND;
+    public int StartIND;
     public int EndIND;
 }
 
@@ -80,9 +78,3 @@ public enum DistributionPriority : int
     Height = 4,
 }
 
-public enum BuildingAnimationState : int
-{
-    Disconnected = 0,
-    Process = 1,
-    Await = 2,
-}

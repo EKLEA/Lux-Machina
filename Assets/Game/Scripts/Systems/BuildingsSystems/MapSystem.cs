@@ -14,7 +14,6 @@ public partial struct MapSystem : ISystem
     EntityQuery _removeBuildingPointsfromMap;
     Entity BuildingMapEntity;
     bool _isInitialized;
-
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
@@ -26,6 +25,8 @@ public partial struct MapSystem : ISystem
                 CellMapBuildings = new NativeParallelHashMap<int2, int>(1000, Allocator.Persistent),
                 CellMapIDs = new NativeParallelHashMap<int2, int>(1000, Allocator.Persistent),
                 CellEntity = new NativeParallelHashMap<int2, Entity>(1000, Allocator.Persistent),
+                Entities = new NativeParallelHashMap<int, Entity>(1000, Allocator.Persistent),
+                
             }
         );
 
@@ -60,22 +61,30 @@ public partial struct MapSystem : ISystem
             Allocator.Persistent
         );
 
+         var newEntities = new NativeParallelHashMap<int, Entity>(
+            newCapacity,
+            Allocator.Persistent
+        );
         foreach (var pair in mapData.CellMapBuildings)
             newCellBuildMap.TryAdd(pair.Key, pair.Value);
         foreach (var pair in mapData.CellMapIDs)
             newCellIDMap.TryAdd(pair.Key, pair.Value);
         foreach (var pair in mapData.CellEntity)
             newCellEntity.TryAdd(pair.Key, pair.Value);
+        foreach (var pair in mapData.Entities)
+            newEntities.TryAdd(pair.Key, pair.Value);
 
         var oldBuildings = mapData.CellMapBuildings;
         var oldIDs = mapData.CellMapIDs;
-        var oldEntities = mapData.CellEntity;
+        var oldCellEntities = mapData.CellEntity;
+        var oldEntities = mapData.Entities;
 
         var newBuildingMap = new BuildingMap
         {
             CellMapBuildings = newCellBuildMap,
             CellMapIDs = newCellIDMap,
             CellEntity = newCellEntity,
+            Entities=newEntities
         };
 
         state.EntityManager.SetComponentData(BuildingMapEntity, newBuildingMap);
@@ -86,6 +95,8 @@ public partial struct MapSystem : ISystem
             oldIDs.Dispose();
         if (oldEntities.IsCreated)
             oldEntities.Dispose();
+        if (oldCellEntities.IsCreated)
+            oldCellEntities.Dispose();
     }
 
     [BurstCompile]

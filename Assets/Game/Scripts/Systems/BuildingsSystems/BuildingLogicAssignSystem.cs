@@ -81,11 +81,6 @@ public partial class BuildingLogicAssignSystem : SystemBase
                     });
                     break;
             }
-            ecb.AddComponent(entity, new AnimationData
-            {
-                AnimationProgress = 0,
-                AnimationState = (int)BuildingAnimationState.Disconnected,
-            });
             ecb.RemoveComponent<AssignLogicTag>(entity);
         }
     }
@@ -194,7 +189,7 @@ public partial class BuildingLogicAssignSystem : SystemBase
         var inputSlots = new HasInputSlots
         {
             StartIND = startIndex,
-            EndIND = startIndex + recipe.inputItems.Count
+            EndIND = startIndex + recipe.inputItems.Count-1
         };
 
         for (int i = 0; i < recipe.inputItems.Count; i++)
@@ -232,7 +227,7 @@ public partial class BuildingLogicAssignSystem : SystemBase
         var outputSlots = new HasOutputSlots
         {
             StartIND = startIndex,
-            EndIND = startIndex + recipe.outputItems.Count
+            EndIND = startIndex + recipe.outputItems.Count-1
         };
 
         for (int i = 0; i < recipe.outputItems.Count; i++)
@@ -280,7 +275,7 @@ public partial class BuildingLogicAssignSystem : SystemBase
         ecb.AddComponent(entity, new DistribureRemovedItems
         {
             StartIND = startIndex,
-            EndIND = startIndex + count
+            EndIND = startIndex + count-1
         });
     }
 

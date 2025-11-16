@@ -79,7 +79,16 @@ public class GameController : IInitializable
             saveService.GameState
         );
     }
-
+    public Entity GetEntity(Vector2Int pos)
+    {
+         _buildingMapSystem.GetEntity(new int2(pos.x,pos.y), out Entity entity);
+         return entity;
+    }
+     public Entity GetEntity(int id)
+    {
+        _buildingMapSystem.GetEntity(id, out Entity entity);
+        return entity;
+    }
     public void PlaceRoad(HashSet<Vector2Int> roadPoints, bool isBluePrint)
     {
         Debug.Log("Контроллер нажал");
@@ -101,7 +110,10 @@ public class GameController : IInitializable
         return result;
     }
 
-    public void RemoveRoadPoints(int entityId, List<Vector2Int> pointsToRemove) { }
+    public void RemoveRoadPoints(int entityId, List<Vector2Int> pointsToRemove)
+    {
+        //////
+    }
 
     public void RequestPath(
         Vector2Int start,

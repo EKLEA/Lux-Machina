@@ -11,6 +11,36 @@ public partial class PublicBuildingMapSystem : SystemBase
 
     protected override void OnUpdate() { }
 
+    
+
+    public bool GetEntity(int2 pos, out Entity entity)
+    {
+        entity = Entity.Null;
+        
+        if (!SystemAPI.TryGetSingleton<BuildingMap>(out var buildingMap))
+            return false;
+        
+        if (buildingMap.CellEntity.TryGetValue(pos, out entity))
+        {
+            return entity != Entity.Null;
+        }
+        
+        return false;
+    }
+    public bool GetEntity(int id, out Entity entity)
+    {
+        entity = Entity.Null;
+        
+        if (!SystemAPI.TryGetSingleton<BuildingMap>(out var buildingMap))
+            return false;
+        
+        if (buildingMap.Entities.TryGetValue(id, out entity))
+        {
+            return entity != Entity.Null;
+        }
+        
+        return false;
+    }
     public bool CanBuildAt(NativeArray<int2> positions, bool isRoad)
     {
         CompleteDependency();
