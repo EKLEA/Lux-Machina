@@ -19,6 +19,7 @@ public class GameSceneBindings : MonoInstaller
         BindGameScene();
     }
 
+
     void BindEcsSystems()
     {
         var world = World.DefaultGameObjectInjectionWorld;
@@ -71,12 +72,15 @@ public class GameSceneBindings : MonoInstaller
 
         Container.Bind<EntityManager>().FromMethod(GetEntityManager).AsSingle();
         Container.Bind<EntityLoader>().AsSingle();
-
+        BindModelViews();
         Container.Bind<UIManager>().FromInstance(UIManager).AsSingle();
         
         Container.BindInterfacesAndSelfTo<GameController>().AsSingle().NonLazy();
     }
-
+    void BindModelViews()
+    {
+        Container.Bind<BuildingManagementWindowViewModel>().AsSingle().NonLazy();
+    }
     EntityManager GetEntityManager()
     {
         return World.DefaultGameObjectInjectionWorld.EntityManager;

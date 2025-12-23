@@ -12,7 +12,7 @@ public struct BuildingData : IComponentData
     public int BuildingIDHash;
     public int UniqueIDHash;
 }
-public struct RoadTag : IComponentData{}
+
 
 [Serializable]
 public struct BuildingPosData : IComponentData

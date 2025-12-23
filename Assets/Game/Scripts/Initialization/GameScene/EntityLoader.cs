@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -12,13 +12,13 @@ public class EntityLoader
     [Inject]
     EntityManager _entityManager;
 
-    public async Task LoadSavedEntitiesAsync(GameStateData gameState)
+    public async UniTask LoadSavedEntitiesAsync(GameStateData gameState)
     {
         await CreateSavedBuildingsAsync(gameState);
         await CreateSavedRoadsAsync(gameState);
     }
 
-    async Task CreateSavedBuildingsAsync(GameStateData gameState)
+    async UniTask CreateSavedBuildingsAsync(GameStateData gameState)
     {
         var entityIds = gameState.buildingPosDatas.Keys.ToArray();
         const int buildingsPerFrame = 5;
@@ -29,17 +29,17 @@ public class EntityLoader
             foreach (var id in chunk)
                 CreateSavedBuildingEntity(id, gameState);
 
-            await Task.Yield();
+            await UniTask.Yield();
         }
     }
 
-    async Task CreateSavedRoadsAsync(GameStateData gameState)
+    async UniTask CreateSavedRoadsAsync(GameStateData gameState)
     {
         if (gameState.roadPoints.Count != 0)
             CreateRoadsQuery(gameState.roadPoints, false);
         if (gameState.phantomPoints.Count != 0)
             CreateRoadsQuery(gameState.phantomPoints, true);
-        await Task.Yield();
+        await UniTask.Yield();
     }
 
     void CreateRoadsQuery(HashSet<int2> roadPoints, bool isBluePrint)

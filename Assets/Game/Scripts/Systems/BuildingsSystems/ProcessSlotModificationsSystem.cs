@@ -21,15 +21,15 @@ public partial struct ProcessSlotModificationsSystem : ISystem
                     
                     if (modification.ItemId == -1) 
                     {
-                        slot.Count = math.max(0, slot.Count - modification.Amount);
-                        if (slot.Count == 0) slot.ItemId = 0;
+                        slot.Amount = math.max(0, slot.Amount - modification.Amount);
+                        if (slot.Amount == 0) slot.ItemId = 0;
                     }
                     else 
                     {
                         if (slot.ItemId == 0 || slot.ItemId == modification.ItemId)
                         {
                             slot.ItemId = modification.ItemId;
-                            slot.Count = math.min(slot.Capacity, slot.Count + modification.Amount);
+                            slot.Amount = math.min(slot.Capacity, slot.Amount + modification.Amount);
                         }
                     }
                     

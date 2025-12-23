@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -29,10 +30,12 @@ public class GameController : IInitializable
 
     [Inject] ECSSystemsManager ecssSystemsManager;
     [Inject] UIManager UIManager;
+    public int Timestep{get;private set;}
 
     public void Initialize()
     {
-        fixedStepSimulationSystemGroup.Timestep = 1 / gameFieldSettings.tickPerSecond;
+        Timestep=1 / gameFieldSettings.tickPerSecond;
+        fixedStepSimulationSystemGroup.Timestep = Timestep;
 
         _buildingMapSystem.Enabled = true;
 
@@ -41,12 +44,14 @@ public class GameController : IInitializable
 
     public void SpeedUpTick()
     {
-        fixedStepSimulationSystemGroup.Timestep /= 2;
+        Timestep/=2;
+        fixedStepSimulationSystemGroup.Timestep =Timestep;
     }
 
     public void SlowDownTick()
     {
-        fixedStepSimulationSystemGroup.Timestep *= 2;
+        Timestep*=2;
+        fixedStepSimulationSystemGroup.Timestep = Timestep;
     }
 
     async void LoadGame()
@@ -54,7 +59,7 @@ public class GameController : IInitializable
         await _loadingService.LoadWithProgressAsync(saveService.LoadGameState, LoadGameField);
     }
 
-    async Task LoadGameField()
+    async UniTask LoadGameField()
     {
         var save = saveService.GameState;
         await EntityLoader.LoadSavedEntitiesAsync(save);
@@ -63,7 +68,7 @@ public class GameController : IInitializable
         cameraController.enabled = true;
         ecssSystemsManager.EnableGameplaySystems();
         UIManager.Initialize();
-        await Task.Yield();
+        await UniTask.Yield();
     }
 
     public void PlaceBuilding(
@@ -81,8 +86,8 @@ public class GameController : IInitializable
     }
     public Entity GetEntity(Vector2Int pos)
     {
-         _buildingMapSystem.GetEntity(new int2(pos.x,pos.y), out Entity entity);
-         return entity;
+        _buildingMapSystem.GetEntity(new int2(pos.x,pos.y), out Entity entity);
+        return entity;
     }
      public Entity GetEntity(int id)
     {

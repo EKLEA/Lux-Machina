@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -24,17 +25,17 @@ public class LoadingScreen : MonoBehaviour
     [Inject]
     private LoadingSettings _loadingSettings;
 
-    public async Task ShowBlackScreen(bool force)
+    public async UniTask ShowBlackScreen(bool force)
     {
         if (!force)
             await FadeCanvas(_blackScreen, 0, 1);
 
         _blackScreen.alpha = 1;
         _blackScreen.blocksRaycasts = true;
-        await Task.Yield();
+        await UniTask.Yield();
     }
 
-    public async Task ShowLoadingScreen()
+    public async UniTask ShowLoadingScreen()
     {
         await FadeCanvas(_canvasGroup, 0, 1);
         _canvasGroup.alpha = 1;
@@ -42,10 +43,10 @@ public class LoadingScreen : MonoBehaviour
         _blackScreen.alpha = 0;
         _blackScreen.blocksRaycasts = false;
         _loadingPanel.SetActive(true);
-        await Task.Yield();
+        await UniTask.Yield();
     }
 
-    public async Task Hide(bool force)
+    public async UniTask Hide(bool force)
     {
         if (!force)
             await FadeCanvas(_canvasGroup, 1f, 0f);
@@ -54,10 +55,10 @@ public class LoadingScreen : MonoBehaviour
         _canvasGroup.alpha = 0;
         _canvasGroup.blocksRaycasts = false;
         _loadingPanel.SetActive(false);
-        await Task.Yield();
+        await UniTask.Yield();
     }
 
-    private async Task FadeCanvas(CanvasGroup group, float fromAlpha, float toAlpha)
+    private async UniTask FadeCanvas(CanvasGroup group, float fromAlpha, float toAlpha)
     {
         float duration = _loadingSettings.TimeOfFade;
         float elapsed = 0f;
@@ -68,10 +69,10 @@ public class LoadingScreen : MonoBehaviour
             float progress = Mathf.Clamp01(elapsed / duration);
             group.alpha = Mathf.Lerp(fromAlpha, toAlpha, progress);
 
-            await Task.Yield();
+            await UniTask.Yield();
         }
         group.alpha = toAlpha;
-        await Task.Yield();
+        await UniTask.Yield();
     }
 
     public void SetProgress(float progress)

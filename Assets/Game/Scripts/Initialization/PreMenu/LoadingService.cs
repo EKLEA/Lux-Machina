@@ -1,13 +1,13 @@
 using System;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 public interface ILoadingService
 {
-    Task LoadWithProgressAsync(params Func<Task>[] loadTasks);
-    Task ShowLoadingScreen();
-    Task HideLoadingScreen();
-    Task ShowBlackScreenForce(bool b);
+    UniTask LoadWithProgressAsync(params Func<UniTask>[] loadTasks);
+    UniTask ShowLoadingScreen();
+    UniTask HideLoadingScreen();
+    UniTask ShowBlackScreenForce(bool b);
 }
 
 public class LoadingService : ILoadingService
@@ -27,7 +27,7 @@ public class LoadingService : ILoadingService
         UnityEngine.Object.DontDestroyOnLoad(_loadingScreen.gameObject);
     }
 
-    public async Task LoadWithProgressAsync(params Func<Task>[] loadTasks)
+    public async UniTask LoadWithProgressAsync(params Func<UniTask>[] loadTasks)
     {
         if (_isFirstLoad)
         {
@@ -53,9 +53,9 @@ public class LoadingService : ILoadingService
         await HideLoadingScreen();
     }
 
-    public async Task ShowBlackScreenForce(bool b) => await _loadingScreen.ShowBlackScreen(b);
+    public async UniTask ShowBlackScreenForce(bool b) => await _loadingScreen.ShowBlackScreen(b);
 
-    public async Task ShowLoadingScreen() => await _loadingScreen.ShowLoadingScreen();
+    public async UniTask ShowLoadingScreen() => await _loadingScreen.ShowLoadingScreen();
 
-    public async Task HideLoadingScreen() => await _loadingScreen.Hide(false);
+    public async UniTask HideLoadingScreen() => await _loadingScreen.Hide(false);
 }

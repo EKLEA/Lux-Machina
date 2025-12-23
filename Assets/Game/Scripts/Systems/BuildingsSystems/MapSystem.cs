@@ -60,31 +60,28 @@ public partial struct MapSystem : ISystem
             newCapacity,
             Allocator.Persistent
         );
+        var newEntities = new NativeParallelHashMap<int, Entity>(newCapacity, Allocator.Persistent); 
 
-         var newEntities = new NativeParallelHashMap<int, Entity>(
-            newCapacity,
-            Allocator.Persistent
-        );
         foreach (var pair in mapData.CellMapBuildings)
             newCellBuildMap.TryAdd(pair.Key, pair.Value);
         foreach (var pair in mapData.CellMapIDs)
             newCellIDMap.TryAdd(pair.Key, pair.Value);
         foreach (var pair in mapData.CellEntity)
             newCellEntity.TryAdd(pair.Key, pair.Value);
-        foreach (var pair in mapData.Entities)
+        foreach (var pair in mapData.Entities) 
             newEntities.TryAdd(pair.Key, pair.Value);
 
         var oldBuildings = mapData.CellMapBuildings;
         var oldIDs = mapData.CellMapIDs;
         var oldCellEntities = mapData.CellEntity;
-        var oldEntities = mapData.Entities;
+        var oldEntities = mapData.Entities; 
 
         var newBuildingMap = new BuildingMap
         {
             CellMapBuildings = newCellBuildMap,
             CellMapIDs = newCellIDMap,
             CellEntity = newCellEntity,
-            Entities=newEntities
+            Entities = newEntities 
         };
 
         state.EntityManager.SetComponentData(BuildingMapEntity, newBuildingMap);
@@ -93,10 +90,10 @@ public partial struct MapSystem : ISystem
             oldBuildings.Dispose();
         if (oldIDs.IsCreated)
             oldIDs.Dispose();
-        if (oldEntities.IsCreated)
-            oldEntities.Dispose();
         if (oldCellEntities.IsCreated)
             oldCellEntities.Dispose();
+        if (oldEntities.IsCreated) // ДОБАВЬТЕ ЭТУ СТРОКУ
+            oldEntities.Dispose();
     }
 
     [BurstCompile]
@@ -176,6 +173,8 @@ public partial struct MapSystem : ISystem
 
             if (mapData.CellEntity.IsCreated)
                 mapData.CellEntity.Dispose();
+            if (mapData.Entities.IsCreated)
+                mapData.Entities.Dispose();
         }
 
         _isInitialized = false;

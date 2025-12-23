@@ -1,11 +1,11 @@
 using System.IO;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using Zenject;
 
-public class SaveService : IGameStateSaver
+public class SaveService : IGameStateSaver,IReadOnlySave
 {
     [Inject]
     IReadOnlyBuildingInfo buildingInfo;
@@ -13,7 +13,7 @@ public class SaveService : IGameStateSaver
     public int saveIndex;
     public GameStateData GameState { get; private set; }
 
-    public async Task LoadGameState()
+    public async UniTask LoadGameState()
     {
         SavePath = Path.Combine(
             Application.persistentDataPath,
@@ -44,7 +44,7 @@ public class SaveService : IGameStateSaver
         }
     }
 
-    public async Task SaveGameState()
+    public async UniTask SaveGameState()
     {
         try
         {
@@ -80,10 +80,10 @@ public class SaveService : IGameStateSaver
         save.phantomPoints = new();
         save.buildingPosDatas = new();
         save.healthDatas = new();
-        save.SlotDatas = new();
+        save.slotDatas = new();
         save.inputSlots = new();
         save.outputSlots = new();
-        save.buildingWorkWithItemsLogicDatas = new();
+        save.buildingsPriorityDatas = new();
         save.processBuildingDatas = new();
         save.phantomBuildings = new();
         save.camData = new PlayerCamData()
@@ -109,8 +109,11 @@ public class SaveService : IGameStateSaver
         return save;
     }
 }
-
+public interface IReadOnlySave
+{
+    public GameStateData GameState{get;}
+}
 public interface IGameStateSaver
 {
-    public Task SaveGameState();
+    public UniTask SaveGameState();
 }

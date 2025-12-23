@@ -60,7 +60,7 @@ public class BuildingButtonsHolder : UIScreen
             {
                 var bt = BTs[i];
                 var buildingConfig = buildings[i];
-                var buildingId = buildingConfig.id.GetStableHashCode();
+                var buildingId = buildingConfig.id;
 
                 bt.image.sprite = buildingInfo.GetBuildingSprite(buildingId);
                 AddButtonListener(buildingId, bt);

@@ -28,6 +28,8 @@ public abstract class UIScreen :MonoBehaviour, IInitializable
         }
     }
 }
+
+
 public interface IDragableWindow: IDragHandler, IBeginDragHandler, IEndDragHandler
 {
     

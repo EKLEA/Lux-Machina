@@ -30,7 +30,7 @@ public partial class RecipeCacheFillSystem : SystemBase
                 if (burstRecipe.InputItems.Length < burstRecipe.InputItems.Capacity)
                 {
                     burstRecipe.InputItems.Add(
-                        new RecipeIngredientStruct { ItemId = input.itemId, Amount = input.amount }
+                        new RecipeIngredientStruct { ItemId = input.Value.itemId, Amount = input.Value.amount }
                     );
                 }
             }
@@ -42,8 +42,8 @@ public partial class RecipeCacheFillSystem : SystemBase
                     burstRecipe.OutputItems.Add(
                         new RecipeIngredientStruct
                         {
-                            ItemId = output.itemId,
-                            Amount = output.amount,
+                            ItemId = output.Value.itemId,
+                            Amount = output.Value.amount,
                         }
                     );
                 }

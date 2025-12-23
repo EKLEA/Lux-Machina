@@ -7,9 +7,10 @@ using System;
 
 public class CsvTableParserEditor : EditorWindow
 {
-    private TextAsset itemsCsv;
-    private TextAsset buildingsCsv;
-    private TextAsset recipesCsv;
+    TextAsset itemsCsv;
+    TextAsset buildingsCsv;
+    TextAsset recipesCsv;
+    TextAsset storageCsv; // Добавлено для Storage
 
     [MenuItem("Tools/Parse CSV Tables")]
     public static void ShowWindow()
@@ -17,7 +18,7 @@ public class CsvTableParserEditor : EditorWindow
         GetWindow<CsvTableParserEditor>("CSV Parser");
     }
 
-    private void OnGUI()
+    void OnGUI()
     {
         GUILayout.Label("CSV Tables Parser", EditorStyles.boldLabel);
         GUILayout.Label("Работает с CSV которые выглядят как Excel", EditorStyles.miniLabel);
@@ -31,6 +32,9 @@ public class CsvTableParserEditor : EditorWindow
         recipesCsv =
             EditorGUILayout.ObjectField("Recipes CSV", recipesCsv, typeof(TextAsset), false)
             as TextAsset;
+        storageCsv =
+            EditorGUILayout.ObjectField("Storages CSV", storageCsv, typeof(TextAsset), false) // Исправлено: storageCsv
+            as TextAsset;
 
         if (GUILayout.Button("Parse All Tables"))
         {
@@ -38,14 +42,13 @@ public class CsvTableParserEditor : EditorWindow
         }
     }
 
-    private void ParseAllTables()
+    void ParseAllTables()
     {
         try
         {
             if (itemsCsv != null)
             {
                 Debug.Log($"Parsing Items CSV: {itemsCsv.name}");
-                // Явно читаем файл с кодировкой UTF-8
                 string csvText = File.ReadAllText(
                     AssetDatabase.GetAssetPath(itemsCsv),
                     System.Text.Encoding.UTF8
@@ -70,6 +73,15 @@ public class CsvTableParserEditor : EditorWindow
                 );
                 ParseRecipes(csvText);
             }
+            if (storageCsv != null)
+            {
+                Debug.Log($"Parsing Storages CSV: {storageCsv.name}"); // Исправлено
+                string csvText = File.ReadAllText(
+                    AssetDatabase.GetAssetPath(storageCsv), // Исправлено: storageCsv
+                    System.Text.Encoding.UTF8
+                );
+                ParseStorages(csvText); // Новый метод
+            }
 
             EditorUtility.DisplayDialog("Success", "All tables parsed successfully!", "OK");
             AssetDatabase.Refresh();
@@ -81,9 +93,7 @@ public class CsvTableParserEditor : EditorWindow
         }
     }
 
-   
-
-    private void ParseItems(string csvText)
+    void ParseItems(string csvText)
     {
         var rows = ParseCsv(csvText);
         if (rows.Count < 2)
@@ -94,7 +104,7 @@ public class CsvTableParserEditor : EditorWindow
         for (int i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            if (row.Length < 5)
+            if (row.Length < 7) // Увеличено до 7
             {
                 Debug.LogWarning(
                     $"Skipping row {i} in Items CSV: not enough columns ({row.Length})"
@@ -107,11 +117,13 @@ public class CsvTableParserEditor : EditorWindow
                 items.Add(
                     new ItemConfig
                     {
-                        id = row[0].Trim(),
+                        id = int.Parse(row[0]),
                         title = row[1],
                         description = row[2],
                         iconPath = row[3],
                         maxInStack = int.Parse(row[4]),
+                        ItemClass = (ItemClass)int.Parse(row[5]),
+                        ItemType = (ItemType)int.Parse(row[6]),
                     }
                 );
             }
@@ -126,7 +138,7 @@ public class CsvTableParserEditor : EditorWindow
         Debug.Log($"Parsed {items.Count} items");
     }
 
-    private void ParseBuildings(string csvText)
+    void ParseBuildings(string csvText)
     {
         var rows = ParseCsv(csvText);
         if (rows.Count < 2)
@@ -150,7 +162,7 @@ public class CsvTableParserEditor : EditorWindow
                 buildings.Add(
                     new BuildingConfig
                     {
-                        id = row[0].Trim(),
+                        id = int.Parse(row[0]),
                         title = row[1],
                         description = row[2],
                         iconPath = row[3],
@@ -163,7 +175,7 @@ public class CsvTableParserEditor : EditorWindow
                             int.Parse(row[9])
                         ),
                         typeOfLogic = (TypeOfLogic)int.Parse(row[10]),
-                        requiredRecipesGroup = (RequiredRecipesGroup)int.Parse(row[11]),
+                        requiredRecipesGroup = ParseIntHashSet(row[11]),
                         maxHealth = float.Parse(row[12]),
                         timeToStartRestore = float.Parse(row[13]),
                         restoreHealthPerSecond = float.Parse(row[14]),
@@ -182,7 +194,7 @@ public class CsvTableParserEditor : EditorWindow
         Debug.Log($"Parsed {buildings.Count} buildings");
     }
 
-    private void ParseRecipes(string csvText)
+    void ParseRecipes(string csvText)
     {
         var rows = ParseCsv(csvText);
         if (rows.Count < 2)
@@ -193,7 +205,7 @@ public class CsvTableParserEditor : EditorWindow
         for (int i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            if (row.Length < 7)
+            if (row.Length < 8)
             {
                 Debug.LogWarning(
                     $"Skipping row {i} in Recipes CSV: not enough columns ({row.Length})"
@@ -206,12 +218,13 @@ public class CsvTableParserEditor : EditorWindow
                 recipes.Add(
                     new RecipeConfig
                     {
-                        id = row[0].Trim(),
-                        groupId = int.Parse(row[1]),
-                        inputItems = ParseIngredientString(row[2]),
-                        outputItems = ParseIngredientString(row[3]),
-                        craftTime = float.Parse(row[4]),
-                        recipeSpritePath = row[5],
+                        id = int.Parse(row[0]),
+                        title = row[1].Trim(),
+                        groupIds = ParseIntHashSet(row[2]),
+                        inputItems = ParseIngredientString(row[3]),
+                        outputItems = ParseIngredientString(row[4]),
+                        craftTime = float.Parse(row[5]),
+                        recipeSpritePath = row[6],
                     }
                 );
             }
@@ -226,9 +239,70 @@ public class CsvTableParserEditor : EditorWindow
         Debug.Log($"Parsed {recipes.Count} recipes");
     }
 
-    private List<RecipeIngredient> ParseIngredientString(string ingredientString)
+    // НОВЫЙ МЕТОД: Парсинг StorageConfig
+    void ParseStorages(string csvText)
     {
-        var ingredients = new List<RecipeIngredient>();
+        var rows = ParseCsv(csvText);
+        if (rows.Count < 2)
+            return;
+
+        var storages = new List<StorageConfig>();
+
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Length < 3) 
+            {
+                Debug.LogWarning(
+                    $"Skipping row {i} in Storages CSV: not enough columns ({row.Length})"
+                );
+                continue;
+            }
+
+            try
+            {
+                storages.Add(
+                    new StorageConfig
+                    {
+                        BuildingID = int.Parse(row[0]),
+                        MaxSlots = int.Parse(row[1]),
+                        ItemsTypes = ParseIntHashSet(row[2])
+                    }
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error parsing storage at row {i}: {ex.Message}");
+                Debug.LogError($"Row data: {string.Join(" | ", row)}");
+                throw;
+            }
+        }
+
+        SaveToJson(new StorageConfigList { storages = storages }, "storages");
+        Debug.Log($"Parsed {storages.Count} storages");
+    }
+
+    HashSet<int> ParseIntHashSet(string idsString)
+    {
+        HashSet<int> ids = new HashSet<int>();
+        
+        if (string.IsNullOrEmpty(idsString) || idsString.Trim() == "0")
+            return ids;
+
+        string[] pairs = idsString.Split(',');
+        foreach (string pair in pairs)
+        {
+            if (int.TryParse(pair.Trim(), out int id))
+            {
+                ids.Add(id);
+            }
+        }
+        return ids;
+    }
+
+    Dictionary<int, RecipeIngredient> ParseIngredientString(string ingredientString)
+    {
+        var ingredients = new Dictionary<int, RecipeIngredient>();
 
         if (string.IsNullOrEmpty(ingredientString))
             return ingredients;
@@ -239,20 +313,35 @@ public class CsvTableParserEditor : EditorWindow
             string[] parts = pair.Split(':');
             if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int amount))
             {
-                ingredients.Add(
-                    new RecipeIngredient
-                    {
-                        itemId = parts[0].Trim().GetStableHashCode(),
-                        amount = amount,
-                    }
-                );
+                string itemIdStr = parts[0].Trim();
+                if (int.TryParse(itemIdStr, out int itemId))
+                {
+                    ingredients.Add(itemId,
+                        new RecipeIngredient
+                        {
+                            itemId = itemId,
+                            amount = amount,
+                        }
+                    );
+                }
+                else
+                {
+                    // Если это не число, используем хэш
+                    ingredients.Add(itemIdStr.GetStableHashCode(),
+                        new RecipeIngredient
+                        {
+                            itemId = itemIdStr.GetStableHashCode(),
+                            amount = amount,
+                        }
+                    );
+                }
             }
         }
 
         return ingredients;
     }
 
-    private List<string[]> ParseCsv(string csvText)
+    List<string[]> ParseCsv(string csvText)
     {
         var rows = new List<string[]>();
 
@@ -329,36 +418,28 @@ public class CsvTableParserEditor : EditorWindow
         return rows;
     }
 
-    private void SaveToJson(object data, string fileName)
+    void SaveToJson(object data, string fileName)
     {
         try
         {
             string json = "";
 
             // Выбираем правильный wrapper в зависимости от типа данных
-            if (data is BuildingConfig[])
+            if (data is BuildingConfigList buildingList)
             {
-                var wrapper = new BuildingConfigList
-                {
-                    buildings = new List<BuildingConfig>((BuildingConfig[])data),
-                };
-                json = JsonUtility.ToJson(wrapper, true);
+                json = JsonUtility.ToJson(buildingList, true);
             }
-            else if (data is ItemConfig[])
+            else if (data is ItemConfigList itemList)
             {
-                var wrapper = new ItemConfigList
-                {
-                    items = new List<ItemConfig>((ItemConfig[])data),
-                };
-                json = JsonUtility.ToJson(wrapper, true);
+                json = JsonUtility.ToJson(itemList, true);
             }
-            else if (data is RecipeConfig[])
+            else if (data is RecipeConfigList recipeList)
             {
-                var wrapper = new RecipeConfigList
-                {
-                    recipes = new List<RecipeConfig>((RecipeConfig[])data),
-                };
-                json = JsonUtility.ToJson(wrapper, true);
+                json = JsonUtility.ToJson(recipeList, true);
+            }
+            else if (data is StorageConfigList storageList) // Добавлено
+            {
+                json = JsonUtility.ToJson(storageList, true);
             }
             else
             {

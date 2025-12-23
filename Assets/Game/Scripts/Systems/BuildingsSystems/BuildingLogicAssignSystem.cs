@@ -1,18 +1,25 @@
 using System;
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.UniversalDelegates;
+using Unity.VisualScripting;
+using UnityEngine;
 using Zenject;
 
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 [UpdateAfter(typeof(RoadSystem))]
 public partial class BuildingLogicAssignSystem : SystemBase
 {
-    [Inject]
-    IReadOnlyBuildingInfo buildingInfo;
-
-    [Inject]
-    IReadOnlyRecipeInfo recipeInfo;
-
+    [Inject] IReadOnlyBuildingInfo buildingInfo;
+    [Inject] IReadOnlySave saveFile;
+    [Inject] IReadOnlyRecipeInfo recipeInfo;
+    [Inject] IReadOnlyStorageConfig storageConfig;
+    [Inject] IReadOnlyItemsInfo itemsInfo;
+    protected override void OnCreate()
+    {
+        RequireForUpdate<SaveService>();
+    }
     protected override void OnUpdate()
     {
         var ecb = new EntityCommandBuffer(Allocator.TempJob);
@@ -20,295 +27,532 @@ public partial class BuildingLogicAssignSystem : SystemBase
         foreach (var (buildingLogicData, entity) in SystemAPI
             .Query<BuildingData>()
             .WithAll<AssignLogicTag>()
-            .WithNone<HasInputSlots, HasOutputSlots>()
+            .WithNone<BuildingTag,PropTag>()
+            .WithNone< ProcessorBuildingTag,DefenceBuildingTag,StorageBuildingTag>()
             .WithEntityAccess())
         {
             AssignLogic(entity, buildingLogicData, ecb);
-        }
-
-        foreach (var (buildingData, recipe, entity) in SystemAPI
-            .Query<BuildingWorkWithItemsLogicData, ChangeRecipeData>()
-            .WithAll<ProcessBuildingData>()
-            .WithAny<HasInputSlots, HasOutputSlots>()
+        };
+        foreach (var (changeBuff,slotBuff, entity) in SystemAPI
+            .Query<DynamicBuffer<ChangeSlotCapacityData>,DynamicBuffer<SlotData>>()
+            .WithAny<InputSlots,OutputSlots>()
             .WithEntityAccess())
         {
-            ChangeRecipe(entity, buildingData, recipe, ecb);
-        }
-
-        foreach (var (changeSlotData, entity) in SystemAPI
-            .Query<ChangeSlotCapacityData>()
-            .WithAll<BuildingWorkWithItemsLogicData>()
-            .WithAny<HasInputSlots, HasOutputSlots>()
-            .WithEntityAccess())
-        {
-            ChangeSlotCapacity(entity, changeSlotData);
+            if(changeBuff.Length>0&&slotBuff.Length>0 && slotBuff.Length>=changeBuff.Length)
+                ChangeSlotCapacity(entity,changeBuff,slotBuff,ecb);
         }
 
         foreach (var (data, entity) in SystemAPI
             .Query<ChangePriorityData>()
-            .WithAll<BuildingWorkWithItemsLogicData>()
-            .WithAny<HasInputSlots, HasOutputSlots>()
+            .WithAll<BuildingPriorityData>()
             .WithEntityAccess())
         {
             ChangePriority(entity, data, ecb);
         }
         foreach (var (data, entity) in SystemAPI
             .Query<ChangeBuildingCountOfPackData>()
-            .WithAll<BuildingWorkWithItemsLogicData>()
-            .WithAny<HasInputSlots, HasOutputSlots>()
+            .WithAll<CountOfPackInBuildingData>()
             .WithEntityAccess())
         {
             ChangeBuildingCountOfPack(entity, data, ecb);
         }
+        foreach (var (countOfPackData, recipeGroupData,newRecipe, entity) in SystemAPI
+            .Query<CountOfPackInBuildingData,BuildingRequiredRecipesGroupData, ChangeRecipeData>()
+            .WithEntityAccess())
+        {
+            ChangeRecipe(entity, countOfPackData, recipeGroupData,newRecipe, ecb);
+        }
 
+        foreach (var (BuildingData,CreateStorageSlotData,slotBuff, entity) in SystemAPI
+            .Query<BuildingData,CreateStorageSlot,DynamicBuffer<SlotData>>()
+            .WithAll<BuildingTag>()
+            .WithAny<StorageBuildingTag,DefenceBuildingTag>()
+            .WithEntityAccess())
+        {
+            CreateStorageSlot(entity,BuildingData,CreateStorageSlotData,slotBuff,ecb);
+        }
+        foreach (var (DeleteStorageSlotData,slotBuff, entity) in SystemAPI
+            .Query<DeleteStorageSlot,DynamicBuffer<SlotData>>()
+            .WithAll<BuildingTag>()
+            .WithAny<StorageBuildingTag,DefenceBuildingTag>()
+            .WithEntityAccess())
+        {
+            DeleteStorageSlot(entity,DeleteStorageSlotData,slotBuff,ecb);
+        }
         ecb.Playback(EntityManager);
         ecb.Dispose();
     }
-
     void AssignLogic(Entity entity, BuildingData buildingData, EntityCommandBuffer ecb)
     {
         var info = buildingInfo.BuildingInfos[buildingData.BuildingIDHash];
-        if (info.typeOfLogic != TypeOfLogic.None)
+        if (info.buildingType == BuildingsTypes.Prop)
         {
-            switch (info.typeOfLogic)
+            ecb.AddComponent<PropTag>(entity);
+        }
+        else
+        {
+            if (info.typeOfLogic != TypeOfLogic.None)
             {
-                case TypeOfLogic.WorkWithItems:
-                    ecb.AddComponent(entity, new BuildingWorkWithItemsLogicData
+                ecb.AddComponent<BuildingStateData>(entity);
+                switch (info.typeOfLogic)
+                {
+                    case TypeOfLogic.WorkWithItems:
+                        var slotBuff=ecb.AddBuffer<SlotData>(entity);
+                        if (saveFile.GameState.slotDatas.ContainsKey(buildingData.UniqueIDHash))
+                        {
+                            slotBuff.ResizeUninitialized(saveFile.GameState.slotDatas[buildingData.UniqueIDHash].Count);
+                            foreach(var sl in saveFile.GameState.slotDatas[buildingData.UniqueIDHash])
+                                slotBuff[sl.ind]=sl.slotData;
+                        }
+                        ecb.AddComponent(entity, new BuildingPriorityData(){Priority=saveFile.GameState.buildingsPriorityDatas.ContainsKey(buildingData.UniqueIDHash)?
+                        saveFile.GameState.buildingsPriorityDatas[buildingData.UniqueIDHash].Priority:(int)DistributionPriority.Middle
+                        });
+
+                        switch (info.buildingType)
+                        {
+                            case BuildingsTypes.Production:
+                                ecb.AddComponent<ProcessorBuildingTag>(entity);
+                                ecb.AddComponent(entity,new CountOfPackInBuildingData{CountOfPack=1});
+                                var fixedListRIDs = new FixedList32Bytes<int>();
+                                foreach(var rId in info.requiredRecipesGroup)
+                                    fixedListRIDs.Add(rId);
+                                ecb.AddComponent(entity,new BuildingRequiredRecipesGroupData{RequiredRecipesGroups=fixedListRIDs});
+                                
+                                if(saveFile.GameState.processBuildingDatas.ContainsKey(buildingData.UniqueIDHash))
+                                    ecb.AddComponent(entity,saveFile.GameState.processBuildingDatas[buildingData.UniqueIDHash]);
+                                else  
+                                    ecb.AddComponent<AssingRecipeTag>(entity);
+                                
+                                if(saveFile.GameState.changeRecipeDatas.ContainsKey(buildingData.UniqueIDHash))
+                                    ecb.AddComponent(entity,saveFile.GameState.changeRecipeDatas[buildingData.UniqueIDHash]);
+
+                                if(saveFile.GameState.changeBuildingCountOfPackDatas.ContainsKey(buildingData.UniqueIDHash))
+                                    ecb.AddComponent(entity,saveFile.GameState.changeBuildingCountOfPackDatas[buildingData.UniqueIDHash]);
+                            break;
+
+                            case BuildingsTypes.Defence:
+                                ecb.AddComponent<DefenceBuildingTag>(entity);
+                                //компонент амуниции
+                            break;
+                            case BuildingsTypes.Logistic:
+                                ecb.AddComponent<StorageBuildingTag>(entity);
+                            break;
+
+                        }
+
+
+                    if(saveFile.GameState.changeSlotCapacitDatas.ContainsKey(buildingData.UniqueIDHash))
                     {
-                        Priority = (int)DistributionPriority.Middle,
-                        RequiredRecipesGroup = (int)info.requiredRecipesGroup,
-                        CountOfPack = 5
-                    });
+                        var changebf = ecb.AddBuffer<ChangeSlotCapacityData>(entity);
+                        foreach(var csc in saveFile.GameState.changeSlotCapacitDatas[buildingData.UniqueIDHash])
+                            changebf.Add(csc);
+                    }
+                    if(saveFile.GameState.changePrioritDatas.ContainsKey(buildingData.UniqueIDHash))
+                        ecb.AddComponent(entity,saveFile.GameState.changePrioritDatas[buildingData.UniqueIDHash]);
+
+                    if(saveFile.GameState.inputSlots.ContainsKey(buildingData.UniqueIDHash))
+                    {
+                        ecb.AddComponent(entity,saveFile.GameState.inputSlots[buildingData.UniqueIDHash]);
+                        if(saveFile.GameState.canResoucesBeAddedTag.Contains(buildingData.UniqueIDHash))
+                             ecb.AddComponent<CanResoucesBeAddedTag>(entity);
+                    }
+                    if(saveFile.GameState.outputSlots.ContainsKey(buildingData.UniqueIDHash))
+                    {
+                        ecb.AddComponent(entity,saveFile.GameState.outputSlots[buildingData.UniqueIDHash]);
+                        if(saveFile.GameState.canResoucesBeRemovedTag.Contains(buildingData.UniqueIDHash))
+                            ecb.AddComponent<CanResoucesBeRemovedTag>(entity);
+                    }
+                    if(saveFile.GameState.excessItemSlots.ContainsKey(buildingData.UniqueIDHash))
+                        ecb.AddComponent(entity,saveFile.GameState.excessItemSlots[buildingData.UniqueIDHash]);
                     break;
-            }
-            ecb.RemoveComponent<AssignLogicTag>(entity);
-        }
-    }
-
-    void ChangeRecipe(
-        Entity entity,
-        BuildingWorkWithItemsLogicData buildingData,
-        ChangeRecipeData recipeData,
-        EntityCommandBuffer ecb)
-    {
-        if (recipeInfo.RecipeInfos.TryGetValue(recipeData.newRecipeID, out RecipeConfig recipe) 
-            && recipe.groupId == buildingData.RequiredRecipesGroup)
-        {
-            using (var removedItems = new NativeHashMap<int, SlotData>(1000, Allocator.Temp))
-            {
-                if (EntityManager.HasBuffer<SlotData>(entity))
-                {
-                    var buff = EntityManager.GetBuffer<SlotData>(entity);
-                    CollectItemsFromSlots(entity, buff, removedItems);
+                        
+                        
                 }
-
-                ProcessBuildingData newData = new()
-                {
-                    RecipeIDHash = recipeData.newRecipeID,
-                    TimeToProduceNext = recipe.craftTime,
-                    CurrTime = 0
-                };
-
-                if (EntityManager.HasBuffer<SlotData>(entity))
-                    ecb.RemoveComponent<SlotData>(entity);
-                if (EntityManager.HasComponent<HasInputSlots>(entity))
-                    ecb.RemoveComponent<HasInputSlots>(entity);
-                if (EntityManager.HasComponent<HasOutputSlots>(entity))
-                    ecb.RemoveComponent<HasOutputSlots>(entity);
-                if (EntityManager.HasComponent<DistribureRemovedItems>(entity))
-                    ecb.RemoveComponent<DistribureRemovedItems>(entity);
-
-                var newBuff = ecb.AddBuffer<SlotData>(entity);
-                int currentIndex = 0;
-
-                if (recipe.inputItems.Count > 0)
-                    currentIndex = CreateInputSlots(recipe, buildingData, removedItems, newBuff, currentIndex, ecb, entity);
-
-                if (recipe.outputItems.Count > 0)
-                    currentIndex = CreateOutputSlots(recipe, buildingData, removedItems, newBuff, currentIndex, ecb, entity);
-
-                if (!removedItems.IsEmpty)
-                    CreateRemovedItemsSlots(removedItems, newBuff, currentIndex, ecb, entity);
-                
-                ecb.SetComponent(entity, newData);
+                ecb.AddComponent<BuildingTag>(entity);
             }
-            ecb.RemoveComponent<ChangeRecipeData>(entity);
         }
+        ecb.RemoveComponent<AssignLogicTag>(entity);
     }
-
-    private void CollectItemsFromSlots(Entity entity, DynamicBuffer<SlotData> buff, NativeHashMap<int, SlotData> removedItems)
+    void DeleteStorageSlot(Entity entity, DeleteStorageSlot deleteStorageSlotData, DynamicBuffer<SlotData> slotBuff, EntityCommandBuffer ecb)
     {
-        if (EntityManager.HasComponent<HasInputSlots>(entity))
+        if (deleteStorageSlotData.SlotIND < slotBuff.Length)
         {
-            var hIn = EntityManager.GetComponentData<HasInputSlots>(entity);
-            CollectFromRange(buff, hIn.StartIND, hIn.EndIND, removedItems);
-        }
-
-        if (EntityManager.HasComponent<HasOutputSlots>(entity))
-        {
-            var hOut = EntityManager.GetComponentData<HasOutputSlots>(entity);
-            CollectFromRange(buff, hOut.StartIND, hOut.EndIND, removedItems);
-        }
-
-        if (EntityManager.HasComponent<DistribureRemovedItems>(entity))
-        {
-            var dist = EntityManager.GetComponentData<DistribureRemovedItems>(entity);
-            CollectFromRange(buff, dist.StartIND, dist.EndIND, removedItems);
-        }
-    }
-
-    private void CollectFromRange(DynamicBuffer<SlotData> buff, int start, int end, NativeHashMap<int, SlotData> removedItems)
-    {
-        for (int i = start; i < end; i++)
-        {
-            if (buff[i].Count > 0)
+            var slot = slotBuff[deleteStorageSlotData.SlotIND];
+            var InputData=EntityManager.GetComponentData<InputSlots>(entity);
+            var OutputData=EntityManager.GetComponentData<OutputSlots>(entity);
+            slotBuff.RemoveAt(deleteStorageSlotData.SlotIND);
+            InputData.EndIND--;
+            OutputData.EndIND--;
+            ecb.SetComponent<InputSlots>(entity,InputData);
+            ecb.SetComponent<OutputSlots>(entity,OutputData);
+            if(slot.Amount>0)
             {
-                int itemId = buff[i].ItemId;
-                if (removedItems.TryGetValue(itemId, out SlotData data))
+                if (EntityManager.HasComponent<ExcessItemSlots>(entity))
                 {
-                    data.Count += buff[i].Count;
-                    removedItems[itemId] = data;
+                    var excessData=EntityManager.GetComponentData<ExcessItemSlots>(entity);
+                    excessData.EndIND++;
+                    ecb.SetComponent<ExcessItemSlots>(entity,excessData);
                 }
                 else
                 {
-                    removedItems.Add(itemId, buff[i]);
+                    EntityManager.AddComponentData(entity,new ExcessItemSlots{StartIND=slotBuff.Length,EndIND=slotBuff.Length} );
+                }
+                slotBuff.Add(slot);
+            }
+        }
+        ecb.RemoveComponent<DeleteStorageSlot>(entity);
+    }
+    void CreateStorageSlot(Entity building,BuildingData buildingData,CreateStorageSlot createSlotData,DynamicBuffer<SlotData>slotBuff, EntityCommandBuffer ecb)
+    {
+        var config=storageConfig.StorageConfig[buildingData.BuildingIDHash];
+        if (slotBuff.Length < config.MaxSlots)
+        {
+            if (!config.ItemsTypes.Contains((int)ItemType.None))
+            {
+                if (config.ItemsTypes.Contains((int)itemsInfo.ItemsInfos[createSlotData.ItemId].ItemType))
+                {
+                    var InputData=EntityManager.GetComponentData<InputSlots>(building);
+                    var OutputData=EntityManager.GetComponentData<OutputSlots>(building);
+                    int amount=0;
+                    if (EntityManager.HasComponent<ExcessItemSlots>(building))
+                    {
+                        NativeList<int> indexToRemove=new NativeList<int>(Allocator.Temp);
+                        var excessData=EntityManager.GetComponentData<ExcessItemSlots>(building);
+                        for(int i=excessData.StartIND;i<=excessData.EndIND;i++)
+                        {
+                            if (slotBuff[i].ItemId == createSlotData.ItemId&&slotBuff[i].Amount>0)
+                            {
+                                if (amount + slotBuff[i].Amount <= createSlotData.Capacity)
+                                {
+                                    amount +=slotBuff[i].Amount;
+                                    var t=slotBuff[i];
+                                    t.Amount=0;
+                                    slotBuff[i]=t;
+                                    indexToRemove.Add(i);
+                                }
+                            }
+                        }
+                        indexToRemove.Sort();
+                        for(int i = indexToRemove.Length - 1; i >= 0; i--)
+                        {
+                            slotBuff.RemoveAt(indexToRemove[i]);
+                            excessData.EndIND--;
+                        }
+                        indexToRemove.Dispose();
+                    }
+                    slotBuff.Add(new SlotData{Amount=amount,Capacity=createSlotData.Capacity,ItemId=createSlotData.ItemId});
+                    InputData.EndIND++;
+                    OutputData.EndIND++;
+                    ecb.SetComponent<InputSlots>(building,InputData);
+                    ecb.SetComponent<OutputSlots>(building,OutputData);
                 }
             }
         }
+        ecb.RemoveComponent<CreateStorageSlot>(building);
     }
-
-    private int CreateInputSlots(
-        RecipeConfig recipe,
-        BuildingWorkWithItemsLogicData buildingData,
-        NativeHashMap<int, SlotData> removedItems,
-        DynamicBuffer<SlotData> newBuff,
-        int startIndex,
-        EntityCommandBuffer ecb,
-        Entity entity)
+    void ChangeRecipe(Entity building, CountOfPackInBuildingData countOfPackDataData, 
+    BuildingRequiredRecipesGroupData recipeGroupData, ChangeRecipeData newRecipe, EntityCommandBuffer ecb)
     {
-        var inputSlots = new HasInputSlots
+        if (newRecipe.newRecipeID ==-1)
         {
-            StartIND = startIndex,
-            EndIND = startIndex + recipe.inputItems.Count-1
-        };
-
-        for (int i = 0; i < recipe.inputItems.Count; i++)
-        {
-            var inputItem = recipe.inputItems[i];
-            int count = 0;
+            if(!EntityManager.HasComponent<ProcessBuildingData>(building)) return;
+            else
+            {
+                 var buff = EntityManager.GetBuffer<SlotData>(building);
+                
+                
+                if (EntityManager.HasComponent<ExcessItemSlots>(building))
+                    ecb.RemoveComponent<ExcessItemSlots>(building);
+                
+                
+                if (EntityManager.HasComponent<OutputSlots>(building))
+                    ecb.RemoveComponent<OutputSlots>(building);
+                
+                if (EntityManager.HasComponent<InputSlots>(building))
+                    ecb.RemoveComponent<InputSlots>(building);
+                
+                
+                ecb.AddComponent(building, new ExcessItemSlots
+                {
+                    StartIND = 0,
+                    EndIND = buff.Length - 1
+                });
             
-            if (removedItems.TryGetValue(inputItem.itemId, out SlotData existingItem))
-            {
-                count = existingItem.Count;
-                removedItems.Remove(inputItem.itemId);
-            }
-
-            newBuff.Add(new SlotData
-            {
-                ItemId = inputItem.itemId,
-                Capacity = inputItem.amount * buildingData.CountOfPack,
-                Count = count
-            });
-        }
-
-        ecb.AddComponent(entity, inputSlots);
-        return inputSlots.EndIND;
-    }
-
-    private int CreateOutputSlots(
-        RecipeConfig recipe,
-        BuildingWorkWithItemsLogicData buildingData,
-        NativeHashMap<int, SlotData> removedItems,
-        DynamicBuffer<SlotData> newBuff,
-        int startIndex,
-        EntityCommandBuffer ecb,
-        Entity entity)
-    {
-        var outputSlots = new HasOutputSlots
-        {
-            StartIND = startIndex,
-            EndIND = startIndex + recipe.outputItems.Count-1
-        };
-
-        for (int i = 0; i < recipe.outputItems.Count; i++)
-        {
-            var outputItem = recipe.outputItems[i];
-            int count = 0;
             
-            if (removedItems.TryGetValue(outputItem.itemId, out SlotData existingItem))
-            {
-                count = existingItem.Count;
-                removedItems.Remove(outputItem.itemId);
-            }
-
-            newBuff.Add(new SlotData
-            {
-                ItemId = outputItem.itemId,
-                Capacity = outputItem.amount * buildingData.CountOfPack,
-                Count = count
-            });
-        }
-
-        ecb.AddComponent(entity, outputSlots);
-        return outputSlots.EndIND;
-    }
-
-    private void CreateRemovedItemsSlots(
-        NativeHashMap<int, SlotData> removedItems,
-        DynamicBuffer<SlotData> newBuff,
-        int startIndex,
-        EntityCommandBuffer ecb,
-        Entity entity)
-    {
-        int count = 0;
-        foreach (var item in removedItems)
-        {
-            newBuff.Add(new SlotData
-            {
-                ItemId = item.Value.ItemId,
-                Capacity = 999,
-                Count = item.Value.Count
-            });
-            count++;
-        }
-
-        ecb.AddComponent(entity, new DistribureRemovedItems
-        {
-            StartIND = startIndex,
-            EndIND = startIndex + count-1
-        });
-    }
-
-    void ChangeSlotCapacity(Entity entity, ChangeSlotCapacityData changeSlotCapacityData)
-    {
-        if (EntityManager.HasBuffer<SlotData>(entity))
-        {
-            var bf = EntityManager.GetBuffer<SlotData>(entity);
-            if (changeSlotCapacityData.SlotIND >= 0 && changeSlotCapacityData.SlotIND < bf.Length)
-            {
-                var slot = bf[changeSlotCapacityData.SlotIND];
-                slot.Capacity = changeSlotCapacityData.newCapacity;
-                bf[changeSlotCapacityData.SlotIND] = slot;
+                ecb.AddComponent<AssingRecipeTag>(building);
+                
+                
+                if (EntityManager.HasComponent<ProcessBuildingData>(building))
+                {
+                    ecb.RemoveComponent<ProcessBuildingData>(building);
+                }
+                
+                return;
             }
         }
-    }
+        else
+        {
+            
+            var recipe=recipeInfo.RecipeInfos[newRecipe.newRecipeID];
+            if (CanBuildingUseRecipe(recipeGroupData.RequiredRecipesGroups, recipe.groupIds))
+            {
+                var processData= new ProcessBuildingData()
+                {
+                    RecipeIDHash=newRecipe.newRecipeID,
+                    TimeToProduceNext=recipe.craftTime,
+                    CurrTime=0
+                };
+                var excessItems = new NativeHashMap<int,SlotData>(100,Allocator.Temp);
+                NativeList<int> indexToRemove=new NativeList<int>(Allocator.Temp);
+                if (EntityManager.HasBuffer<SlotData>(building))
+                {
+                    var allSlots = EntityManager.GetBuffer<SlotData>(building);
+                    
+                    for (int i = 0; i < allSlots.Length; i++)
+                    {
+                        if(allSlots[i].Amount > 0)
+                            excessItems.Add(i,allSlots[i]);
+                    }
+                    
+                    ecb.RemoveComponent<SlotData>(building);  
+                }  
+                var slotBuff =ecb.AddBuffer<SlotData>(building);
+                int startInd=0;
+                if (recipe.inputItems.Count > 0)
+                {
+                    ecb.AddComponent(building,new InputSlots{StartIND=startInd,EndIND=startInd+recipe.inputItems.Count-1});
+                    startInd=startInd+recipe.outputItems.Count;
+                    foreach (var inputItem in recipe.inputItems.Values)
+                    {
+                        int amount = 0;
+                        int capacity = countOfPackDataData.CountOfPack * inputItem.amount;
 
+                        var keys = excessItems.GetKeyArray(Allocator.Temp);
+
+                        foreach (int key in keys)
+                        {
+                            if (amount >= capacity)
+                                break;
+                            
+                            if (!indexToRemove.Contains(key))
+                            {
+                                SlotData slotData = excessItems[key];
+                                
+                                if (slotData.ItemId == inputItem.itemId)
+                                {
+                                    if (amount + slotData.Amount <= capacity)
+                                    {
+                                        amount += slotData.Amount;
+                                        slotData.Amount = 0;
+                                        excessItems[key] = slotData;
+                                        indexToRemove.Add(key);
+                                    }
+                                    else
+                                    {
+                                        int takeAmount = capacity - amount;
+                                        slotData.Amount -= takeAmount;
+                                        amount = capacity;
+                                        excessItems[key] = slotData;
+                                    }
+                                }
+                            }
+                        }
+                        keys.Dispose();
+                        slotBuff.Add(new SlotData{Amount=amount,Capacity=capacity,ItemId=inputItem.itemId});
+                    }
+                }
+                if (recipe.outputItems.Count > 0)
+                {
+                    ecb.AddComponent(building,new OutputSlots{StartIND=startInd,EndIND=startInd+recipe.outputItems.Count-1});
+                    startInd=startInd+recipe.outputItems.Count;
+                    foreach( var outputItem in recipe.outputItems.Values)
+                    {
+                        int capacity = countOfPackDataData.CountOfPack * outputItem.amount;
+                        slotBuff.Add(new SlotData{Amount=0,Capacity=capacity,ItemId=outputItem.itemId});
+                    }
+                }
+                indexToRemove.Sort();
+                for(int i = indexToRemove.Length - 1; i >= 0; i--)
+                {
+                    excessItems.Remove(indexToRemove[i]);
+                }
+                indexToRemove.Dispose();
+                if (excessItems.Count > 0)
+                {
+                    ecb.AddComponent(building,new ExcessItemSlots{StartIND=startInd,EndIND=startInd+excessItems.Count-1});
+                    foreach( var ex in excessItems)
+                         slotBuff.Add(ex.Value);
+                }
+                excessItems.Dispose();
+                ecb.SetComponent<ProcessBuildingData>(building,processData);
+                if (EntityManager.HasComponent<AssingRecipeTag>(building))
+                {
+                    ecb.RemoveComponent<AssingRecipeTag>(building);
+                }
+            }
+        }
+        
+        ecb.RemoveComponent<ChangeRecipeData>(building);
+    }
+    bool CanBuildingUseRecipe(FixedList32Bytes<int> buildingGroups, HashSet<int> recipeGroups)
+    {
+        foreach (int buildingGroup in buildingGroups)
+        {
+            if (recipeGroups.Contains(buildingGroup))
+                return true;
+        }
+        return false;
+    }
+    void ChangeBuildingCountOfPack(Entity entity, ChangeBuildingCountOfPackData countOfPackDataData, EntityCommandBuffer ecb)
+    {
+        if (countOfPackDataData.newCountOfPack>=1)
+        {
+            var data = new CountOfPackInBuildingData(){CountOfPack=countOfPackDataData.newCountOfPack};
+            ecb.SetComponent<CountOfPackInBuildingData>(entity, data);
+            if (EntityManager.HasBuffer<SlotData>(entity)&&EntityManager.HasComponent<ProcessBuildingData>(entity))
+            {
+                var slotBuff=EntityManager.GetBuffer<SlotData>(entity);
+                var recipe=recipeInfo.RecipeInfos[EntityManager.GetComponentData<ProcessBuildingData>(entity).RecipeIDHash];
+                if(EntityManager.HasComponent<InputSlots>(entity)||EntityManager.HasComponent<OutputSlots>(entity))
+                {
+                    DynamicBuffer<ChangeSlotCapacityData> changeBuff;
+                    if(EntityManager.HasBuffer<ChangeSlotCapacityData>(entity))
+                        changeBuff=EntityManager.GetBuffer<ChangeSlotCapacityData>(entity);
+                    else
+                        changeBuff=ecb.AddBuffer<ChangeSlotCapacityData>(entity);
+
+                    if (EntityManager.HasComponent<InputSlots>(entity))
+                    {
+                        var inputData=EntityManager.GetComponentData<InputSlots>(entity);
+                        for (int i = inputData.StartIND; i <= inputData.EndIND; i++)
+                        {
+                            if (i >= slotBuff.Length) break;
+                            
+                            var itemId = slotBuff[i].ItemId;
+                            if (recipe.inputItems.TryGetValue(itemId, out var inputItem))
+                            {
+                                changeBuff.Add(new ChangeSlotCapacityData {
+                                    SlotIND = i,
+                                    newCapacity = inputItem.amount * countOfPackDataData.newCountOfPack
+                                });
+                            }
+                            else
+                            {
+                                Debug.Log("Ошибка инпута   "+itemId);
+                            }
+                        }
+                    }
+
+                    if (EntityManager.HasComponent<OutputSlots>(entity))
+                    {
+                        var outputData=EntityManager.GetComponentData<OutputSlots>(entity);
+                        for (int i = outputData.StartIND; i <= outputData.EndIND; i++)
+                        {
+                            if (i >= slotBuff.Length) break;
+                            
+                            var itemId = slotBuff[i].ItemId;
+                            if (recipe.outputItems.TryGetValue(itemId, out var outputItem))
+                            {
+                                changeBuff.Add(new ChangeSlotCapacityData {
+                                    SlotIND = i,
+                                    newCapacity = outputItem.amount * countOfPackDataData.newCountOfPack
+                                });
+                            }
+                            else
+                            {
+                                Debug.Log("Ошибка оутпута  "+itemId);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ecb.RemoveComponent<ChangeBuildingCountOfPackData>(entity);
+    }
     void ChangePriority(Entity entity, ChangePriorityData priorityData, EntityCommandBuffer ecb)
     {
         if (Enum.IsDefined(typeof(DistributionPriority), priorityData.newPriorityID))
         {
-            var data = EntityManager.GetComponentData<BuildingWorkWithItemsLogicData>(entity);
-            data.Priority = priorityData.newPriorityID;
-            ecb.SetComponent(entity, data);
+            var data = new BuildingPriorityData(){Priority=priorityData.newPriorityID};
+            ecb.SetComponent<BuildingPriorityData>(entity, data);
         }
+        ecb.RemoveComponent<ChangePriorityData>(entity);
     }
-    void ChangeBuildingCountOfPack(Entity entity, ChangeBuildingCountOfPackData countOfPackDataData, EntityCommandBuffer ecb)
+    void ChangeSlotCapacity(Entity building,DynamicBuffer<ChangeSlotCapacityData> changeBuff,DynamicBuffer<SlotData>slotBuff, EntityCommandBuffer ecb)
     {
-        if (countOfPackDataData.newCountOfPack>1)
+        foreach(var changeData in changeBuff)
         {
-            var data = EntityManager.GetComponentData<BuildingWorkWithItemsLogicData>(entity);
-            data.CountOfPack = countOfPackDataData.newCountOfPack;
-            ecb.SetComponent(entity, data);
+            var slot=slotBuff[changeData.SlotIND];
+            
+            if (changeData.newCapacity > slot.Capacity)
+            {
+                if (EntityManager.HasComponent<ExcessItemSlots>(building))
+                {
+                     NativeList<int> indexToRemove=new NativeList<int>(Allocator.Temp);
+                    var excessData=EntityManager.GetComponentData<ExcessItemSlots>(building);
+                    for(int i=excessData.StartIND;i<=excessData.EndIND;i++)
+                    {
+                        if (slotBuff[i].ItemId == slot.ItemId&&slotBuff[i].Amount>0)
+                        {
+                            if (slot.Amount + slotBuff[i].Amount <= changeData.newCapacity)
+                            {
+                                slot.Amount +=slotBuff[i].Amount;
+                                var t=slotBuff[i];
+                                t.Amount=0;
+                                slotBuff[i]=t;
+                                indexToRemove.Add(i);
+                            }
+                        }
+                    }
+                    indexToRemove.Sort();
+                    for(int i = indexToRemove.Length - 1; i >= 0; i--)
+                    {
+                        slotBuff.RemoveAt(indexToRemove[i]);
+                        excessData.EndIND--;
+                    }
+                    indexToRemove.Dispose();
+                }
+                slot.Capacity=changeData.newCapacity;
+                slotBuff[changeData.SlotIND]=slot;
+            }
+            else
+            {
+                if (slot.Amount > changeData.newCapacity)
+                {
+                    int remain=slot.Amount- changeData.newCapacity;
+                    slot.Capacity=changeData.newCapacity;
+                    slot.Amount= slot.Capacity;
+                    if (EntityManager.HasComponent<ExcessItemSlots>(building))
+                    {
+                        var excessData=EntityManager.GetComponentData<ExcessItemSlots>(building);
+                        for(int i=excessData.StartIND;i<=excessData.EndIND;i++)
+                        {
+                            if (slotBuff[i].ItemId == slot.ItemId&&slotBuff[i].Amount<slotBuff[i].Capacity)
+                            {
+                                int addValue=slotBuff[i].Amount+remain<=slotBuff[i].Capacity?remain:slotBuff[i].Capacity-slotBuff[i].Amount;
+                                var t=slotBuff[i];
+                                t.Amount+=addValue;
+                                slotBuff[i]=t;
+                                remain-=addValue;
+                                if(remain==0)
+                                    break;
+                            }  
+
+                        }
+                        if(remain>0)
+                        {
+                            slotBuff.Add(new SlotData(){ItemId=slot.ItemId,Capacity=100, Amount=remain});
+                            excessData.EndIND++;
+                        }
+                    }
+                    else
+                    {
+                        slotBuff.Add(new SlotData(){ItemId=slot.ItemId,Capacity=100, Amount=remain});
+                        ecb.AddComponent(building,new ExcessItemSlots(){StartIND=slotBuff.Length - 1,EndIND=slotBuff.Length - 1});
+                    }
+                }
+            }
         }
+        ecb.RemoveComponent<ChangeSlotCapacityData>(building);
     }
 }

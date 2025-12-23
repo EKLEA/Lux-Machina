@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 public class ConfigService
@@ -9,13 +9,16 @@ public class ConfigService
         IReadOnlyItemsInfo,
         IReadOnlyMaterialInfo,
         IReadOnlyRecipeInfo,
-        IReadOnlyTypeBuildingButtonInfo
+        IReadOnlyTypeBuildingButtonInfo,
+        IReadOnlyStorageConfig
 {
     public Dictionary<int, ItemConfig> ItemsInfos { get; private set; }
     public Dictionary<int, BuildingConfig> BuildingInfos { get; private set; }
     public Dictionary<string, Material> MaterialInfos { get; private set; }
     public Dictionary<int, RecipeConfig> RecipeInfos { get; private set; }
     public Dictionary<int, string> TypeBuildingButtonConfig { get; private set; }
+
+    public Dictionary<int, StorageConfig> StorageConfig { get; private set; }
 
     Dictionary<int, Sprite> _spriteCache = new Dictionary<int, Sprite>();
     Dictionary<int, GameObject> _prefabCache = new Dictionary<int, GameObject>();
@@ -29,20 +32,21 @@ public class ConfigService
         TypeBuildingButtonConfig=new Dictionary<int, string>();
     }
 
-    public async Task LoadConfigs()
+    public async UniTask LoadConfigs()
     {
         LoadItems();
         LoadBuildings();
         LoadMaterials();
         LoadRecipes();
         LoadTypeBuildingButtons();
+        LoadStorageConfigs();
 
         Debug.Log(
             $"Configs loaded: {ItemsInfos.Count} items, {BuildingInfos.Count} buildings, {MaterialInfos.Count} materials, {RecipeInfos.Count} recipes"
         );
-        await Task.Yield();
+        await UniTask.Yield();
     }
-
+    
     void LoadMaterials()
     {
         Material[] allMaterials = Resources.LoadAll<Material>("Materials");
@@ -67,13 +71,29 @@ public class ConfigService
         {
             foreach (var item in wrapper.items)
             {
-                ItemsInfos[item.id.GetStableHashCode()] = item;
+                ItemsInfos[item.id] = item;
             }
             Debug.Log($"Loaded {wrapper.items.Count} items");
         }
         else
         {
             Debug.LogError("Failed to load items - wrapper or items list is null");
+        }
+    }
+    void LoadStorageConfigs()
+    {
+        var wrapper = LoadJson<StorageConfigList>("Configs/JsonData/storages");
+        if (wrapper?. storages!= null)
+        {
+            foreach (var storage in wrapper.storages)
+            {
+                StorageConfig[storage.BuildingID] = storage;
+            }
+            Debug.Log($"Loaded {wrapper.storages.Count} items");
+        }
+        else
+        {
+            Debug.LogError("Failed to load storages - wrapper or storages list is null");
         }
     }
 
@@ -84,7 +104,7 @@ public class ConfigService
         {
             foreach (var building in wrapper.buildings)
             {
-                BuildingInfos[building.id.GetStableHashCode()] = building;
+                BuildingInfos[building.id] = building;
             }
             Debug.Log($"Loaded {wrapper.buildings.Count} buildings");
         }
@@ -101,7 +121,7 @@ public class ConfigService
         {
             foreach (var recipe in wrapper.recipes)
             {
-                RecipeInfos[recipe.id.GetStableHashCode()] = recipe;
+                RecipeInfos[recipe.id] = recipe;
             }
             Debug.Log($"Loaded {wrapper.recipes.Count} recipes");
         }
@@ -262,14 +282,14 @@ public class ConfigService
         _prefabCache.Clear();
     }
 
-    public async Task PreloadSprites(IEnumerable<string> spritePaths)
+    public async UniTask PreloadSprites(IEnumerable<string> spritePaths)
     {
         foreach (var path in spritePaths)
         {
             int pathHash = path.GetStableHashCode();
             if (!_spriteCache.ContainsKey(pathHash))
             {
-                await Task.Run(() =>
+                await UniTask.RunOnThreadPool(() =>
                 {
                     var sprite = Resources.Load<Sprite>(path);
                     if (sprite != null)
@@ -286,7 +306,7 @@ public class ConfigService
 
     public List<RecipeConfig> GetRecipesByGroup(int groupId)
     {
-        return RecipeInfos.Values.Where(r => r.groupId == groupId).ToList();
+        return RecipeInfos.Values.Where(r => r.groupIds.Contains(groupId)).ToList();
     }
 }
 
@@ -320,4 +340,10 @@ public interface IReadOnlyTypeBuildingButtonInfo
     public Dictionary<int, string> TypeBuildingButtonConfig { get; }
     Sprite GetBuildingTypeBTSprite(int type);
 }
+public interface IReadOnlyStorageConfig
+{
+
+    public Dictionary<int, StorageConfig> StorageConfig { get; }
+}
+
 

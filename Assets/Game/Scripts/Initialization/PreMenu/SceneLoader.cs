@@ -1,9 +1,10 @@
-using System.Threading.Tasks;
+
+using Cysharp.Threading.Tasks;
 using UnityEngine.SceneManagement;
 
 public class SceneLoader
 {
-    public async Task LoadSceneAsync(string sceneName)
+    public async UniTask LoadSceneAsync(string sceneName)
     {
         var operation = SceneManager.LoadSceneAsync(sceneName);
         operation.allowSceneActivation = false;
@@ -14,7 +15,7 @@ public class SceneLoader
             {
                 operation.allowSceneActivation = true;
             }
-            await Task.Yield();
+            await UniTask.Yield();
         }
     }
 }

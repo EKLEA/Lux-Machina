@@ -1,6 +1,6 @@
 using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Zenject;
 
 public class BootStrapper : IInitializable
@@ -34,14 +34,14 @@ public class BootStrapper : IInitializable
         await _loadingService.LoadWithProgressAsync(LoadConfigsAsync, LoadInitialAssetsAsync);
     }
 
-    async Task LoadConfigsAsync()
+    async UniTask LoadConfigsAsync()
     {
         await _configService.LoadConfigs();
-        await Task.Delay(500);
+        await UniTask.Delay(500);
     }
 
-    async Task LoadInitialAssetsAsync()
+    async UniTask LoadInitialAssetsAsync()
     {
-        await Task.Delay(500);
+        await UniTask.Delay(500);
     }
 }

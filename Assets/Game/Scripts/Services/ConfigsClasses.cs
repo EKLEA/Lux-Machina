@@ -5,17 +5,19 @@ using UnityEngine;
 [Serializable]
 public class ItemConfig
 {
-    public string id;
+    public int id;
     public string title;
     public string description;
     public string iconPath;
     public int maxInStack;
+    public ItemClass ItemClass;
+    public ItemType ItemType;
 }
 
 [Serializable]
 public class BuildingConfig
 {
-    public string id;
+    public int id;
     public string title;
     public string description;
     public string iconPath;
@@ -24,7 +26,7 @@ public class BuildingConfig
     public ActionType actionType;
     public Vector3Int size;
     public TypeOfLogic typeOfLogic;
-    public RequiredRecipesGroup requiredRecipesGroup;
+    public HashSet<int> requiredRecipesGroup;
     public float maxHealth;
     public float timeToStartRestore;
     public float restoreHealthPerSecond;
@@ -33,10 +35,11 @@ public class BuildingConfig
 [Serializable]
 public class RecipeConfig
 {
-    public string id;
-    public int groupId;
-    public List<RecipeIngredient> inputItems = new List<RecipeIngredient>();
-    public List<RecipeIngredient> outputItems = new List<RecipeIngredient>();
+    public int id;
+    public string title;
+    public HashSet<int> groupIds;
+    public Dictionary<int,RecipeIngredient> inputItems = new Dictionary<int,RecipeIngredient>();
+    public Dictionary<int,RecipeIngredient> outputItems = new Dictionary<int,RecipeIngredient>();
     public float craftTime;
     public string recipeSpritePath;
 }
@@ -47,14 +50,34 @@ public class RecipeIngredient
     public int itemId;
     public int amount;
 }
+[Serializable]
+public class StorageConfig
+{
+    public int BuildingID;
+    public int MaxSlots;
+    public HashSet<int> ItemsTypes; 
+}
 
+public enum ItemClass: int
+{
+    Rawitems=0,
+    Components,
+    Assembly,
+    Weapon
+}
+public enum ItemType: int
+{
+    None=0,
+    Bullets=20,
+}
 public enum BuildingsTypes : int
 {
-    Special = 0,
-    Production = 1,
-    Enegry = 2,
-    Logistic = 3,
-    Defence = 4,
+    Prop=0,
+    Special = 1,
+    Production = 2,
+    Enegry = 3,
+    Logistic = 4,
+    Defence = 5,
 }
 
 public enum ActionType : int
@@ -95,3 +118,9 @@ public class RecipeConfigList
 {
     public List<RecipeConfig> recipes;
 }
+[Serializable]
+public class StorageConfigList
+{
+    public List<StorageConfig> storages;
+}
+

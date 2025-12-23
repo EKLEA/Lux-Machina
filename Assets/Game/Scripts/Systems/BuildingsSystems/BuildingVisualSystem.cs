@@ -138,13 +138,13 @@ public partial class BuildingVisualSystem : SystemBase
     void DestroyVisuals(EntityCommandBuffer ecb)
     {
         foreach (
-            var (buildingData, gameObjectRef, entity) in SystemAPI
-                .Query<BuildingData, GameObjectReference>()
-                .WithAll<DestroyVisualTag>()
+            var (buildingData, entity) in SystemAPI
+                .Query<BuildingData>()
+                .WithAll<DestroyVisualTag,GameObjectReference>()
                 .WithEntityAccess()
         )
         {
-            DestroyVisual(entity, buildingData, gameObjectRef, ecb);
+            DestroyVisual(entity, buildingData, ecb);
         }
     }
 
@@ -188,8 +188,9 @@ public partial class BuildingVisualSystem : SystemBase
 
         ecb.RemoveComponent<BluePrint>(entity);
         ecb.AddComponent(building, new AssignLogicTag());
-        ecb.AddComponent(building, new AssignHealthTag());
+        //ecb.AddComponent(building, new AssignHealthTag());
         ecb.AddComponent(building, new AssignToCluster());
+        ecb.AddComponent(building, new BuildingTag());
         ecb.AddComponent(building, new AddEntitiesToMapTag());
     }
 
@@ -251,7 +252,6 @@ public partial class BuildingVisualSystem : SystemBase
     void DestroyVisual(
         Entity entity,
         BuildingData buildingData,
-        GameObjectReference gameObjectRef,
         EntityCommandBuffer ecb
     )
     {
