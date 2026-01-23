@@ -1,31 +1,12 @@
 ﻿{
-    "buildings": [
-        {
-            "id": "Core",
-            "title": "Ядро",
-            "description": "выфывф",
-            "iconPath": "core",
-            "prefabPath": "core",
-            "buildingType": 0,
-            "actionType": 0,
-            "size": {
-                "x": 2,
-                "y": 2,
-                "z": 2
-            },
-            "typeOfLogic": 0,
-            "requiredRecipesGroup": 0,
-            "maxHealth": 100.0,
-            "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
-        },
+    "buildingsBaseConfigs": [
         {
             "id": "Road",
             "title": "Дорога",
-            "description": "ыфвывф",
+            "description": "дорога",
             "iconPath": "road",
-            "prefabPath": "road",
-            "buildingType": 3,
+            "prefabPath": "roadPrefab",
+            "buildingType": 4,
             "actionType": 1,
             "size": {
                 "x": 1,
@@ -33,7 +14,96 @@
                 "z": 1
             },
             "typeOfLogic": 0,
-            "requiredRecipesGroup": 0,
+            "maxHealth": 100.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 20.0
+        },
+        {
+            "id": "Core",
+            "title": "Ядро",
+            "description": "выфывф",
+            "iconPath": "core",
+            "prefabPath": "corePrefab",
+            "buildingType": 1,
+            "actionType": 0,
+            "size": {
+                "x": 5,
+                "y": 5,
+                "z": 5
+            },
+            "typeOfLogic": 0,
+            "maxHealth": 100.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 20.0
+        },
+        {
+            "id": "Drill",
+            "title": "Дрель",
+            "description": "выфывф",
+            "iconPath": "drill",
+            "prefabPath": "drillPrefab",
+            "buildingType": 2,
+            "actionType": 0,
+            "size": {
+                "x": 3,
+                "y": 3,
+                "z": 3
+            },
+            "typeOfLogic": 1,
+            "maxHealth": 100.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 20.0
+        },
+        {
+            "id": "FurnaceFT",
+            "title": "Печь первого уровня",
+            "description": "выфывф",
+            "iconPath": "furnaceFT",
+            "prefabPath": "furnaceFTPrefab",
+            "buildingType": 2,
+            "actionType": 0,
+            "size": {
+                "x": 3,
+                "y": 3,
+                "z": 3
+            },
+            "typeOfLogic": 1,
+            "maxHealth": 100.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 20.0
+        },
+        {
+            "id": "ConstructionFT",
+            "title": "Сборщик первого уровня",
+            "description": "выфывф",
+            "iconPath": "constructionFT",
+            "prefabPath": "constructionFTPrefab",
+            "buildingType": 2,
+            "actionType": 0,
+            "size": {
+                "x": 3,
+                "y": 3,
+                "z": 3
+            },
+            "typeOfLogic": 1,
+            "maxHealth": 100.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 20.0
+        },
+        {
+            "id": "StorageFT",
+            "title": "Хранилищие первого уровня",
+            "description": "ывыфвыф",
+            "iconPath": "storageFT",
+            "prefabPath": "storageFTPrefab",
+            "buildingType": 4,
+            "actionType": 0,
+            "size": {
+                "x": 2,
+                "y": 2,
+                "z": 2
+            },
+            "typeOfLogic": 1,
             "maxHealth": 100.0,
             "timeToStartRestore": 5.0,
             "restoreHealthPerSecond": 20.0

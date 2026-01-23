@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,38 +7,35 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.LowLevel;
 using Zenject;
 
 public class GameController : IInitializable
 {
+    public World World {get;private set;}
     [Inject] IReadOnlyGameFieldSettings gameFieldSettings;
-
-    [Inject] IReadOnlyBuildingInfo _buildingInfo;
-
     [Inject] SaveService saveService;
 
     [Inject] ILoadingService _loadingService;
 
     [Inject] CameraController cameraController;
 
-    [Inject] EntityLoader EntityLoader;
 
-    [Inject] PublicBuildingMapSystem _buildingMapSystem;
-
-    [Inject] FixedStepSimulationSystemGroup fixedStepSimulationSystemGroup;
-
-    [Inject] PathfindingSystem _pathfindingSystem;
-
-    [Inject] ECSSystemsManager ecssSystemsManager;
     [Inject] UIManager UIManager;
-    public int Timestep{get;private set;}
-
+    [Inject] DiContainer _container;
+    [Inject] ConfigToBlob configToBlob;
+    Entity Map;
+    public float Timestep{get;private set;}
+    
+    public GameController() 
+    {
+        World = DefaultWorldInitialization.Initialize("Game Scene World");
+    }
     public void Initialize()
     {
         Timestep=1 / gameFieldSettings.tickPerSecond;
-        fixedStepSimulationSystemGroup.Timestep = Timestep;
+        //fixedStepSimulationSystemGroup.Timestep = Timestep;
 
-        _buildingMapSystem.Enabled = true;
 
         LoadGame();
     }
@@ -45,140 +43,190 @@ public class GameController : IInitializable
     public void SpeedUpTick()
     {
         Timestep/=2;
-        fixedStepSimulationSystemGroup.Timestep =Timestep;
+        //.Timestep =Timestep;
     }
 
     public void SlowDownTick()
     {
         Timestep*=2;
-        fixedStepSimulationSystemGroup.Timestep = Timestep;
+       // fixedStepSimulationSystemGroup.Timestep = Timestep;
     }
-
+    public Vector2Int GetMapPos(Vector3 pos)
+    {
+        return new Vector2Int(
+        Mathf.FloorToInt(pos.x / gameFieldSettings.cellSize),
+        Mathf.FloorToInt(pos.z / gameFieldSettings.cellSize)
+    );
+    }
     async void LoadGame()
     {
         await _loadingService.LoadWithProgressAsync(saveService.LoadGameState, LoadGameField);
+         
     }
-
+    public bool GetEntity(int id,out Entity entity)
+    {
+       var buildingEntities= World.EntityManager.GetComponentData<EntitiesDictionary>(Map);
+        if (buildingEntities.Entities.ContainsKey(id))
+        {
+            entity= buildingEntities.Entities[id];;
+            return true;
+        }
+        entity=default;
+        return false;
+    }
     async UniTask LoadGameField()
     {
+        await configToBlob.LoadConfigs(World.EntityManager);
         var save = saveService.GameState;
-        await EntityLoader.LoadSavedEntitiesAsync(save);
+
+        await CreateMap();
+        await CreateSystems(World);
+        await LoadSavedEntities(save);
 
         cameraController.SetUp(save.camData);
         cameraController.enabled = true;
-        ecssSystemsManager.EnableGameplaySystems();
         UIManager.Initialize();
         await UniTask.Yield();
     }
 
-    public void PlaceBuilding(
-        BuildingData buildingData,
-        BuildingPosData buildingPosData,
-        bool isBluePrint
-    )
+    async UniTask CreateSystems(World world)
     {
-        EntityLoader.CreateBuilding(
-            buildingData,
-            buildingPosData,
-            isBluePrint,
-            saveService.GameState
-        );
-    }
-    public Entity GetEntity(Vector2Int pos)
-    {
-        _buildingMapSystem.GetEntity(new int2(pos.x,pos.y), out Entity entity);
-        return entity;
-    }
-     public Entity GetEntity(int id)
-    {
-        _buildingMapSystem.GetEntity(id, out Entity entity);
-        return entity;
-    }
-    public void PlaceRoad(HashSet<Vector2Int> roadPoints, bool isBluePrint)
-    {
-        Debug.Log("Контроллер нажал");
-        EntityLoader.CreateRoad(roadPoints, isBluePrint, saveService.GameState);
-    }
+        var simGroup = world.GetOrCreateSystemManaged<SimulationSystemGroup>();
+        var presGroup = world.GetOrCreateSystemManaged<PresentationSystemGroup>();
 
-    public List<Vector2Int> FilterExistingRoadPoints(List<Vector2Int> positions)
-    {
-        var result = new List<Vector2Int>();
 
-        foreach (var position in positions)
+        T RegisterManagedSystem<T>(ComponentSystemGroup group) where T : SystemBase
         {
-            if (!_buildingMapSystem.IsPositionOccupiedByRoad(new int2(position.x, position.y)))
-            {
-                result.Add(position);
-            }
+            var system = world.GetOrCreateSystemManaged<T>();
+            _container.Inject(system); 
+           // _container.BindInterfacesAndSelfTo<T>().FromInstance(system).AsSingle();
+            group.AddSystemToUpdateList(system); 
+            return system;
+        }
+         void AddUnmanaged<T>(ComponentSystemGroup group) where T : unmanaged, ISystem
+        {
+            var handle = world.GetOrCreateSystem<T>();
+            group.AddSystemToUpdateList(handle);
         }
 
-        return result;
+        world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>();
+        world.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
+        AddUnmanaged<MarkBuildingOnMapSystem>(simGroup);
+        AddUnmanaged<DestroyBuildingsSystem>(simGroup);
+        AddUnmanaged<DeleteMapPointsSystem>(simGroup);
+        AddUnmanaged<ProcessRoadPointsSystem>(simGroup);
+        AddUnmanaged<BuildingCreateSystem>(simGroup);
+        AddUnmanaged<EnergySystem>(simGroup);
+        AddUnmanaged<ClusterAssignSystem>(simGroup);
+        AddUnmanaged<BuildingConfigManagerSystem>(simGroup);
+        AddUnmanaged<ItemDistributionSystem>(simGroup);
+        AddUnmanaged<CraftSystem>(simGroup);
+        AddUnmanaged<CraftApplySystem>(simGroup);
+        AddUnmanaged<PathFindingSystem>(simGroup);
+
+        RegisterManagedSystem<BuildingCreateDestroyVisualSystem>(presGroup);
+        RegisterManagedSystem<BuildingChangeVisualSystem>(presGroup);
+        RegisterManagedSystem<BuildingGameObjectClusterAssignSystem>(presGroup);
+
+        var BuildSystem=RegisterManagedSystem<PlayerPlaceBuildingSystem>(presGroup);
+        var RoadSystem= RegisterManagedSystem<PlayerPlaceRoadSystem>(presGroup);
+
+         var player = _container.Resolve<PlayerController>();
+        player.Initialize(BuildSystem, RoadSystem);
+        simGroup.SortSystems();
+        presGroup.SortSystems();
+        await UniTask.Yield();
     }
-
-    public void RemoveRoadPoints(int entityId, List<Vector2Int> pointsToRemove)
+    async UniTask CreateMap()
     {
-        //////
-    }
-
-    public void RequestPath(
-        Vector2Int start,
-        Vector2Int end,
-        System.Action<List<Vector2Int>> onPathFound
-    )
-    {
-        _pathfindingSystem.FindBuildingPathAsync(
-            new int2(start.x, start.y),
-            new int2(end.x, end.y),
-            (nativePath) =>
-            {
-                var points = new List<Vector2Int>();
-
-                if (nativePath.IsCreated && nativePath.Length > 0)
-                {
-                    for (int i = 0; i < nativePath.Length; i++)
-                    {
-                        var point = nativePath[i];
-                        points.Add(new Vector2Int(point.x, point.y));
-                    }
-
-                    nativePath.Dispose();
-                }
-                else
-                {
-                    points.Add(start);
-                    points.Add(end);
-                }
-
-                onPathFound?.Invoke(points);
-            }
-        );
-    }
-
-    public bool CanBuildHereMany(List<Vector2Int> positions, bool isRoad)
-    {
-        var nativeCells = new NativeArray<int2>(positions.Count, Allocator.Temp);
-        for (int i = 0; i < positions.Count; i++)
-            nativeCells[i] = new int2(positions[i].x, positions[i].y);
-
-        bool canBuild = _buildingMapSystem.CanBuildAt(nativeCells, isRoad);
-        nativeCells.Dispose();
-        return canBuild;
-    }
-
-    public int GetBuildingInThere(Vector2Int position)
-    {
-        return _buildingMapSystem.GetBuildingAt(new int2(position.x, position.y));
-    }
-
-    public int[] GetBuildingInThereMany(Vector2Int[] positions)
-    {
-        List<int> result = new List<int>();
-        foreach (var pos in positions)
+        Map=World.EntityManager.CreateEntity();
+        World.EntityManager.AddComponentData(Map, new BuildingMap
         {
-            int buildingId = _buildingMapSystem.GetBuildingAt(new int2(pos.x, pos.y));
-            if (buildingId != -1)
-                result.Add(buildingId);
+            CellMapBuildingsIDs=new(1000,Allocator.Persistent),
+            CellMapEntites=new(1000,Allocator.Persistent),
+            CellEntityMultiMap=new(1000,Allocator.Persistent),
+        });
+
+        World.EntityManager.AddComponentData(Map, new EntitiesDictionary
+        {
+            Entities=new(250,Allocator.Persistent)
+        });
+        World.EntityManager.AddComponentData(Map, new ClusterMap
+        {
+            clusterIDs=new(50,Allocator.Persistent),
+            producersSlots=new(2000,Allocator.Persistent),
+            consumersSlots=new(2000,Allocator.Persistent),
+            storagesSlots=new(2000,Allocator.Persistent),
+             excessSlots=new(2000,Allocator.Persistent),
+             bluePrintsSlots=new(2000,Allocator.Persistent),
+            demolitionsSlots=new(2000,Allocator.Persistent),
+             roadsPoints=new(2000,Allocator.Persistent),
+             pointToClusterId=new(2000,Allocator.Persistent),
+        });
+
+        World.EntityManager.AddComponent<UpdateMapTag>(Map);
+        World.EntityManager.AddComponent<UpdateCLustersTag>(Map);
+        World.EntityManager.SetComponentEnabled<UpdateMapTag>(Map,false);
+        World.EntityManager.SetComponentEnabled<UpdateCLustersTag>(Map,false);
+         World.EntityManager.AddComponentData(Map, new TickInfoData
+        {
+            currTickPerSecond=gameFieldSettings.tickPerSecond,
+        });
+         World.EntityManager.AddComponentData(Map, new ProductionTable
+        {
+            produced=new(1000,Allocator.Persistent),
+            consumed=new(1000,Allocator.Persistent),
+        });
+        await UniTask.Yield();
+    }
+    async UniTask LoadSavedEntities(GameStateData gameStateData)
+    {
+        var buildingCommand = World.EntityManager.CreateArchetype(typeof(CreateFromSave),typeof(CreateBuildingEventData),typeof(IsBlueprint));
+
+        var roadCommand = World.EntityManager.CreateArchetype(typeof(CreateFromSave),typeof(CreateRoadEventTag),typeof(MapPoint),typeof(IsBlueprint));
+        CreateBuildingCommand(buildingCommand,gameStateData.ProcessorsBuildings);
+        CreateBuildingCommand(buildingCommand,gameStateData.ConsumerBuildings);
+        CreateBuildingCommand(buildingCommand,gameStateData.ProducerBuildings);
+        CreateBuildingCommand(buildingCommand,gameStateData.baseBuildings);
+
+        using var entities = new NativeArray<Entity>(gameStateData.RoadsBuildings.Count, Allocator.TempJob);
+        World.EntityManager.CreateEntity(roadCommand, entities);
+        int index = 0;
+        foreach (var pair in gameStateData.RoadsBuildings)
+        {
+            Entity entity = entities[index];
+            int id = pair.Key;
+            World.EntityManager.SetComponentData(entity, new CreateFromSave { UniqueIDHash = id });
+            var buff =World.EntityManager.AddBuffer<MapPoint>(entity);
+            for(int i =0;i<pair.Value.points.Length;i++)
+                buff.Add(new MapPoint{pos=pair.Value.points[i]});
+            
+            
+            World.EntityManager.SetComponentEnabled<IsBlueprint>(entity,pair.Value.isBlueprint);
+            index++;
         }
-        return result.ToArray();
+        await UniTask.Yield();
+    }
+    void CreateBuildingCommand<T>(EntityArchetype commandArchetype,Dictionary<int,T> data) where T : BaseBuildingSaveData
+    {
+        using var entities = new NativeArray<Entity>(data.Count, Allocator.TempJob);
+        World.EntityManager.CreateEntity(commandArchetype, entities);
+        int index = 0;
+        foreach (var pair in data)
+        {
+            Entity entity = entities[index];
+            int id = pair.Key;
+
+            World.EntityManager.SetComponentData(entity, new CreateFromSave { UniqueIDHash = id });
+            World.EntityManager.SetComponentData(entity, new CreateBuildingEventData
+            {
+                buildingID=pair.Value.buildingID,
+                buildingPosition=pair.Value.buildingPosition,
+                rotation=pair.Value.rotation,
+                isConnected=pair.Value.isConnected,
+            });
+            World.EntityManager.SetComponentEnabled<IsBlueprint>(entity,pair.Value.isBlueprint);
+            index++;
+        }
     }
 }

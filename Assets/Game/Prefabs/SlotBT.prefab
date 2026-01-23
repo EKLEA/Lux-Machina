@@ -162,7 +162,8 @@ GameObject:
   - component: {fileID: 3669944565776320128}
   - component: {fileID: 1728178940179541049}
   - component: {fileID: 4432069762832962497}
-  - component: {fileID: 6022929478295799708}
+  - component: {fileID: 8032951728730002003}
+  - component: {fileID: 5501598509767102366}
   m_Layer: 0
   m_Name: SlotBT
   m_TagString: Untagged
@@ -177,7 +178,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2089366401912290020}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -217,8 +218,8 @@ MonoBehaviour:
   m_IgnoreLayout: 0
   m_MinWidth: -1
   m_MinHeight: -1
-  m_PreferredWidth: 45
-  m_PreferredHeight: 40
+  m_PreferredWidth: 50
+  m_PreferredHeight: 45
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
@@ -252,7 +253,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &6022929478295799708
+--- !u!114 &8032951728730002003
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -261,13 +262,59 @@ MonoBehaviour:
   m_GameObject: {fileID: 2089366401912290020}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3db7dc561ecef23459828ab6d34d5e67, type: 3}
+  m_Script: {fileID: 11500000, guid: b4f3a5642e1083e41bd4a110a2de1e41, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  UpBT: {fileID: 0}
-  DownBT: {fileID: 0}
-  MainBT: {fileID: 0}
-  valueText: {fileID: 0}
+  UpBT: {fileID: 7377236196176185845}
+  DownBT: {fileID: 2140220517663248741}
+  MainBT: {fileID: 5501598509767102366}
+  CloseBT: {fileID: 454279599866285865}
+  icon: {fileID: 4432069762832962497}
+  valueText: {fileID: 5746762776579241339}
+--- !u!114 &5501598509767102366
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2089366401912290020}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Navigation:
+    m_Mode: 3
+    m_WrapAround: 0
+    m_SelectOnUp: {fileID: 0}
+    m_SelectOnDown: {fileID: 0}
+    m_SelectOnLeft: {fileID: 0}
+    m_SelectOnRight: {fileID: 0}
+  m_Transition: 1
+  m_Colors:
+    m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
+    m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
+    m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
+    m_ColorMultiplier: 1
+    m_FadeDuration: 0.1
+  m_SpriteState:
+    m_HighlightedSprite: {fileID: 0}
+    m_PressedSprite: {fileID: 0}
+    m_SelectedSprite: {fileID: 0}
+    m_DisabledSprite: {fileID: 0}
+  m_AnimationTriggers:
+    m_NormalTrigger: Normal
+    m_HighlightedTrigger: Highlighted
+    m_PressedTrigger: Pressed
+    m_SelectedTrigger: Selected
+    m_DisabledTrigger: Disabled
+  m_Interactable: 1
+  m_TargetGraphic: {fileID: 4432069762832962497}
+  m_OnClick:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &2672191557509266907
 GameObject:
   m_ObjectHideFlags: 0
@@ -281,7 +328,7 @@ GameObject:
   - component: {fileID: 986089746702881728}
   - component: {fileID: 7377236196176185845}
   m_Layer: 0
-  m_Name: PriorityUpBT
+  m_Name: UpBT
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -401,7 +448,7 @@ GameObject:
   - component: {fileID: 2119100817569491206}
   - component: {fileID: 5746762776579241339}
   m_Layer: 0
-  m_Name: PriorityText
+  m_Name: Text
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -463,8 +510,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+    rgba: 4278254079
+  m_fontColor: {r: 1, g: 0.9747956, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -583,7 +630,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.22078538, g: 1, b: 0, a: 0.6039216}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.5019608}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -688,7 +735,7 @@ GameObject:
   - component: {fileID: 234214159407297686}
   - component: {fileID: 2140220517663248741}
   m_Layer: 0
-  m_Name: 'PriorityDownBT '
+  m_Name: DownPT
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

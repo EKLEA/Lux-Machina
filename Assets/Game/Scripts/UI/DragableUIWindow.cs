@@ -5,13 +5,13 @@ public abstract class DragableUIWindow : UIScreen,IDragableWindow
 {
     [Header("Drag Settings")]
     [SerializeField] protected RectTransform dragHandle; 
-    [SerializeField] protected RectTransform windowToMove; 
+    [SerializeField] public RectTransform windowToMove; 
     
     private Vector2 dragOffset;
     private Canvas canvas;
     private RectTransform canvasRect;
     private bool isValidDrag = false;
-    
+   [field: SerializeField] public Vector3 defaultPos{get;   private set;}
     public override void Initialize()
     {
         if (windowToMove == null) windowToMove = transform.parent as RectTransform;
@@ -20,6 +20,7 @@ public abstract class DragableUIWindow : UIScreen,IDragableWindow
         
         canvas = GetComponentInParent<Canvas>();
         if (canvas != null) canvasRect = canvas.GetComponent<RectTransform>();
+        base.Initialize();
     }
     
     private bool IsPointerOverDragHandle(PointerEventData eventData)

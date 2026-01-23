@@ -12,9 +12,6 @@ public class BootStrapperBindings : MonoInstaller
 
     public override void InstallBindings()
     {
-        Container.Bind<ECSSystemsManager>().AsSingle().NonLazy();
-        var systemsManager = Container.Resolve<ECSSystemsManager>();
-        systemsManager.DisableGameplaySystems();
 
         BindServices();
         BindСonfigsPoint();
@@ -89,10 +86,6 @@ public class BootStrapperBindings : MonoInstaller
             .AsSingle();
         Container
             .Bind<IReadOnlyTypeBuildingButtonInfo>()
-            .FromMethod(ctx => ctx.Container.Resolve<ConfigService>())
-            .AsSingle();
-        Container
-            .Bind<IReadOnlyStorageConfig>()
             .FromMethod(ctx => ctx.Container.Resolve<ConfigService>())
             .AsSingle();
     }

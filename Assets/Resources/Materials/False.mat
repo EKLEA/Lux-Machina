@@ -86,9 +86,9 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _LineFrequency: 80
+    - _LineFrequency: 20
     - _LineRotation: 45
-    - _LineStrength: 0.3
+    - _LineStrength: 1
     - _LineThickness: 0.2
     - _Metallic: 0
     - _Mode: 3

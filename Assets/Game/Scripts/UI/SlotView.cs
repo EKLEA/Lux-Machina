@@ -12,32 +12,38 @@ public class SlotView : MonoBehaviour,IDisposable,IInitializable
     [SerializeField] private Image back;
     [SerializeField] private TextMeshProUGUI CountText;
     [Inject] IReadOnlyItemsInfo itemsInfo;
-    
-    IDisposable disposable;
-    
+    CompositeDisposable disposable;
     public void Initialize()
     {
         icon.gameObject.SetActive(false);
         CountText.text = "";
+        
     }
-
-    public void Bind(IReadOnlyReactiveProperty<(int ItemId, int amount, int Capacity)> slotData)
+    public void Bind((int ItemId, IReadOnlyReactiveProperty<int> amount, ReactiveProperty<int> capacity) slotData)
     {
+        
         if(disposable!=null) disposable.Dispose();
-        disposable=slotData.Subscribe(data =>
+        disposable=new();
+       
+        slotData.amount.Subscribe(data =>
         {
-            UpdateView(data.ItemId, data.amount, data.Capacity);
-        });
+            UpdateAmount(slotData.amount.Value,slotData.capacity.Value);
+        }).AddTo(disposable);
+        
+        UpdateAllSlot(slotData.ItemId,slotData.amount.Value,slotData.capacity.Value);
         
         gameObject.SetActive(true);
-        UpdateView(slotData.Value.ItemId, slotData.Value.amount, slotData.Value.Capacity);
     }
     
-    private void UpdateView(int itemId, int amount, int capacity)
+    void UpdateAmount(int amount,int capacity)
+    {
+        CountText.text = string.Format("{0}/{1}",amount.ToString(),capacity.ToString());
+    }
+    void UpdateAllSlot(int itemId,int amount,int capacity)
     {
         if (itemId > 0)
         {
-            icon.sprite = GetSprite(itemId);
+            icon.sprite = itemsInfo.GetItemSprite(itemId);
             icon.gameObject.SetActive(true);
             CountText.text = string.Format("{0}/{1}",amount.ToString(),capacity.ToString());
         }
@@ -48,12 +54,11 @@ public class SlotView : MonoBehaviour,IDisposable,IInitializable
         }
     }
     
-    private Sprite GetSprite(int itemId) => itemsInfo.GetItemSprite(itemId);
 
     public void Dispose()
     {
-        disposable.Dispose();
-        UpdateView(-1,0,0);
+        disposable?.Dispose();
+        UpdateAllSlot(-1,0,0);
         gameObject.SetActive(false);
     }
 }

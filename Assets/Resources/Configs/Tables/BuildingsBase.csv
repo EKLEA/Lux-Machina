@@ -1,0 +1,7 @@
+﻿id;title;description;iconPath;prefabPath;buildingType;actionType;size_x;size_y;size_z;typeOfLogic;maxHealth;timeToStartRestore;RestoreHealthPerSecond
+Road;Дорога;дорога;road;roadPrefab;4;1;1;1;1;0;100;5;20
+Core;Ядро;выфывф;core;corePrefab;0;0;5;5;5;0;100;5;20
+Drill;Дрель;выфывф;drill;drillPrefab;2;0;3;3;3;1;100;5;20
+FurnaceFT;Печь первого уровня;выфывф;furnaceFT;furnaceFTPrefab;2;0;3;3;3;1;100;5;20
+ConstructionFT;Сборщик первого уровня;выфывф;constructionFT;constructionFTPrefab;2;0;3;3;3;1;100;5;20
+StorageFT;Хранилищие первого уровня;ывыфвыф;storageFT;storageFTPrefab;4;0;2;2;2;1;100;5;20

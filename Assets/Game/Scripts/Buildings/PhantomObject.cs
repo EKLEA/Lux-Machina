@@ -11,9 +11,8 @@ public class PhantomObject : MonoBehaviour
     Material _trueMat;
     Material _falseMat;
 
-    public void SetUp(Material trueMat, Material falseMat)
+    public void SetUp( Material trueMat, Material falseMat)
     {
-
         meshRenderers.AddRange(GetComponentsInChildren<MeshRenderer>(true));
 
         _trueMat = trueMat;

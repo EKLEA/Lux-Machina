@@ -17,7 +17,7 @@ public class ConstructionButtonHandler : UIScreen
         typeBts = new();
         foreach(var t in typeBuildingButtonInfo.TypeBuildingButtonConfig)
         {
-            if(t.Value=="Prop") return;
+            if(t.Value=="Prop") continue;
             var bt = Instantiate(ButtonPrefab, buttonHolder);
             bt.image.sprite = typeBuildingButtonInfo.GetBuildingTypeBTSprite(t.Key);
             typeBts.Add(t.Key,bt );
@@ -41,12 +41,13 @@ public class ConstructionButtonHandler : UIScreen
     void OpenBuildingButtonsHolder(int type)
     {
         BuildingButtonsHolder.SetUpByType(type);
-        BuildingButtonsHolder.onBuildingSelected+=InvokeData;
+        BuildingButtonsHolder.onBuildingSelected -= InvokeData;
+        BuildingButtonsHolder.onBuildingSelected += InvokeData;
     }
    
     public override void Open()
     {
-        
+        if(isOpened.Value) Close();
         base.Open();
         foreach (var bt in typeBts)
         {

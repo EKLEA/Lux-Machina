@@ -13,15 +13,22 @@ public class BuildingButtonsHolder : UIScreen
     [SerializeField] Transform buttonHolder;
     [Inject] Button ButtonPrefab;
     [Inject] IReadOnlyBuildingInfo buildingInfo;
-    List<BuildingConfig> buildings;
+    List<BuildingBaseConfig> buildings;
     Dictionary<int, Button> BTs;
     int prevType;
     int currType;
     public void SetUpByType(int type)
     {
+        foreach (var bt in BTs.Values)
+        {
+            bt.onClick.RemoveAllListeners();
+            bt.interactable = false;
+            bt.gameObject.SetActive(false);
+        }
+        
         buildings.Clear();
         buildings = buildingInfo.BuildingInfos.Values.Where(f => f.buildingType == (BuildingsTypes)type).ToList();
-        if (type != currType||!isOpened)
+        if (type != currType||!isOpened.Value)
         {
             prevType = currType;
             currType = type;
@@ -35,6 +42,7 @@ public class BuildingButtonsHolder : UIScreen
         currType = -1;
         BTs = new();
         buildings = new();
+        
         for (int i = 0; i < 20; i++)
         {
             var bt = Instantiate(ButtonPrefab, buttonHolder);
@@ -54,13 +62,13 @@ public class BuildingButtonsHolder : UIScreen
         else
         {
             
-            isOpened = false;
+            isOpened.Value = false;
             base.Open();
             for (int i = 0; i < buildings.Count; i++)
             {
                 var bt = BTs[i];
                 var buildingConfig = buildings[i];
-                var buildingId = buildingConfig.id;
+                var buildingId = buildingConfig.id.GetStableHashCode();
 
                 bt.image.sprite = buildingInfo.GetBuildingSprite(buildingId);
                 AddButtonListener(buildingId, bt);
@@ -83,12 +91,15 @@ public class BuildingButtonsHolder : UIScreen
     }
     public override void Close()
     {
+        buildings.Clear();
         foreach (var bt in BTs.Values)
         {
+            
             bt.onClick.RemoveAllListeners();
             bt.interactable = false;
             bt.gameObject.SetActive(false);
         }
+        onBuildingSelected=null;
         base.Close();
     }
 }

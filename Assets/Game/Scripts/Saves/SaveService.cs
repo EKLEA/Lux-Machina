@@ -1,5 +1,6 @@
 using System.IO;
 using Cysharp.Threading.Tasks;
+using NUnit.Framework;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
@@ -39,7 +40,7 @@ public class SaveService : IGameStateSaver,IReadOnlySave
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Ошибка загрузки: {e.Message}");
+                Debug.LogError($"Ошибка загрузки: {e.Message}");
             GameState = GenerateDefault();
         }
     }
@@ -75,35 +76,38 @@ public class SaveService : IGameStateSaver,IReadOnlySave
     GameStateData GenerateDefault()
     {
         var save = new GameStateData();
-        save.buildingDatas = new();
-        save.roadPoints = new();
-        save.phantomPoints = new();
-        save.buildingPosDatas = new();
-        save.healthDatas = new();
-        save.slotDatas = new();
-        save.inputSlots = new();
-        save.outputSlots = new();
-        save.buildingsPriorityDatas = new();
-        save.processBuildingDatas = new();
-        save.phantomBuildings = new();
+        save.ProcessorsBuildings=new();
+        save.baseBuildings=new();
+        save.ConsumerBuildings=new();
+        save.ProducerBuildings=new();
+        save.RoadsBuildings=new();
+
+        // save.buildingDatas = new();
+        // save.roadPoints = new();
+        // save.phantomPoints = new();
+        // save.buildingPosDatas = new();
+        // save.healthDatas = new();
+        // save.slotDatas = new();
+        // save.inputSlots = new();
+        // save.outputSlots = new();
+        // save.buildingsPriorityDatas = new();
+        // save.processBuildingDatas = new();
+        // save.phantomBuildings = new();
         save.camData = new PlayerCamData()
         {
             lookPointPosition = new Vector3(0, 0, 0),
-            CamPosition = new Vector3(0, 5, -5),
+            CamPosition = new Vector3(0, 25, -25),
         };
         var hash = "Core".GetStableHashCode();
-        save.buildingDatas.Add(
-            hash,
-            new BuildingData { UniqueIDHash = hash, BuildingIDHash = hash }
-        );
-        var size = buildingInfo.BuildingInfos[hash].size;
-        save.buildingPosDatas.Add(
-            hash,
-            new BuildingPosData
+        save.baseBuildings.Add(
+            123,
+            new BaseBuildingSaveData
             {
-                LeftCornerPos = new int2(-1, -1),
-                Rotation = 1,
-                Size = new int2(size.x, size.z),
+                buildingID=hash,
+                buildingPosition= new int2(-1, -1),
+                rotation = 1,
+                isConnected=false,
+                isBlueprint=false,
             }
         );
         return save;

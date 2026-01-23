@@ -43,7 +43,7 @@ public class LoadingScreen : MonoBehaviour
         _blackScreen.alpha = 0;
         _blackScreen.blocksRaycasts = false;
         _loadingPanel.SetActive(true);
-        await UniTask.Yield();
+        await  UniTask.Yield();
     }
 
     public async UniTask Hide(bool force)
@@ -55,7 +55,7 @@ public class LoadingScreen : MonoBehaviour
         _canvasGroup.alpha = 0;
         _canvasGroup.blocksRaycasts = false;
         _loadingPanel.SetActive(false);
-        await UniTask.Yield();
+        await  UniTask.Yield();
     }
 
     private async UniTask FadeCanvas(CanvasGroup group, float fromAlpha, float toAlpha)
@@ -72,7 +72,7 @@ public class LoadingScreen : MonoBehaviour
             await UniTask.Yield();
         }
         group.alpha = toAlpha;
-        await UniTask.Yield();
+        await  UniTask.Yield();
     }
 
     public void SetProgress(float progress)

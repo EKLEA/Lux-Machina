@@ -1,0 +1,25 @@
+﻿{
+    "processionConfigs": [
+        {
+            "BuildingID": "Drill",
+            "typeOfProcession": 2,
+            "requiredRecipesGroup": [
+                2
+            ]
+        },
+        {
+            "BuildingID": "FurnaceFT",
+            "typeOfProcession": 1,
+            "requiredRecipesGroup": [
+                1
+            ]
+        },
+        {
+            "BuildingID": "ConstructionFT",
+            "typeOfProcession": 1,
+            "requiredRecipesGroup": [
+                3
+            ]
+        }
+    ]
+}

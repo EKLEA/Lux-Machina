@@ -9,16 +9,17 @@ public class ConfigService
         IReadOnlyItemsInfo,
         IReadOnlyMaterialInfo,
         IReadOnlyRecipeInfo,
-        IReadOnlyTypeBuildingButtonInfo,
-        IReadOnlyStorageConfig
+        IReadOnlyTypeBuildingButtonInfo
 {
     public Dictionary<int, ItemConfig> ItemsInfos { get; private set; }
-    public Dictionary<int, BuildingConfig> BuildingInfos { get; private set; }
     public Dictionary<string, Material> MaterialInfos { get; private set; }
     public Dictionary<int, RecipeConfig> RecipeInfos { get; private set; }
     public Dictionary<int, string> TypeBuildingButtonConfig { get; private set; }
+     public Dictionary<int, BuildingBaseConfig> BuildingInfos{ get; private set; }
+    public Dictionary<int, BuildingStorageConfig> BuildingStorageInfos{ get; private set; }
+    public Dictionary<int, BuildingProcessionConfig> BuildingProcessionInfos { get; private set; }
+    public Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; private set; }
 
-    public Dictionary<int, StorageConfig> StorageConfig { get; private set; }
 
     Dictionary<int, Sprite> _spriteCache = new Dictionary<int, Sprite>();
     Dictionary<int, GameObject> _prefabCache = new Dictionary<int, GameObject>();
@@ -26,7 +27,10 @@ public class ConfigService
     public ConfigService()
     {
         ItemsInfos = new Dictionary<int, ItemConfig>();
-        BuildingInfos = new Dictionary<int, BuildingConfig>();
+        BuildingInfos = new Dictionary<int, BuildingBaseConfig>();
+        BuildingStorageInfos = new Dictionary<int, BuildingStorageConfig>();
+        BuildingProcessionInfos = new Dictionary<int, BuildingProcessionConfig>();
+        BuildingItemRequestsInfos = new Dictionary<int, BuildingItemRequestsConfig>();
         MaterialInfos = new Dictionary<string, Material>();
         RecipeInfos = new Dictionary<int, RecipeConfig>();
         TypeBuildingButtonConfig=new Dictionary<int, string>();
@@ -35,12 +39,14 @@ public class ConfigService
     public async UniTask LoadConfigs()
     {
         LoadItems();
-        LoadBuildings();
+        LoadBuildingsBase();
+        LoadBuildingsStorages();
+        LoadBuildingsProcession();
+        LoadBuildingsItemRequests();
+
         LoadMaterials();
         LoadRecipes();
         LoadTypeBuildingButtons();
-        LoadStorageConfigs();
-
         Debug.Log(
             $"Configs loaded: {ItemsInfos.Count} items, {BuildingInfos.Count} buildings, {MaterialInfos.Count} materials, {RecipeInfos.Count} recipes"
         );
@@ -80,37 +86,69 @@ public class ConfigService
             Debug.LogError("Failed to load items - wrapper or items list is null");
         }
     }
-    void LoadStorageConfigs()
-    {
-        var wrapper = LoadJson<StorageConfigList>("Configs/JsonData/storages");
-        if (wrapper?. storages!= null)
-        {
-            foreach (var storage in wrapper.storages)
-            {
-                StorageConfig[storage.BuildingID] = storage;
-            }
-            Debug.Log($"Loaded {wrapper.storages.Count} items");
-        }
-        else
-        {
-            Debug.LogError("Failed to load storages - wrapper or storages list is null");
-        }
-    }
 
-    void LoadBuildings()
+    void LoadBuildingsBase()
     {
-        var wrapper = LoadJson<BuildingConfigList>("Configs/JsonData/buildings");
-        if (wrapper?.buildings != null)
+        var wrapper = LoadJson<BuildingBaseConfigList>("Configs/JsonData/buildings");
+        if (wrapper?.buildingsBaseConfigs != null)
         {
-            foreach (var building in wrapper.buildings)
+            foreach (var building in wrapper.buildingsBaseConfigs)
             {
-                BuildingInfos[building.id] = building;
+                BuildingInfos[building.id.GetStableHashCode()] = building;
             }
-            Debug.Log($"Loaded {wrapper.buildings.Count} buildings");
+            Debug.Log($"Loaded {wrapper.buildingsBaseConfigs.Count} buildings");
         }
         else
         {
             Debug.LogError("Failed to load buildings - wrapper or buildings list is null");
+        }
+    }
+    void LoadBuildingsStorages()
+    {
+        var wrapper = LoadJson<BuildingStorageConfigList>("Configs/JsonData/buildingsStorages");
+        if (wrapper?.storageConfigs != null)
+        {
+            foreach (var building in wrapper.storageConfigs)
+            {
+                BuildingStorageInfos[building.BuildingID.GetStableHashCode()] = building;
+            }
+            Debug.Log($"Loaded {wrapper.storageConfigs.Count} buildings storages");
+        }
+        else
+        {
+            Debug.LogError("Failed to load buildings storages - wrapper or buildings storages list is null");
+        }
+    }
+    void LoadBuildingsProcession()
+    {
+        var wrapper = LoadJson<BuildingProcessionConfigList>("Configs/JsonData/buildingProcessions");
+        if (wrapper?.processionConfigs != null)
+        {
+            foreach (var building in wrapper.processionConfigs)
+            {
+                BuildingProcessionInfos[building.BuildingID.GetStableHashCode()] = building;
+            }
+            Debug.Log($"Loaded {wrapper.processionConfigs.Count} buildings processions");
+        }
+        else
+        {
+            Debug.LogError("Failed to load buildings processions- wrapper or buildings processions list is null");
+        }
+    }
+    void LoadBuildingsItemRequests()
+    {
+        var wrapper = LoadJson<BuildingItemRequestsConfigList>("Configs/JsonData/buildingItemRequests");
+        if (wrapper?.buildingItemRequestsConfigs != null)
+        {
+            foreach (var building in wrapper.buildingItemRequestsConfigs)
+            {
+                BuildingItemRequestsInfos[building.BuildingID.GetStableHashCode()] = building;
+            }
+            Debug.Log($"Loaded {wrapper.buildingItemRequestsConfigs.Count} buildings");
+        }
+        else
+        {
+            Debug.LogError("Failed to load buildings item requests - wrapper or buildings requests list is null");
         }
     }
 
@@ -132,7 +170,7 @@ public class ConfigService
     }
 
     T LoadJson<T>(string path)
-        where T : class
+        where T : class,IWrapper
     {
         TextAsset jsonFile = Resources.Load<TextAsset>(path);
         if (jsonFile != null)
@@ -165,14 +203,14 @@ public class ConfigService
         if (!ItemsInfos.TryGetValue(itemId, out var item) || string.IsNullOrEmpty(item.iconPath))
             return null;
 
-        return GetOrLoadSprite($"Items/{item.iconPath}");
+        return GetOrLoadSprite($"Images/Items/{item.iconPath}");
     }
     public Sprite GetBuildingTypeBTSprite(int path)
     {
         if (!TypeBuildingButtonConfig.TryGetValue(path, out var info) || string.IsNullOrEmpty(info))
             return null;
 
-        return GetOrLoadSprite($"BuildingTypesBT/{info}");
+        return GetOrLoadSprite($"Images/BuildingTypesBT/{info}");
     }
 
     public Sprite GetBuildingSprite(int buildingId)
@@ -183,7 +221,7 @@ public class ConfigService
         )
             return null;
 
-        return GetOrLoadSprite($"Buildings/{building.iconPath}");
+        return GetOrLoadSprite($"Images/Buildings/{building.iconPath}");
     }
 
     public Sprite GetRecipeSprite(int recipeId)
@@ -194,7 +232,7 @@ public class ConfigService
         )
             return null;
 
-        return GetOrLoadSprite($"Recipes/{recipe.recipeSpritePath}");
+        return GetOrLoadSprite($"Images/Recipes/{recipe.recipeSpritePath}");
     }
 
     public Material GetMaterial(string materialName)
@@ -318,7 +356,10 @@ public interface IReadOnlyItemsInfo
 
 public interface IReadOnlyBuildingInfo
 {
-    Dictionary<int, BuildingConfig> BuildingInfos { get; }
+    Dictionary<int, BuildingBaseConfig> BuildingInfos { get; }
+    Dictionary<int, BuildingStorageConfig> BuildingStorageInfos { get; }
+    Dictionary<int, BuildingProcessionConfig> BuildingProcessionInfos { get; }
+    Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; }
     GameObject GetBuildingPrefab(int buildingId);
     Sprite GetBuildingSprite(int buildingId);
 }
@@ -339,11 +380,6 @@ public interface IReadOnlyTypeBuildingButtonInfo
 
     public Dictionary<int, string> TypeBuildingButtonConfig { get; }
     Sprite GetBuildingTypeBTSprite(int type);
-}
-public interface IReadOnlyStorageConfig
-{
-
-    public Dictionary<int, StorageConfig> StorageConfig { get; }
 }
 
 

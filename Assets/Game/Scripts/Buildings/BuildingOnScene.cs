@@ -1,6 +1,7 @@
+using System;
 using UnityEngine;
 
-public class BuildingOnScene : MonoBehaviour
+public class BuildingOnScene : MonoBehaviour,IDisposable
 {
     public int id;
     public int clusterID = -1;
@@ -32,5 +33,10 @@ public class BuildingOnScene : MonoBehaviour
 
         clusterIndicator = renderer;
         clusterIndicator.enabled = false;
+    }
+
+    public void Dispose()
+    {
+        throw new NotImplementedException();
     }
 }

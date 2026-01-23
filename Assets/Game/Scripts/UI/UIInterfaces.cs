@@ -1,31 +1,29 @@
 using System;
-using Unity.VisualScripting;
+using UniRx;
+
+using Zenject;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 
 public abstract class UIScreen :MonoBehaviour, IInitializable
 {
-    public bool isOpened{ get; protected set; }
+    public ReactiveProperty<bool> isOpened{ get; protected set; }
     public virtual void Close()
     {
-        isOpened = false;
+        isOpened.Value = false;
         gameObject.SetActive(false);
     }
 
     public virtual void Initialize()
     {
-        
+        isOpened=new ReactiveProperty<bool>(false);
     }
 
     public virtual void Open()
     {
-        if (isOpened) Close();
-        else
-        {
-            isOpened = true;
-            gameObject.SetActive(true);
-        }
+        isOpened.Value = true;
+        gameObject.SetActive(true);
     }
 }
 

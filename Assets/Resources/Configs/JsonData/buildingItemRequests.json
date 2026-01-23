@@ -1,0 +1,85 @@
+﻿{
+    "buildingItemRequestsConfigs": [
+        {
+            "BuildingID": "Road",
+            "itemsRequest": [
+                {
+                    "itemId": 9,
+                    "amount": 1
+                },
+                {
+                    "itemId": 10,
+                    "amount": 1
+                }
+            ]
+        },
+        {
+            "BuildingID": "Drill",
+            "itemsRequest": [
+                {
+                    "itemId": 5,
+                    "amount": 4
+                },
+                {
+                    "itemId": 8,
+                    "amount": 4
+                },
+                {
+                    "itemId": 9,
+                    "amount": 2
+                }
+            ]
+        },
+        {
+            "BuildingID": "FurnaceFT",
+            "itemsRequest": [
+                {
+                    "itemId": 9,
+                    "amount": 2
+                },
+                {
+                    "itemId": 10,
+                    "amount": 2
+                },
+                {
+                    "itemId": 5,
+                    "amount": 2
+                }
+            ]
+        },
+        {
+            "BuildingID": "ConstructionFT",
+            "itemsRequest": [
+                {
+                    "itemId": 9,
+                    "amount": 3
+                },
+                {
+                    "itemId": 10,
+                    "amount": 3
+                },
+                {
+                    "itemId": 5,
+                    "amount": 2
+                },
+                {
+                    "itemId": 8,
+                    "amount": 2
+                }
+            ]
+        },
+        {
+            "BuildingID": "StorageFT",
+            "itemsRequest": [
+                {
+                    "itemId": 9,
+                    "amount": 2
+                },
+                {
+                    "itemId": 8,
+                    "amount": 2
+                }
+            ]
+        }
+    ]
+}

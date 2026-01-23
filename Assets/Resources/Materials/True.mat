@@ -40,11 +40,15 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _LineFrequency: 80
+    - _FresnelStrength: 4
+    - _LineFrequency: 20
+    - _LineRotation: 45
+    - _LineStrength: 1
     - _LineThickness: 0.2
+    - _ScrollSpeed: -1
     m_Colors:
     - _Color: {r: 0.6084906, g: 0.77178353, b: 1, a: 0.4745098}
     - _FresnelColor: {r: 0.418848, g: 0.67223066, b: 7.999999, a: 1}
-    - _Tint: {r: 0, g: 0.09182358, b: 1, a: 0.47058824}
+    - _Tint: {r: 0, g: 0.09182358, b: 1, a: 0.5882353}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

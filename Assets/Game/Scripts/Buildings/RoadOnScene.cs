@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class RoadOnScene : BuildingOnScene
@@ -14,6 +15,12 @@ public class RoadOnScene : BuildingOnScene
     float _currentCellSize;
     public Renderer roadRenderer;
     public Vector2Int[] _cellCenters;
+    
+    
+    MeshCollider staticMeshCollider;
+    
+    
+    private List<BoxCollider> debugSegmentColliders = new List<BoxCollider>();
 
     public override void SetCluster(int newClusterID, Color clusterColor)
     {
@@ -35,9 +42,9 @@ public class RoadOnScene : BuildingOnScene
     public void Init(float cellSize)
     {
         _currentCellSize = cellSize;
-
         roadWidth = cellSize;
 
+        
         meshFilter = GetComponent<MeshFilter>();
         if (meshFilter == null)
             meshFilter = gameObject.AddComponent<MeshFilter>();
@@ -51,12 +58,56 @@ public class RoadOnScene : BuildingOnScene
 
         if (roadMaterial != null)
             meshRenderer.material = roadMaterial;
+            
+        
+        AddStaticMeshCollider();
+        
+        
+        gameObject.isStatic = true;
+    }
+
+    void AddStaticMeshCollider()
+    {
+        
+        var oldCollider = GetComponent<MeshCollider>();
+        if (oldCollider != null)
+            Destroy(oldCollider);
+            
+        
+        staticMeshCollider = gameObject.AddComponent<MeshCollider>();
+        staticMeshCollider.sharedMesh = null; 
+        
+        
+        staticMeshCollider.isTrigger = false;
+        
+        
+        
+    }
+
+    void UpdateStaticMeshCollider()
+    {
+        if (staticMeshCollider != null && mesh != null)
+        {
+            staticMeshCollider.sharedMesh = mesh;
+        }
+    }
+
+    void ClearDebugColliders()
+    {
+        
+        foreach (var collider in debugSegmentColliders)
+        {
+            if (collider != null)
+                Destroy(collider);
+        }
+        debugSegmentColliders.Clear();
     }
 
     public void GenerateRoadMesh(Vector2Int[] cellCenters)
     {
         if (cellCenters == null || cellCenters.Length == 0)
             return;
+            
         _cellCenters = cellCenters;
 
         var vertices = new List<Vector3>();
@@ -88,6 +139,9 @@ public class RoadOnScene : BuildingOnScene
 
         transform.position = centroid;
         transform.rotation = Quaternion.identity;
+        
+        
+        UpdateStaticMeshCollider();
     }
 
     void AddRoadQuadForCell(
@@ -153,6 +207,8 @@ public class RoadOnScene : BuildingOnScene
         if (cellCenters == null || cellCenters.Length < 2)
             return;
 
+        _cellCenters = cellCenters;
+
         transform.position = Vector3.zero;
         transform.rotation = Quaternion.identity;
 
@@ -171,6 +227,15 @@ public class RoadOnScene : BuildingOnScene
         mesh.uv = uvs.ToArray();
         mesh.RecalculateNormals();
         mesh.RecalculateBounds();
+        
+        
+        UpdateStaticMeshCollider();
+        
+        
+        if (Application.isEditor)
+        {
+            CreateDebugColliders();
+        }
     }
 
     void AddRoadSegment(
@@ -229,99 +294,117 @@ public class RoadOnScene : BuildingOnScene
         uvs.Add(new Vector2(endU, 1));
     }
 
+    
+    void CreateDebugColliders()
+    {
+        ClearDebugColliders();
+        
+        if (_cellCenters == null || _cellCenters.Length < 2)
+            return;
+            
+        
+        for (int i = 0; i < _cellCenters.Length - 1; i++)
+        {
+            Vector2Int startCell = _cellCenters[i];
+            Vector2Int endCell = _cellCenters[i + 1];
+            
+            Vector3 startWorld = new Vector3(
+                startCell.x * _currentCellSize,
+                0.05f,
+                startCell.y * _currentCellSize
+            );
+
+            Vector3 endWorld = new Vector3(
+                endCell.x * _currentCellSize,
+                0.05f,
+                endCell.y * _currentCellSize
+            );
+            
+            
+            var debugCollider = gameObject.AddComponent<BoxCollider>();
+            debugCollider.isTrigger = true;
+            debugCollider.enabled = false; 
+            
+            
+            Vector3 segmentCenter = (startWorld + endWorld) * 0.5f;
+            Vector3 direction = endWorld - startWorld;
+            float segmentLength = direction.magnitude;
+            
+            if (segmentLength > 0)
+            {
+                direction.Normalize();
+                debugCollider.center = segmentCenter - transform.position;
+                debugCollider.size = new Vector3(roadWidth, 0.1f, segmentLength);
+                
+                
+                Quaternion rotation = Quaternion.LookRotation(direction);
+                var debugColliderObj = new GameObject("DebugCollider_" + i);
+                debugColliderObj.transform.SetParent(transform);
+                debugColliderObj.transform.position = segmentCenter;
+                debugColliderObj.transform.rotation = rotation;
+                var tempCollider = debugColliderObj.AddComponent<BoxCollider>();
+                tempCollider.size = new Vector3(roadWidth, 0.1f, segmentLength);
+                tempCollider.isTrigger = true;
+                
+                debugSegmentColliders.Add(tempCollider);
+                
+                
+                Destroy(debugCollider);
+            }
+        }
+    }
+
     public void ClearMesh()
     {
         if (mesh != null)
         {
             mesh.Clear();
         }
+        
+        if (staticMeshCollider != null)
+        {
+            staticMeshCollider.sharedMesh = null;
+        }
+        
+        ClearDebugColliders();
     }
 
-    public void DrawDebugBounds(Vector2Int[] cellCenters)
+    
+    public bool IsPointOnRoad(Vector3 worldPoint)
     {
-        Vector3 objectWorldPos = transform.position;
+        if (_cellCenters == null || _cellCenters.Length == 0)
+            return false;
 
-        Debug.Log($"DrawDebugBounds: Object at {objectWorldPos}");
-
-        foreach (var cell in cellCenters)
+        
+        Vector3 localPoint = transform.InverseTransformPoint(worldPoint);
+        
+        
+        foreach (var cell in _cellCenters)
         {
-            Vector3 worldCenter = new Vector3(
+            Vector3 cellCenterLocal = new Vector3(
                 cell.x * _currentCellSize,
-                0.2f,
+                0.05f,
                 cell.y * _currentCellSize
             );
 
-            Vector3 cellBottomLeft = new Vector3(
-                cell.x * _currentCellSize - _currentCellSize * 0.5f,
-                0,
-                cell.y * _currentCellSize - _currentCellSize * 0.5f
-            );
-
-            Vector3 cellBottomRight = new Vector3(
-                cell.x * _currentCellSize + _currentCellSize * 0.5f,
-                0,
-                cell.y * _currentCellSize - _currentCellSize * 0.5f
-            );
-
-            Vector3 cellTopLeft = new Vector3(
-                cell.x * _currentCellSize - _currentCellSize * 0.5f,
-                0,
-                cell.y * _currentCellSize + _currentCellSize * 0.5f
-            );
-
-            Vector3 cellTopRight = new Vector3(
-                cell.x * _currentCellSize + _currentCellSize * 0.5f,
-                0,
-                cell.y * _currentCellSize + _currentCellSize * 0.5f
-            );
-
-            float halfRoadWidth = roadWidth * 0.5f;
-            Vector3 roadBottomLeft = new Vector3(
-                worldCenter.x - halfRoadWidth,
-                0.1f,
-                worldCenter.z - halfRoadWidth
-            );
-
-            Vector3 roadBottomRight = new Vector3(
-                worldCenter.x + halfRoadWidth,
-                0.1f,
-                worldCenter.z - halfRoadWidth
-            );
-
-            Vector3 roadTopLeft = new Vector3(
-                worldCenter.x - halfRoadWidth,
-                0.1f,
-                worldCenter.z + halfRoadWidth
-            );
-
-            Vector3 roadTopRight = new Vector3(
-                worldCenter.x + halfRoadWidth,
-                0.1f,
-                worldCenter.z + halfRoadWidth
-            );
-
-            Debug.DrawLine(cellBottomLeft, cellBottomRight, Color.green, 2f);
-            Debug.DrawLine(cellBottomRight, cellTopRight, Color.green, 2f);
-            Debug.DrawLine(cellTopRight, cellTopLeft, Color.green, 2f);
-            Debug.DrawLine(cellTopLeft, cellBottomLeft, Color.green, 2f);
-
-            Debug.DrawLine(roadBottomLeft, roadBottomRight, Color.blue, 2f);
-            Debug.DrawLine(roadBottomRight, roadTopRight, Color.blue, 2f);
-            Debug.DrawLine(roadTopRight, roadTopLeft, Color.blue, 2f);
-            Debug.DrawLine(roadTopLeft, roadBottomLeft, Color.blue, 2f);
-
-            Debug.DrawLine(
-                worldCenter - Vector3.forward * 0.3f,
-                worldCenter + Vector3.forward * 0.3f,
-                Color.red,
-                2f
-            );
-            Debug.DrawLine(
-                worldCenter - Vector3.right * 0.3f,
-                worldCenter + Vector3.right * 0.3f,
-                Color.red,
-                2f
-            );
+            float halfWidth = roadWidth * 0.5f;
+            float halfLength = roadWidth * 0.5f;
+            
+            if (Mathf.Abs(localPoint.x - cellCenterLocal.x) < halfWidth &&
+                Mathf.Abs(localPoint.z - cellCenterLocal.z) < halfLength)
+            {
+                return true;
+            }
         }
+        
+        return false;
     }
+
+    void OnDestroy()
+    {
+        
+        ClearMesh();
+    }
+    
+    
 }

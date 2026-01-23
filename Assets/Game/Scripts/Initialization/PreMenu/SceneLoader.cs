@@ -15,7 +15,7 @@ public class SceneLoader
             {
                 operation.allowSceneActivation = true;
             }
-            await UniTask.Yield();
+            await  UniTask.Yield();
         }
     }
 }

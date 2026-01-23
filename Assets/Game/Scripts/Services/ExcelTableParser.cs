@@ -7,10 +7,12 @@ using System;
 
 public class CsvTableParserEditor : EditorWindow
 {
-    TextAsset itemsCsv;
-    TextAsset buildingsCsv;
+    TextAsset buildingsBaseCsv;
+    TextAsset buildingsStorageCsv;
+    TextAsset buildingsProcessionCsv;
+    TextAsset buildingsItemRequestsCsv;
     TextAsset recipesCsv;
-    TextAsset storageCsv; // Добавлено для Storage
+    TextAsset itemsCsv;
 
     [MenuItem("Tools/Parse CSV Tables")]
     public static void ShowWindow()
@@ -21,21 +23,27 @@ public class CsvTableParserEditor : EditorWindow
     void OnGUI()
     {
         GUILayout.Label("CSV Tables Parser", EditorStyles.boldLabel);
-        GUILayout.Label("Работает с CSV которые выглядят как Excel", EditorStyles.miniLabel);
 
-        itemsCsv =
-            EditorGUILayout.ObjectField("Items CSV", itemsCsv, typeof(TextAsset), false)
+        
+        buildingsBaseCsv =
+            EditorGUILayout.ObjectField("Buildings Base CSV", buildingsBaseCsv, typeof(TextAsset), false)
             as TextAsset;
-        buildingsCsv =
-            EditorGUILayout.ObjectField("Buildings CSV", buildingsCsv, typeof(TextAsset), false)
+        buildingsStorageCsv =
+            EditorGUILayout.ObjectField("Buildings Storage CSV", buildingsStorageCsv, typeof(TextAsset), false)
             as TextAsset;
+        buildingsProcessionCsv =
+            EditorGUILayout.ObjectField("Buildings Procession CSV", buildingsProcessionCsv, typeof(TextAsset), false)
+            as TextAsset;
+        buildingsItemRequestsCsv =
+            EditorGUILayout.ObjectField("Buildings Item Requests CSV", buildingsItemRequestsCsv, typeof(TextAsset), false)
+            as TextAsset;
+
         recipesCsv =
             EditorGUILayout.ObjectField("Recipes CSV", recipesCsv, typeof(TextAsset), false)
             as TextAsset;
-        storageCsv =
-            EditorGUILayout.ObjectField("Storages CSV", storageCsv, typeof(TextAsset), false) // Исправлено: storageCsv
+        itemsCsv =
+            EditorGUILayout.ObjectField("Items CSV", itemsCsv, typeof(TextAsset), false)
             as TextAsset;
-
         if (GUILayout.Button("Parse All Tables"))
         {
             ParseAllTables();
@@ -46,24 +54,44 @@ public class CsvTableParserEditor : EditorWindow
     {
         try
         {
-            if (itemsCsv != null)
+           
+            if (buildingsBaseCsv != null)
             {
-                Debug.Log($"Parsing Items CSV: {itemsCsv.name}");
+                Debug.Log($"Parsing Buildings CSV: {buildingsBaseCsv.name}");
                 string csvText = File.ReadAllText(
-                    AssetDatabase.GetAssetPath(itemsCsv),
+                    AssetDatabase.GetAssetPath(buildingsBaseCsv),
                     System.Text.Encoding.UTF8
                 );
-                ParseItems(csvText);
+                ParseBuildingsBaseConfig(csvText);
             }
-            if (buildingsCsv != null)
+            if (buildingsStorageCsv != null)
             {
-                Debug.Log($"Parsing Buildings CSV: {buildingsCsv.name}");
+                Debug.Log($"Parsing Buildings Storage CSV: {buildingsStorageCsv.name}");
                 string csvText = File.ReadAllText(
-                    AssetDatabase.GetAssetPath(buildingsCsv),
+                    AssetDatabase.GetAssetPath(buildingsStorageCsv),
                     System.Text.Encoding.UTF8
                 );
-                ParseBuildings(csvText);
+                ParseBuildingsStorageConfig(csvText);
             }
+            if (buildingsProcessionCsv != null)
+            {
+                Debug.Log($"Parsing Buildings Procession CSV: {buildingsProcessionCsv.name}");
+                string csvText = File.ReadAllText(
+                    AssetDatabase.GetAssetPath(buildingsProcessionCsv),
+                    System.Text.Encoding.UTF8
+                );
+                ParseBuildingsProcessionConfig(csvText);
+            } 
+            if (buildingsItemRequestsCsv != null)
+            {
+                Debug.Log($"Parsing Item Requests CSV: {buildingsItemRequestsCsv.name}");
+                string csvText = File.ReadAllText(
+                    AssetDatabase.GetAssetPath(buildingsItemRequestsCsv),
+                    System.Text.Encoding.UTF8
+                );
+                ParseBuildingsItemRequestsConfig(csvText);
+            }
+
             if (recipesCsv != null)
             {
                 Debug.Log($"Parsing Recipes CSV: {recipesCsv.name}");
@@ -73,16 +101,16 @@ public class CsvTableParserEditor : EditorWindow
                 );
                 ParseRecipes(csvText);
             }
-            if (storageCsv != null)
+
+            if (itemsCsv != null)
             {
-                Debug.Log($"Parsing Storages CSV: {storageCsv.name}"); // Исправлено
+                Debug.Log($"Parsing Items CSV: {itemsCsv.name}");
                 string csvText = File.ReadAllText(
-                    AssetDatabase.GetAssetPath(storageCsv), // Исправлено: storageCsv
+                    AssetDatabase.GetAssetPath(itemsCsv),
                     System.Text.Encoding.UTF8
                 );
-                ParseStorages(csvText); // Новый метод
+                ParseItems(csvText);
             }
-
             EditorUtility.DisplayDialog("Success", "All tables parsed successfully!", "OK");
             AssetDatabase.Refresh();
         }
@@ -93,6 +121,185 @@ public class CsvTableParserEditor : EditorWindow
         }
     }
 
+#region buildings
+    void ParseBuildingsBaseConfig(string csvText)
+    {
+        var rows = ParseCsv(csvText);
+        if (rows.Count < 2)
+            return;
+
+        var buildings = new List<BuildingBaseConfig>();
+
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Length < 14)
+            {
+                Debug.LogWarning(
+                    $"Skipping row {i} in Buildings CSV: not enough columns ({row.Length})"
+                );
+                continue;
+            }
+
+            try
+            {
+                buildings.Add(
+                    new BuildingBaseConfig
+                    {
+                        id = row[0],
+                        title = row[1],
+                        description = row[2],
+                        iconPath = row[3],
+                        prefabPath = row[4],
+                        buildingType = (BuildingsTypes)int.Parse(row[5]),
+                        actionType = (ActionType)int.Parse(row[6]),
+                        size = new Vector3Int(
+                            int.Parse(row[7]),
+                            int.Parse(row[8]),
+                            int.Parse(row[9])
+                        ),
+                        typeOfLogic = (TypeOfLogic)int.Parse(row[10]),
+                        maxHealth = float.Parse(row[11]),
+                        timeToStartRestore = float.Parse(row[12]),
+                        restoreHealthPerSecond = float.Parse(row[13]),
+                    }
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error parsing building at row {i}: {ex.Message}");
+                Debug.LogError($"Row data: {string.Join(" | ", row)}");
+                throw;
+            }
+        }
+
+        SaveToJson(new BuildingBaseConfigList { buildingsBaseConfigs = buildings }, "buildings");
+        Debug.Log($"Parsed {buildings.Count} buildings");
+    }
+    void ParseBuildingsStorageConfig(string csvText)
+    {
+        var rows = ParseCsv(csvText);
+        if (rows.Count < 2)
+            return;
+
+        var buildingsStorages = new List<BuildingStorageConfig>();
+
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Length < 3)
+            {
+                Debug.LogWarning(
+                    $"Skipping row {i} in Buildings CSV: not enough columns ({row.Length})"
+                );
+                continue;
+            }
+            try
+            {
+                buildingsStorages.Add(
+                    new BuildingStorageConfig
+                    {
+                        BuildingID = row[0],
+                        MaxSlots = int.Parse(row[1]),
+                        ItemsTypes=ParseIntHashSet(row[2]) 
+
+                    }
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error parsing building at row {i}: {ex.Message}");
+                Debug.LogError($"Row data: {string.Join(" | ", row)}");
+                throw;
+            }
+        }
+
+        SaveToJson(new BuildingStorageConfigList { storageConfigs = buildingsStorages }, "buildingsStorages");
+        Debug.Log($"Parsed {buildingsStorages.Count} buildingsStorages");
+    }
+    void ParseBuildingsProcessionConfig(string csvText)
+    {
+        var rows = ParseCsv(csvText);
+        if (rows.Count < 2)
+            return;
+
+        var buildingProcessions = new List<BuildingProcessionConfig>();
+
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Length < 3)
+            {
+                Debug.LogWarning(
+                    $"Skipping row {i} in Buildings CSV: not enough columns ({row.Length})"
+                );
+                continue;
+            }
+            try
+            {
+                buildingProcessions.Add(
+                    new BuildingProcessionConfig
+                    {
+                        BuildingID = row[0],
+                        typeOfProcession = (TypeOfProcession)int.Parse(row[1]),
+                        requiredRecipesGroup=ParseIntHashSet(row[2]) 
+
+                    }
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error parsing building at row {i}: {ex.Message}");
+                Debug.LogError($"Row data: {string.Join(" | ", row)}");
+                throw;
+            }
+        }
+
+        SaveToJson(new BuildingProcessionConfigList { processionConfigs = buildingProcessions }, "buildingProcessions");
+        Debug.Log($"Parsed {buildingProcessions.Count} buildingProcessions");
+    }
+
+    void ParseBuildingsItemRequestsConfig(string csvText)
+    {
+        var rows = ParseCsv(csvText);
+        if (rows.Count < 2)
+            return;
+        var buildingItemRequests = new List<BuildingItemRequestsConfig>();
+
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Length < 2)
+            {
+                Debug.LogWarning(
+                    $"Skipping row {i} in Buildings CSV: not enough columns ({row.Length})"
+                );
+                continue;
+            }
+            try
+            {
+                buildingItemRequests.Add(
+                    new BuildingItemRequestsConfig
+                    {
+                        BuildingID = row[0],
+                        itemsRequest =ParseIngredientString(row[1]) ,
+
+                    }
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error parsing building at row {i}: {ex.Message}");
+                Debug.LogError($"Row data: {string.Join(" | ", row)}");
+                throw;
+            }
+        }
+
+        SaveToJson(new BuildingItemRequestsConfigList {  buildingItemRequestsConfigs= buildingItemRequests }, "buildingItemRequests");
+        Debug.Log($"Parsed {buildingItemRequests.Count} buildingItemRequests");
+    }
+#endregion
+#region itemes
     void ParseItems(string csvText)
     {
         var rows = ParseCsv(csvText);
@@ -104,7 +311,7 @@ public class CsvTableParserEditor : EditorWindow
         for (int i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            if (row.Length < 7) // Увеличено до 7
+            if (row.Length < 6)
             {
                 Debug.LogWarning(
                     $"Skipping row {i} in Items CSV: not enough columns ({row.Length})"
@@ -121,9 +328,8 @@ public class CsvTableParserEditor : EditorWindow
                         title = row[1],
                         description = row[2],
                         iconPath = row[3],
-                        maxInStack = int.Parse(row[4]),
-                        ItemClass = (ItemClass)int.Parse(row[5]),
-                        ItemType = (ItemType)int.Parse(row[6]),
+                        ItemClass = (ItemClass)int.Parse(row[4]),
+                        ItemType = (ItemType)int.Parse(row[5]),
                     }
                 );
             }
@@ -138,62 +344,6 @@ public class CsvTableParserEditor : EditorWindow
         Debug.Log($"Parsed {items.Count} items");
     }
 
-    void ParseBuildings(string csvText)
-    {
-        var rows = ParseCsv(csvText);
-        if (rows.Count < 2)
-            return;
-
-        var buildings = new List<BuildingConfig>();
-
-        for (int i = 1; i < rows.Count; i++)
-        {
-            var row = rows[i];
-            if (row.Length < 15)
-            {
-                Debug.LogWarning(
-                    $"Skipping row {i} in Buildings CSV: not enough columns ({row.Length})"
-                );
-                continue;
-            }
-
-            try
-            {
-                buildings.Add(
-                    new BuildingConfig
-                    {
-                        id = int.Parse(row[0]),
-                        title = row[1],
-                        description = row[2],
-                        iconPath = row[3],
-                        prefabPath = row[4],
-                        buildingType = (BuildingsTypes)int.Parse(row[5]),
-                        actionType = (ActionType)int.Parse(row[6]),
-                        size = new Vector3Int(
-                            int.Parse(row[7]),
-                            int.Parse(row[8]),
-                            int.Parse(row[9])
-                        ),
-                        typeOfLogic = (TypeOfLogic)int.Parse(row[10]),
-                        requiredRecipesGroup = ParseIntHashSet(row[11]),
-                        maxHealth = float.Parse(row[12]),
-                        timeToStartRestore = float.Parse(row[13]),
-                        restoreHealthPerSecond = float.Parse(row[14]),
-                    }
-                );
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"Error parsing building at row {i}: {ex.Message}");
-                Debug.LogError($"Row data: {string.Join(" | ", row)}");
-                throw;
-            }
-        }
-
-        SaveToJson(new BuildingConfigList { buildings = buildings }, "buildings");
-        Debug.Log($"Parsed {buildings.Count} buildings");
-    }
-
     void ParseRecipes(string csvText)
     {
         var rows = ParseCsv(csvText);
@@ -205,7 +355,7 @@ public class CsvTableParserEditor : EditorWindow
         for (int i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            if (row.Length < 8)
+            if (row.Length < 7)
             {
                 Debug.LogWarning(
                     $"Skipping row {i} in Recipes CSV: not enough columns ({row.Length})"
@@ -238,53 +388,10 @@ public class CsvTableParserEditor : EditorWindow
         SaveToJson(new RecipeConfigList { recipes = recipes }, "recipes");
         Debug.Log($"Parsed {recipes.Count} recipes");
     }
-
-    // НОВЫЙ МЕТОД: Парсинг StorageConfig
-    void ParseStorages(string csvText)
+#endregion
+    List<int> ParseIntHashSet(string idsString)
     {
-        var rows = ParseCsv(csvText);
-        if (rows.Count < 2)
-            return;
-
-        var storages = new List<StorageConfig>();
-
-        for (int i = 1; i < rows.Count; i++)
-        {
-            var row = rows[i];
-            if (row.Length < 3) 
-            {
-                Debug.LogWarning(
-                    $"Skipping row {i} in Storages CSV: not enough columns ({row.Length})"
-                );
-                continue;
-            }
-
-            try
-            {
-                storages.Add(
-                    new StorageConfig
-                    {
-                        BuildingID = int.Parse(row[0]),
-                        MaxSlots = int.Parse(row[1]),
-                        ItemsTypes = ParseIntHashSet(row[2])
-                    }
-                );
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"Error parsing storage at row {i}: {ex.Message}");
-                Debug.LogError($"Row data: {string.Join(" | ", row)}");
-                throw;
-            }
-        }
-
-        SaveToJson(new StorageConfigList { storages = storages }, "storages");
-        Debug.Log($"Parsed {storages.Count} storages");
-    }
-
-    HashSet<int> ParseIntHashSet(string idsString)
-    {
-        HashSet<int> ids = new HashSet<int>();
+        List<int> ids = new List<int>();
         
         if (string.IsNullOrEmpty(idsString) || idsString.Trim() == "0")
             return ids;
@@ -300,9 +407,9 @@ public class CsvTableParserEditor : EditorWindow
         return ids;
     }
 
-    Dictionary<int, RecipeIngredient> ParseIngredientString(string ingredientString)
+    List<RecipeIngredient> ParseIngredientString(string ingredientString)
     {
-        var ingredients = new Dictionary<int, RecipeIngredient>();
+        var ingredients = new List<RecipeIngredient>();
 
         if (string.IsNullOrEmpty(ingredientString))
             return ingredients;
@@ -316,7 +423,7 @@ public class CsvTableParserEditor : EditorWindow
                 string itemIdStr = parts[0].Trim();
                 if (int.TryParse(itemIdStr, out int itemId))
                 {
-                    ingredients.Add(itemId,
+                    ingredients.Add(
                         new RecipeIngredient
                         {
                             itemId = itemId,
@@ -326,8 +433,7 @@ public class CsvTableParserEditor : EditorWindow
                 }
                 else
                 {
-                    // Если это не число, используем хэш
-                    ingredients.Add(itemIdStr.GetStableHashCode(),
+                    ingredients.Add(
                         new RecipeIngredient
                         {
                             itemId = itemIdStr.GetStableHashCode(),
@@ -345,7 +451,6 @@ public class CsvTableParserEditor : EditorWindow
     {
         var rows = new List<string[]>();
 
-        // Удаляем BOM символ если есть (для UTF-8)
         if (csvText.Length > 0 && csvText[0] == '\uFEFF')
         {
             csvText = csvText.Substring(1);
@@ -353,7 +458,6 @@ public class CsvTableParserEditor : EditorWindow
 
         var lines = csvText.Split('\n');
 
-        // Определяем разделитель
         char delimiter = ';';
         if (lines.Length > 0 && lines[0].Contains(',') && !lines[0].Contains(';'))
         {
@@ -418,45 +522,19 @@ public class CsvTableParserEditor : EditorWindow
         return rows;
     }
 
-    void SaveToJson(object data, string fileName)
+    void SaveToJson(IWrapper data, string fileName)
     {
         try
         {
-            string json = "";
-
-            // Выбираем правильный wrapper в зависимости от типа данных
-            if (data is BuildingConfigList buildingList)
-            {
-                json = JsonUtility.ToJson(buildingList, true);
-            }
-            else if (data is ItemConfigList itemList)
-            {
-                json = JsonUtility.ToJson(itemList, true);
-            }
-            else if (data is RecipeConfigList recipeList)
-            {
-                json = JsonUtility.ToJson(recipeList, true);
-            }
-            else if (data is StorageConfigList storageList) // Добавлено
-            {
-                json = JsonUtility.ToJson(storageList, true);
-            }
-            else
-            {
-                json = JsonUtility.ToJson(data, true);
-            }
+            string json=JsonUtility.ToJson(data, true);
 
             string directory = Application.dataPath + "/Resources/Configs/JsonData";
             if (!Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
-
-            // Сохраняем с кодировкой UTF-8
             string filePath = $"{directory}/{fileName}.json";
             File.WriteAllText(filePath, json, System.Text.Encoding.UTF8);
 
             Debug.Log($"Saved: {fileName}.json with {json.Length} characters");
-
-            // Для отладки выводим содержимое JSON
             Debug.Log($"JSON content for {fileName}: {json}");
         }
         catch (System.Exception ex)

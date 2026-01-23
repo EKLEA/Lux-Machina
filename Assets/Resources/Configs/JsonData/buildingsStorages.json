@@ -1,0 +1,16 @@
+﻿{
+    "storageConfigs": [
+        {
+            "BuildingID": "Core",
+            "MaxSlots": 20,
+            "ItemsTypes": [
+                1
+            ]
+        },
+        {
+            "BuildingID": "StorageFT",
+            "MaxSlots": 10,
+            "ItemsTypes": []
+        }
+    ]
+}

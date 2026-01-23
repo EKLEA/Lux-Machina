@@ -16,6 +16,15 @@
                     "initialStateCheck": true
                 },
                 {
+                    "name": "Hold",
+                    "type": "Button",
+                    "id": "73ec9a45-2c80-4178-9150-9b2f7dcef8b4",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "MouseScroll",
                     "type": "Value",
                     "id": "67d03f8d-9f8b-49e0-9949-bad0212ab90a",
@@ -23,15 +32,6 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
-                },
-                {
-                    "name": "Click",
-                    "type": "Button",
-                    "id": "5c61ff1c-c796-49a4-a66c-b04a2cc35007",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
                 },
                 {
                     "name": "Speed",
@@ -55,24 +55,6 @@
                     "name": "Camera Rotate BT",
                     "type": "Button",
                     "id": "c099a395-6ecc-41c7-9324-dcb6f00c0758",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "RecalculateClusters",
-                    "type": "Button",
-                    "id": "fcec2643-4605-4ec6-9094-3c314d13d611",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "ClusterInfo",
-                    "type": "Button",
-                    "id": "9d85a726-d55e-41fa-a6d5-a2681ac8f4ed",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -137,23 +119,23 @@
                 },
                 {
                     "name": "",
+                    "id": "541e0427-aa25-4efd-9a6f-aca9e83c878a",
+                    "path": "<Keyboard>/leftShift",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Hold",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "be95e963-794b-4ef4-ad93-2f368906b178",
                     "path": "<Mouse>/scroll/y",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "MouseScroll",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "f3605558-c59e-4d86-8d07-e8b666e32c3b",
-                    "path": "<Mouse>/leftButton",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Click",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -187,28 +169,6 @@
                     "processors": "",
                     "groups": "",
                     "action": "Camera Rotate BT",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "40e247b3-de1d-42b6-bbbe-fddf086a2efd",
-                    "path": "<Keyboard>/r",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "RecalculateClusters",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "faa28189-63e3-408a-aac2-c6b8b5990db2",
-                    "path": "<Keyboard>/c",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "ClusterInfo",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
@@ -281,15 +241,6 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
-                },
-                {
-                    "name": "Hold",
-                    "type": "Button",
-                    "id": "47834772-f4f4-44ef-91a7-db4912f1679c",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -334,17 +285,6 @@
                     "processors": "",
                     "groups": "",
                     "action": "ForceBuilding",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "329c2e1a-6557-411c-88db-ecd89b0532af",
-                    "path": "<Keyboard>/leftShift",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "Hold",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }
