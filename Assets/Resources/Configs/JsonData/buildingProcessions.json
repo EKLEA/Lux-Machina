@@ -4,21 +4,21 @@
             "BuildingID": "Drill",
             "typeOfProcession": 2,
             "requiredRecipesGroup": [
-                2
+                1
             ]
         },
         {
             "BuildingID": "FurnaceFT",
             "typeOfProcession": 1,
             "requiredRecipesGroup": [
-                1
+                2
             ]
         },
         {
             "BuildingID": "ConstructionFT",
             "typeOfProcession": 1,
             "requiredRecipesGroup": [
-                3
+                4
             ]
         }
     ]

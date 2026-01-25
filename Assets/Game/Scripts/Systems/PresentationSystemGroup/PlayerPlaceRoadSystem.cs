@@ -156,6 +156,7 @@ public partial class PlayerPlaceRoadSystem : SystemBase
              Debug.Log("вызов");
             onBuildingDone?.Invoke();
             _isProcessing=false;
+            onBuildingDone=null;
         }
 
     }

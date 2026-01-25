@@ -37,6 +37,7 @@ public class BuildingInfoViewModel
     ReactiveProperty<int> CountInPack;
     CompositeDisposable disposables;
     CompositeDisposable storageDisposables;
+    
     public BuildingInfoViewModel(World world)
     {
         entityManager=world.EntityManager;
@@ -90,7 +91,12 @@ public class BuildingInfoViewModel
             }
             else distribuitionViewData =null;
             Priority=entityManager.HasComponent<CraftingPriorityData>(building)? new(entityManager.GetComponentData<CraftingPriorityData>(building).CraftingPriority):null;
-            Priority?.Subscribe(value=>ChangePriority(building,false,value)).AddTo(disposables);;
+            Priority?.Subscribe(
+                value =>
+                {
+                    ChangePriority(building,false,value);
+                    
+                }).AddTo(disposables);;
             priority=Priority;
             if(entityManager.HasComponent<ExcessSlotData>(building)) ExcessSlots=new(GetSlotsFromBuff<ExcessSlotData>(building));
             else ExcessSlots=null;
@@ -106,9 +112,14 @@ public class BuildingInfoViewModel
                 IsActiveConstructionInput=entityManager.HasComponent<IsInputConstructionEnabled>(building)? new(entityManager.IsComponentEnabled<IsInputConstructionEnabled>(building)) :null;
                 IsActiveConstructionOutput=entityManager.HasComponent<IsOutputConstuctionEnabled>(building)? new(entityManager.IsComponentEnabled<IsOutputConstuctionEnabled>(building)):null;
                 ConstructionPriority=entityManager.HasComponent<ConstructionPriorityData>(building)? new(entityManager.GetComponentData<ConstructionPriorityData>(building).ConstructionPriority):null;
-                ConstructionPriority?.Skip(1).Subscribe(value=>ChangePriority(building,true,value));
-                IsActiveConstructionInput?.Skip(1).Subscribe(value=>ChangeBuildingAccess(building,true,true,value)).AddTo(disposables);
-                IsActiveConstructionOutput?.Skip(1).Subscribe(value=>ChangeBuildingAccess(building,true,false,value)).AddTo(disposables);
+                ConstructionPriority?.Subscribe(value =>
+                {
+                    ChangePriority(building,true,value);
+                    
+                    
+                });
+                IsActiveConstructionInput?.Subscribe(value=>ChangeBuildingAccess(building,true,true,value)).AddTo(disposables);
+                IsActiveConstructionOutput?.Subscribe(value=>ChangeBuildingAccess(building,true,false,value)).AddTo(disposables);
                 placeDestroyViewData = new()
                 {
                     InputConstructionSlots=InputConstructionSlots,
@@ -127,7 +138,10 @@ public class BuildingInfoViewModel
                 TimeToCraft=new(recipeData.TimeToCraft);
                 CurrTime=new(recipeData.CurrTime);
                 CountInPack=new(entityManager.GetComponentData<CountOfPackInBuildingData>(building).CountOfPack);
-                CountInPack.Skip(1).Subscribe(value=>ChangeCountOfPack(building,value)).AddTo(disposables);;
+                CountInPack.Subscribe(value =>
+                {
+                    ChangeCountOfPack(building,value);
+                }).AddTo(disposables);;
                 recipeViewData.Item2 = new()
                 {
                     recipeIDHash=recipeData.RecipeIDHash,
@@ -152,12 +166,12 @@ public class BuildingInfoViewModel
                         ReactiveProperty<int>  ItemID=new(buff[i].ItemId);
                         ReactiveProperty<int> Amount=new(buff[i].Amount);
                         ReactiveProperty<int> Capacity=new(buff[i].Capacity);
-                        Capacity.Skip(1).Subscribe(value=> ChangeStorageSlotCapacity(building,indexForLambda,value)).AddTo(storageDisposables);
+                        Capacity.Subscribe(value=> ChangeStorageSlotCapacity(building,indexForLambda,value)).AddTo(storageDisposables);
                         ReactiveProperty<bool> IsActiveSlotInput=new(buff[i].IsInputEnabled);
                         ReactiveProperty<bool>  IsActiveSlotOutput=new(buff[i].IsOutputEnabled);
 
-                        IsActiveSlotInput.Skip(1).Subscribe(value=>ChangeStorageSlotAccess(building,indexForLambda,true,value)).AddTo(storageDisposables);
-                        IsActiveSlotOutput.Skip(1).Subscribe(value=>ChangeStorageSlotAccess(building,indexForLambda,false,value)).AddTo(storageDisposables);
+                        IsActiveSlotInput.Subscribe(value=>ChangeStorageSlotAccess(building,indexForLambda,true,value)).AddTo(storageDisposables);
+                        IsActiveSlotOutput.Subscribe(value=>ChangeStorageSlotAccess(building,indexForLambda,false,value)).AddTo(storageDisposables);
                         slots[i]=new StorageSlotViewData{
                             ItemID=ItemID,
                             Amount=Amount,
@@ -190,6 +204,7 @@ public class BuildingInfoViewModel
     {
         if (entityManager.HasBuffer<T>(building))
         {
+            
             var buff = entityManager.GetBuffer<T>(building);
             for(int i = 0; i < buff.Length;i++)
             {
@@ -221,6 +236,8 @@ public class BuildingInfoViewModel
             if (entityManager.HasComponent<IsRecipeAssigned>(viewDataData.buildingEntity)&&entityManager.IsComponentEnabled<IsRecipeAssigned>(viewDataData.buildingEntity))
             {
                 var data=entityManager.GetComponentData<RecipeBuildingData>(viewDataData.buildingEntity);
+                
+               
                 TimeToCraft.Value=data.TimeToCraft;
                 CurrTime.Value=data.CurrTime;
             }
@@ -253,12 +270,12 @@ public class BuildingInfoViewModel
                 ReactiveProperty<int>  ItemID=new(buff[i].ItemId);
                 ReactiveProperty<int> Amount=new(buff[i].Amount);
                 ReactiveProperty<int> Capacity=new(buff[i].Capacity);
-                Capacity.Skip(1).Subscribe(value=> ChangeStorageSlotCapacity(entity,indexForLambda,value)).AddTo(storageDisposables);
+                Capacity.Subscribe(value=> ChangeStorageSlotCapacity(entity,indexForLambda,value)).AddTo(storageDisposables);
                 ReactiveProperty<bool> IsActiveSlotInput=new(buff[i].IsInputEnabled);
                 ReactiveProperty<bool>  IsActiveSlotOutput=new(buff[i].IsOutputEnabled);
 
-                IsActiveSlotInput.Skip(1).Subscribe(value=>ChangeStorageSlotAccess(entity,indexForLambda,true,value)).AddTo(storageDisposables);
-                IsActiveSlotOutput.Skip(1).Subscribe(value=>ChangeStorageSlotAccess(entity,indexForLambda,false,value)).AddTo(storageDisposables);
+                IsActiveSlotInput.Subscribe(value=>ChangeStorageSlotAccess(entity,indexForLambda,true,value)).AddTo(storageDisposables);
+                IsActiveSlotOutput.Subscribe(value=>ChangeStorageSlotAccess(entity,indexForLambda,false,value)).AddTo(storageDisposables);
                 newSlots[i] = new StorageSlotViewData {
                     ItemID=ItemID,
                             Amount=Amount,
@@ -337,6 +354,7 @@ public class BuildingInfoViewModel
         Entity Command=ecb.CreateEntity();
         ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
         ecb.AddComponent(Command,new SetRecipeData{RecipeID=RecipeID});
+        
     }
 
     public void MarkAsDemolition(Entity entity,bool IsDemolition)
@@ -347,7 +365,7 @@ public class BuildingInfoViewModel
         ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
         ecb.AddComponent(Command,new MarkAsDemolitionData{IsDemolition=IsDemolition});
     }
-    public void MarkAsForceDestory(Entity entity,bool isForceDestroy)
+    public void MarkAsForceDestory(Entity entity)
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
                .CreateCommandBuffer();
@@ -365,7 +383,6 @@ public class BuildingInfoViewModel
             var buff=entityManager.GetBuffer<StorageSlotData>(entity);
             if(buff.Length==buff.Capacity) return;
             
-            Debug.Log("dsdssd");
             Entity Command=ecb.CreateEntity();
             ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
             ecb.AddComponent(Command,new AddStorageSlotData{ItemID=ItemID,Capacity=Capacity});
@@ -376,11 +393,9 @@ public class BuildingInfoViewModel
         if (entityManager.HasBuffer<StorageSlotData>(entity))
         {     var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
                 .CreateCommandBuffer();
-            Debug.Log("sdssd");
             var buff=entityManager.GetBuffer<StorageSlotData>(entity);
             if(buff.Length<=slotIND) return;
             
-            Debug.Log("sdssd2323");
             Entity Command=ecb.CreateEntity();
             ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
             ecb.AddComponent(Command,new RemoveStorageSlotData{slotIND=slotIND});

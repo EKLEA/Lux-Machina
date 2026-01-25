@@ -201,7 +201,7 @@ public class CsvTableParserEditor : EditorWindow
                     {
                         BuildingID = row[0],
                         MaxSlots = int.Parse(row[1]),
-                        ItemsTypes=ParseIntHashSet(row[2]) 
+                        ItemsTypes=ParseHashSet<ItemClass>(row[2]) 
 
                     }
                 );
@@ -242,7 +242,7 @@ public class CsvTableParserEditor : EditorWindow
                     {
                         BuildingID = row[0],
                         typeOfProcession = (TypeOfProcession)int.Parse(row[1]),
-                        requiredRecipesGroup=ParseIntHashSet(row[2]) 
+                        requiredRecipesGroup=ParseHashSet<RequiredRecipesGroup>(row[2]) 
 
                     }
                 );
@@ -355,7 +355,7 @@ public class CsvTableParserEditor : EditorWindow
         for (int i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            if (row.Length < 7)
+            if (row.Length < 8)
             {
                 Debug.LogWarning(
                     $"Skipping row {i} in Recipes CSV: not enough columns ({row.Length})"
@@ -370,11 +370,12 @@ public class CsvTableParserEditor : EditorWindow
                     {
                         id = int.Parse(row[0]),
                         title = row[1].Trim(),
-                        groupIds = ParseIntHashSet(row[2]),
-                        inputItems = ParseIngredientString(row[3]),
-                        outputItems = ParseIngredientString(row[4]),
-                        craftTime = float.Parse(row[5]),
-                        recipeSpritePath = row[6],
+                        RecipesGroupIds = ParseHashSet<RequiredRecipesGroup>(row[2]),
+                        ItemClass = (ItemClass)int.Parse(row[3]),
+                        inputItems = ParseIngredientString(row[4]),
+                        outputItems = ParseIngredientString(row[5]),
+                        craftTime = float.Parse(row[6]),
+                        recipeSpritePath = row[7],
                     }
                 );
             }
@@ -389,9 +390,9 @@ public class CsvTableParserEditor : EditorWindow
         Debug.Log($"Parsed {recipes.Count} recipes");
     }
 #endregion
-    List<int> ParseIntHashSet(string idsString)
+    List<T> ParseHashSet<T>(string idsString) where T : struct, Enum
     {
-        List<int> ids = new List<int>();
+        List<T> ids = new List<T>();
         
         if (string.IsNullOrEmpty(idsString) || idsString.Trim() == "0")
             return ids;
@@ -401,7 +402,7 @@ public class CsvTableParserEditor : EditorWindow
         {
             if (int.TryParse(pair.Trim(), out int id))
             {
-                ids.Add(id);
+                ids.Add((T)System.Enum.ToObject(typeof(T), id));
             }
         }
         return ids;
@@ -411,7 +412,7 @@ public class CsvTableParserEditor : EditorWindow
     {
         var ingredients = new List<RecipeIngredient>();
 
-        if (string.IsNullOrEmpty(ingredientString))
+        if (string.IsNullOrEmpty(ingredientString.Trim()))
             return ingredients;
 
         string[] pairs = ingredientString.Split(',');
@@ -468,20 +469,21 @@ public class CsvTableParserEditor : EditorWindow
 
         foreach (var line in lines)
         {
-            if (string.IsNullOrWhiteSpace(line))
+            var l =line.Trim();
+            if (string.IsNullOrWhiteSpace(l))
                 continue;
 
             var fields = new List<string>();
             var currentField = new System.Text.StringBuilder();
             bool inQuotes = false;
 
-            for (int i = 0; i < line.Length; i++)
+            for (int i = 0; i < l.Length; i++)
             {
-                char c = line[i];
+                char c = l[i];
 
                 if (c == '"')
                 {
-                    if (inQuotes && i < line.Length - 1 && line[i + 1] == '"')
+                    if (inQuotes && i < l.Length - 1 && l[i + 1] == '"')
                     {
                         currentField.Append('"');
                         i++;

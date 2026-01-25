@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using UniRx;
 using Zenject;
 using Unity.Entities;
+using System.Linq;
 
 public class BuildingManagementWindowView:DragableUIWindow
 {
@@ -24,28 +25,31 @@ public class BuildingManagementWindowView:DragableUIWindow
     [SerializeField] Transform StorageArea;
     [SerializeField] Transform ConstructionArea;
     [SerializeField] Transform ExcessItemsArea;
+    [SerializeField] RecipesAndItemsWindow RecipesAndItemsHead;
+
     [Header("CraftArea")]
     [SerializeField] Transform RecipeHead;
     [SerializeField] Transform CraftSlotsHead;
+    [SerializeField] Button ChangeRecipeBT;
     [SerializeField] Transform ProgressBar;
+    [SerializeField] Image ProgressFill;
     [SerializeField] Transform InputSlotsHolder;
     [SerializeField] Transform OutputSlotsHolder;
     [SerializeField] Image RecipeSprite;
     [SerializeField] Transform RecipeIndicator;
     [SerializeField] TextMeshProUGUI RecipeName;
-    [SerializeField] Transform ChooseRecipeWindow;
     [SerializeField] SlotView[] InputSlots;
     [SerializeField] SlotView[] OutputSlots;
     [SerializeField] ToggleButtonScript ToggleInputBT;
     [SerializeField] ToggleButtonScript ToggleOutputBT;
     [SerializeField] AdjustableButtonScript PriorityBT;
     [SerializeField] AdjustableButtonScript CountOfPackBT;
+
     [Header("StorageArea")]
     [SerializeField] Transform StorageHead;
     [SerializeField] Transform StorageSlotsHead;
     [SerializeField] AdjustableSlotButtonScript[] StorageSlots;
     [SerializeField] Button AddSlotBT;
-    [SerializeField] SetUpStorageSlotWindow SetUpStorageSlotWindow;
 
     [Header("ConstructionArea")]
     [SerializeField] Transform ConstructionHead;
@@ -84,11 +88,11 @@ public class BuildingManagementWindowView:DragableUIWindow
     ConstructionViewData constructionViewData;
     (bool,BuildingCraftViewData) recipeViewData;
      ReactiveProperty<StorageSlotViewData[]> storageSlots;
-     int storageCacheLength,excessSlotsLength;
+    bool windowChanged;
     public void BindModel(BuildingInfoViewModel model)
     {
         this.model=model;
-        SetUpStorageSlotWindow.Initialize();
+        RecipesAndItemsHead.Initialize();
     }
     public void SetUpData(Entity entity)
     { 
@@ -100,7 +104,7 @@ public class BuildingManagementWindowView:DragableUIWindow
     {
         if (buildingViewData == null) 
         {
-             Debug.Log(buildingViewData);
+            Debug.Log(buildingViewData);
             Close();
             return;
         }
@@ -124,6 +128,7 @@ public class BuildingManagementWindowView:DragableUIWindow
                 UpdateState(state);
             });
         }
+        fC=0;
         base.Open();
     }
     void UpdateState(int state)
@@ -149,6 +154,25 @@ public class BuildingManagementWindowView:DragableUIWindow
             RecipeHead.gameObject.SetActive(true);
             RecipeName.text="Выбор рецепта";
             RecipeIndicator.gameObject.SetActive(false);
+            ChangeRecipeBT.onClick.AddListener(()=>
+            {
+                if(!recipeViewData.Item1&&RecipesAndItemsHead.isOpened.Value) return;
+
+                if (recipeViewData.Item1&&recipeViewData.Item2.recipeIDHash!=-1)
+                    model.SetRecipe(buildingViewData.buildingEntity, -1);
+                
+                windowChanged=true;
+                CraftSlotsHead.gameObject.SetActive(false);
+                RecipesAndItemsHead.SetUpWindowAsRecipesByRecipeGroup(
+                    buildingInfo.BuildingProcessionInfos[buildingViewData.buildingID].requiredRecipesGroup.ToHashSet());
+            });     
+            RecipesAndItemsHead.onItemChoosed += (value) => 
+            {
+                model.SetRecipe(buildingViewData.buildingEntity, value);
+                windowChanged=true;
+                RecipesAndItemsHead.Close();
+            };
+            
             if (distribuitionViewData.IsProcessor&&recipeViewData.Item1)
             {
                 CraftSlotsHead.gameObject.SetActive(true);
@@ -180,23 +204,45 @@ public class BuildingManagementWindowView:DragableUIWindow
                 RecipeName.text=recipeInfo.RecipeInfos[recipeViewData.Item2.recipeIDHash].title;
                 RecipeSprite.sprite=recipeInfo.GetRecipeSprite(recipeViewData.Item2.recipeIDHash);
                 ProgressBar.gameObject.SetActive(true);
+                recipeViewData.Item2.CurrTime.Subscribe((value) =>
+                {
+                    
+                    ProgressFill.fillAmount=value/recipeViewData.Item2.TimeToCraft.Value;
+                }).AddTo(CraftAreaDispose);
                 CountOfPackBT.Bind(recipeViewData.Item2.CountInPack);
                 CraftAreaDispose.Add(CountOfPackBT);
+            }
+            else
+            {
+                RecipesAndItemsHead.SetUpWindowAsRecipesByRecipeGroup(
+                    buildingInfo.BuildingProcessionInfos[buildingViewData.buildingID].requiredRecipesGroup.ToHashSet());
             }
             allDisposables.Add(CraftAreaDispose);
         }
     }
     void ShowStorageArea()
     { 
-        if (storageSlots != null&&storageSlots.Value!=null)
+        if (storageSlots != null&&storageSlots.Value!=null&&distribuitionViewData==null)
         {
-            AddSlotBT.onClick.AddListener(SetUpStorageSlotWindow.Open);
-            SetUpStorageSlotWindow.OnSlotCreated += (itemIndex, amount) => 
+            AddSlotBT.onClick.AddListener(()=>
             {
-                model.AddStorageSlot(buildingViewData.buildingEntity, itemIndex, amount);
+                if(RecipesAndItemsHead.isOpened.Value) RecipesAndItemsHead.Close();
+                else
+                    RecipesAndItemsHead.SetUpWindowAsItemsByItemClasses(
+                        buildingInfo.BuildingStorageInfos[buildingViewData.buildingID].ItemsTypes.Count>0?
+                        buildingInfo.BuildingStorageInfos[buildingViewData.buildingID].ItemsTypes.ToHashSet():
+                        Enum.GetValues(typeof(ItemClass)).Cast<ItemClass>()
+                                 .ToHashSet());
+            });
+
+            RecipesAndItemsHead.onItemChoosed += (value) => 
+            {
+                model.AddStorageSlot(buildingViewData.buildingEntity, value, 5);
+                windowChanged=true;
                 AddSlotBT.transform.SetAsLastSibling();
+                RecipesAndItemsHead.Close();
                 
-            };
+            }; 
             StorageAreaDispose=new();
             StorageArea.gameObject.SetActive(true);
             StorageHead.gameObject.SetActive(true);
@@ -302,7 +348,6 @@ public class BuildingManagementWindowView:DragableUIWindow
             int indexForLambda = i; 
             ExcessItemsSlots[indexForLambda].Bind((slots[indexForLambda].ItemID.Value,slots[indexForLambda].Amount,slots[indexForLambda].Capacity));
             ExcessAreaDispose.Add(ExcessItemsSlots[indexForLambda]);
-            excessSlotsLength=slots.Length;
 
         }
         
@@ -351,7 +396,6 @@ public class BuildingManagementWindowView:DragableUIWindow
                 StorageAreaDispose.Add(slotUI);
             }
         }
-        storageCacheLength=slots.Length;
         
     }
    
@@ -360,6 +404,8 @@ public class BuildingManagementWindowView:DragableUIWindow
     {
         CraftAreaDispose?.Dispose();
         CraftAreaDispose=null;
+        RecipesAndItemsHead.Close();
+        ChangeRecipeBT.onClick.RemoveAllListeners();
         RecipeHead.gameObject.SetActive(false);
         CraftSlotsHead.gameObject.SetActive(false);
         ProgressBar.gameObject.SetActive(false);
@@ -374,7 +420,7 @@ public class BuildingManagementWindowView:DragableUIWindow
         StorageHead.gameObject.SetActive(false);
         StorageSlotsHead.gameObject.SetActive(false);
         AddSlotBT.onClick.RemoveAllListeners();
-        SetUpStorageSlotWindow.Clear();
+        RecipesAndItemsHead.Close();
         StorageArea.gameObject.SetActive(false);
     }  
     void HideConstructionArea()
@@ -410,20 +456,34 @@ public class BuildingManagementWindowView:DragableUIWindow
     public override void Close()
     {
         ResetWindow();
+        RecipesAndItemsHead.Close();
         base.Close();
     }
     
        
-   
+   private bool _pendingSetup = false;
     public void UpdateView()
     {
-        if(model==null) return;
-        if(!isOpened.Value) return;
-        if(buildingViewData==null) return;
+        if(model == null || !isOpened.Value || buildingViewData == null) return;
+        
+        if (windowChanged)
+        {
+            windowChanged = false;
+            _pendingSetup = true; 
+            return; 
+        }
+
+        if (_pendingSetup)
+        {
+            SetUpData(buildingViewData.buildingEntity);
+            _pendingSetup = false;
+            return; 
+        }
+
         if (fC % 4 == 0)
         {
             model.FixedUpdate(buildingViewData);
-            fC=0;
+            fC = 0;
         }
         else fC++;
     }

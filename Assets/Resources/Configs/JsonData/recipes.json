@@ -3,9 +3,10 @@
         {
             "id": 1,
             "title": "железная руда",
-            "groupIds": [
+            "RecipesGroupIds": [
                 1
             ],
+            "ItemClass": 1,
             "inputItems": [],
             "outputItems": [
                 {
@@ -19,14 +20,15 @@
         {
             "id": 2,
             "title": "медная руда",
-            "groupIds": [
+            "RecipesGroupIds": [
                 1
             ],
+            "ItemClass": 1,
             "inputItems": [],
             "outputItems": [
                 {
                     "itemId": 2,
-                    "amount": 2
+                    "amount": 1
                 }
             ],
             "craftTime": 1.0,
@@ -35,14 +37,15 @@
         {
             "id": 3,
             "title": "оловянная руда",
-            "groupIds": [
+            "RecipesGroupIds": [
                 1
             ],
+            "ItemClass": 1,
             "inputItems": [],
             "outputItems": [
                 {
                     "itemId": 3,
-                    "amount": 2
+                    "amount": 1
                 }
             ],
             "craftTime": 1.0,
@@ -51,14 +54,15 @@
         {
             "id": 4,
             "title": "уголь",
-            "groupIds": [
+            "RecipesGroupIds": [
                 1
             ],
+            "ItemClass": 1,
             "inputItems": [],
             "outputItems": [
                 {
                     "itemId": 4,
-                    "amount": 2
+                    "amount": 1
                 }
             ],
             "craftTime": 1.0,
@@ -67,9 +71,10 @@
         {
             "id": 5,
             "title": "камень",
-            "groupIds": [
+            "RecipesGroupIds": [
                 1
             ],
+            "ItemClass": 1,
             "inputItems": [],
             "outputItems": [
                 {
@@ -83,9 +88,10 @@
         {
             "id": 6,
             "title": "дерево",
-            "groupIds": [
+            "RecipesGroupIds": [
                 1
             ],
+            "ItemClass": 1,
             "inputItems": [],
             "outputItems": [
                 {
@@ -99,9 +105,10 @@
         {
             "id": 7,
             "title": "живая эссенция",
-            "groupIds": [
+            "RecipesGroupIds": [
                 1
             ],
+            "ItemClass": 1,
             "inputItems": [],
             "outputItems": [
                 {
@@ -115,21 +122,22 @@
         {
             "id": 8,
             "title": "железный слиток",
-            "groupIds": [
+            "RecipesGroupIds": [
                 2,
                 3,
                 4
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 1,
-                    "amount": 2
+                    "amount": 1
                 }
             ],
             "outputItems": [
                 {
                     "itemId": 8,
-                    "amount": 2
+                    "amount": 1
                 }
             ],
             "craftTime": 2.0,
@@ -138,21 +146,22 @@
         {
             "id": 9,
             "title": "медный слиток",
-            "groupIds": [
+            "RecipesGroupIds": [
                 2,
                 3,
                 4
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 2,
-                    "amount": 2
+                    "amount": 1
                 }
             ],
             "outputItems": [
                 {
                     "itemId": 9,
-                    "amount": 2
+                    "amount": 1
                 }
             ],
             "craftTime": 1.0,
@@ -161,21 +170,22 @@
         {
             "id": 10,
             "title": "оловянный слиток",
-            "groupIds": [
+            "RecipesGroupIds": [
                 2,
                 3,
                 4
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 3,
-                    "amount": 2
+                    "amount": 1
                 }
             ],
             "outputItems": [
                 {
                     "itemId": 10,
-                    "amount": 3
+                    "amount": 1
                 }
             ],
             "craftTime": 1.0,
@@ -184,21 +194,26 @@
         {
             "id": 11,
             "title": "бронзовый слиток",
-            "groupIds": [
+            "RecipesGroupIds": [
                 2,
                 3,
                 4
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 9,
-                    "amount": 2
+                    "amount": 1
+                },
+                {
+                    "itemId": 10,
+                    "amount": 1
                 }
             ],
             "outputItems": [
                 {
                     "itemId": 11,
-                    "amount": 3
+                    "amount": 2
                 }
             ],
             "craftTime": 2.0,
@@ -207,12 +222,17 @@
         {
             "id": 12,
             "title": "стальной слиток",
-            "groupIds": [
+            "RecipesGroupIds": [
                 3
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 8,
+                    "amount": 5
+                },
+                {
+                    "itemId": 4,
                     "amount": 5
                 }
             ],
@@ -228,21 +248,18 @@
         {
             "id": 13,
             "title": "живой слиток",
-            "groupIds": [
+            "RecipesGroupIds": [
                 3
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
-                    "itemId": 11,
-                    "amount": 4
-                },
-                {
-                    "itemId": 12,
+                    "itemId": 8,
                     "amount": 2
                 },
                 {
                     "itemId": 7,
-                    "amount": 2
+                    "amount": 1
                 }
             ],
             "outputItems": [
@@ -257,10 +274,11 @@
         {
             "id": 14,
             "title": "железная шестерня",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 8,
@@ -269,7 +287,7 @@
             ],
             "outputItems": [
                 {
-                    "itemId": 13,
+                    "itemId": 14,
                     "amount": 2
                 }
             ],
@@ -279,10 +297,11 @@
         {
             "id": 15,
             "title": "медная шестерня",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 9,
@@ -301,10 +320,11 @@
         {
             "id": 16,
             "title": "бронзовая шестерня",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 11,
@@ -323,33 +343,13 @@
         {
             "id": 17,
             "title": "стальная шестерня",
-            "groupIds": [
+            "RecipesGroupIds": [
                 5
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 12,
-                    "amount": 1
-                }
-            ],
-            "outputItems": [
-                {
-                    "itemId": 18,
-                    "amount": 2
-                }
-            ],
-            "craftTime": 4.0,
-            "recipeSpritePath": "live_cog"
-        },
-        {
-            "id": 18,
-            "title": "живая шестерня",
-            "groupIds": [
-                5
-            ],
-            "inputItems": [
-                {
-                    "itemId": 13,
                     "amount": 1
                 }
             ],
@@ -359,16 +359,39 @@
                     "amount": 2
                 }
             ],
+            "craftTime": 4.0,
+            "recipeSpritePath": "live_cog"
+        },
+        {
+            "id": 18,
+            "title": "живая шестерня",
+            "RecipesGroupIds": [
+                5
+            ],
+            "ItemClass": 1,
+            "inputItems": [
+                {
+                    "itemId": 13,
+                    "amount": 1
+                }
+            ],
+            "outputItems": [
+                {
+                    "itemId": 18,
+                    "amount": 2
+                }
+            ],
             "craftTime": 8.0,
             "recipeSpritePath": "steel_cog"
         },
         {
             "id": 19,
             "title": "железная плита",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 8,
@@ -387,10 +410,11 @@
         {
             "id": 20,
             "title": "медная плита",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 9,
@@ -409,10 +433,11 @@
         {
             "id": 21,
             "title": "бронзовая плита",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
                     "itemId": 11,
@@ -431,33 +456,13 @@
         {
             "id": 22,
             "title": "стальная плита",
-            "groupIds": [
+            "RecipesGroupIds": [
                 5
             ],
+            "ItemClass": 1,
             "inputItems": [
                 {
-                    "itemId": 11,
-                    "amount": 2
-                }
-            ],
-            "outputItems": [
-                {
-                    "itemId": 23,
-                    "amount": 1
-                }
-            ],
-            "craftTime": 4.0,
-            "recipeSpritePath": "live_plate"
-        },
-        {
-            "id": 23,
-            "title": "живая плита",
-            "groupIds": [
-                5
-            ],
-            "inputItems": [
-                {
-                    "itemId": 11,
+                    "itemId": 12,
                     "amount": 2
                 }
             ],
@@ -467,16 +472,39 @@
                     "amount": 1
                 }
             ],
+            "craftTime": 4.0,
+            "recipeSpritePath": "live_plate"
+        },
+        {
+            "id": 23,
+            "title": "живая плита",
+            "RecipesGroupIds": [
+                5
+            ],
+            "ItemClass": 1,
+            "inputItems": [
+                {
+                    "itemId": 13,
+                    "amount": 2
+                }
+            ],
+            "outputItems": [
+                {
+                    "itemId": 23,
+                    "amount": 1
+                }
+            ],
             "craftTime": 8.0,
             "recipeSpritePath": "steel_plate"
         },
         {
             "id": 24,
             "title": "строительные конструкции",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 5,
@@ -495,16 +523,22 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 24,
+                    "amount": 8
+                }
+            ],
             "craftTime": 4.0,
             "recipeSpritePath": "building_structures"
         },
         {
             "id": 25,
             "title": "железобетонные конструкции",
-            "groupIds": [
+            "RecipesGroupIds": [
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 12,
@@ -523,17 +557,23 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 25,
+                    "amount": 4
+                }
+            ],
             "craftTime": 4.0,
             "recipeSpritePath": "reinforced_construction"
         },
         {
             "id": 26,
             "title": "паровой механизм",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 9,
@@ -552,17 +592,23 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 26,
+                    "amount": 2
+                }
+            ],
             "craftTime": 4.0,
             "recipeSpritePath": "steam_mechanism"
         },
         {
             "id": 27,
             "title": "поршень",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 8,
@@ -581,17 +627,23 @@
                     "amount": 1
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 27,
+                    "amount": 3
+                }
+            ],
             "craftTime": 2.0,
             "recipeSpritePath": "steam_piston"
         },
         {
             "id": 28,
             "title": "паровое ядро",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 4,
@@ -610,16 +662,22 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 28,
+                    "amount": 1
+                }
+            ],
             "craftTime": 5.0,
             "recipeSpritePath": "steam_core"
         },
         {
             "id": 29,
             "title": "паровой механизм высокой прочности",
-            "groupIds": [
+            "RecipesGroupIds": [
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 10,
@@ -638,16 +696,22 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 29,
+                    "amount": 3
+                }
+            ],
             "craftTime": 8.0,
             "recipeSpritePath": "high_strength_steam_mechanism"
         },
         {
             "id": 30,
             "title": "поршень высокой прочности",
-            "groupIds": [
+            "RecipesGroupIds": [
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 12,
@@ -666,16 +730,22 @@
                     "amount": 1
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 30,
+                    "amount": 3
+                }
+            ],
             "craftTime": 4.0,
             "recipeSpritePath": "high_strength_steam_piston"
         },
         {
             "id": 31,
             "title": "паровое ядро высокой прочности",
-            "groupIds": [
+            "RecipesGroupIds": [
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 4,
@@ -690,16 +760,22 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 31,
+                    "amount": 1
+                }
+            ],
             "craftTime": 10.0,
             "recipeSpritePath": "high_strength_steam_core"
         },
         {
             "id": 32,
             "title": "живой механизм",
-            "groupIds": [
+            "RecipesGroupIds": [
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 17,
@@ -714,16 +790,22 @@
                     "amount": 1
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 32,
+                    "amount": 2
+                }
+            ],
             "craftTime": 12.0,
             "recipeSpritePath": "live_mechanism"
         },
         {
             "id": 33,
             "title": "живой поршень",
-            "groupIds": [
+            "RecipesGroupIds": [
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 22,
@@ -738,16 +820,22 @@
                     "amount": 1
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 33,
+                    "amount": 3
+                }
+            ],
             "craftTime": 8.0,
             "recipeSpritePath": "live_piston"
         },
         {
             "id": 34,
             "title": "живое ядро",
-            "groupIds": [
+            "RecipesGroupIds": [
                 5
             ],
+            "ItemClass": 2,
             "inputItems": [
                 {
                     "itemId": 12,
@@ -766,17 +854,23 @@
                     "amount": 1
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 34,
+                    "amount": 1
+                }
+            ],
             "craftTime": 15.0,
             "recipeSpritePath": "live_core"
         },
         {
             "id": 35,
             "title": "патроны",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 3,
             "inputItems": [
                 {
                     "itemId": 4,
@@ -791,17 +885,23 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 35,
+                    "amount": 10
+                }
+            ],
             "craftTime": 2.0,
             "recipeSpritePath": "bullets"
         },
         {
             "id": 36,
             "title": "бронебойные патроны",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 3,
             "inputItems": [
                 {
                     "itemId": 22,
@@ -812,17 +912,23 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 36,
+                    "amount": 10
+                }
+            ],
             "craftTime": 4.0,
             "recipeSpritePath": "improved_bullets"
         },
         {
             "id": 37,
             "title": "артелиерийский снаряд",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 3,
             "inputItems": [
                 {
                     "itemId": 4,
@@ -837,17 +943,23 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 37,
+                    "amount": 2
+                }
+            ],
             "craftTime": 2.0,
             "recipeSpritePath": "artillery_shell"
         },
         {
             "id": 38,
             "title": "бронебойный артелиерийский снаряд",
-            "groupIds": [
+            "RecipesGroupIds": [
                 4,
                 5
             ],
+            "ItemClass": 3,
             "inputItems": [
                 {
                     "itemId": 22,
@@ -862,7 +974,12 @@
                     "amount": 2
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 38,
+                    "amount": 2
+                }
+            ],
             "craftTime": 4.0,
             "recipeSpritePath": "improved_artillery_shell"
         }

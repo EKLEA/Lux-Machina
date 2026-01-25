@@ -48,7 +48,7 @@ public class ConfigToBlob : IInitializable
             
             FixedList64Bytes<int> requiredItemTypesGroups=new();
             foreach(var g in cfg.Value.ItemsTypes)
-                requiredItemTypesGroups.Add(g);
+                requiredItemTypesGroups.Add((int)g);
 
             var sturctCFG=new BuildingStorageStructConfig
             {
@@ -63,7 +63,7 @@ public class ConfigToBlob : IInitializable
             
             FixedList64Bytes<int> requiredRecipesGroups=new();
             foreach(var g in cfg.Value.requiredRecipesGroup)
-                requiredRecipesGroups.Add(g);
+                requiredRecipesGroups.Add((int)g);
 
             var sturctCFG=new BuildingProcessionStructConfig
             {
@@ -113,9 +113,9 @@ public class ConfigToBlob : IInitializable
                 outputItems.Add(new RecipeIngredientStruct{Amount=outItem.amount,ItemId=outItem.itemId});
             }
 
-             foreach(var rGroutp in cf.Value.groupIds)
+             foreach(var rGroutp in cf.Value.RecipesGroupIds)
             {
-                recipeGroups.Add(rGroutp);
+                recipeGroups.Add((int)rGroutp);
             }
             var sturctCFG=new RecipeStructConfig
             {

@@ -45,14 +45,12 @@ public class AdjustableButtonScript :MonoBehaviour, IDisposable
     void ChangeValue(int Value)
     {
         int next = this.Value.Value + Value;
-
         if (next > _max)
             this.Value.Value = _min;
         else if (next < _min)
             this.Value.Value = _max;
         else
             this.Value.Value = next;
-
         valueText.text=string.Format(format,this.Value.Value.ToString());
     }
 }

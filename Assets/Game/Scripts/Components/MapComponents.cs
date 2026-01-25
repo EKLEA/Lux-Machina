@@ -28,30 +28,75 @@ public struct EntitiesDictionary: IComponentData, IDisposable
 }
 public struct ClusterMap : IComponentData, IDisposable
 {
-    public NativeList<int> clusterIDs;
-    public NativeParallelMultiHashMap<int, Entity> producersSlots;
-    public NativeParallelMultiHashMap<int, Entity> consumersSlots;
-    public NativeParallelMultiHashMap<int, Entity> storagesSlots;
-    public NativeParallelMultiHashMap<int, Entity> excessSlots;
-    public NativeParallelMultiHashMap<int, Entity> bluePrintsSlots;
-    public NativeParallelMultiHashMap<int, Entity> demolitionsSlots;
-    public NativeParallelMultiHashMap<int, int2> roadsPoints;
+    public NativeList<int> UniqueClusterIDs;
     public NativeParallelHashMap<int2, int> pointToClusterId;
+    public NativeParallelMultiHashMap<int, int2> roadsPoints;
+    public NativeParallelMultiHashMap<int, SlotReference> ClusterToProducers;
+    public NativeParallelMultiHashMap<int, SlotReference> ClusterToConsumers;
+    public NativeParallelMultiHashMap<Entity, SlotReference> EntityInputSlots;
+    public NativeParallelMultiHashMap<Entity, SlotReference> EntityOutputSlots;
+    
+    public NativeParallelMultiHashMap<SlotReference, SlotReference> SlotGraph;
+    public NativeParallelMultiHashMap<SlotReference, SlotReference> ReverseSlotGraph;
+
+    public ClusterMap(Allocator allocator)
+    {
+        UniqueClusterIDs = new NativeList<int>(5000,allocator);
+        ClusterToProducers = new NativeParallelMultiHashMap<int, SlotReference>(5000, allocator);
+        ClusterToConsumers = new NativeParallelMultiHashMap<int, SlotReference>(5000, allocator);
+        SlotGraph = new NativeParallelMultiHashMap<SlotReference, SlotReference>(5000, allocator);
+        ReverseSlotGraph = new NativeParallelMultiHashMap<SlotReference, SlotReference>(5000, allocator);
+        EntityInputSlots = new NativeParallelMultiHashMap<Entity, SlotReference>(5000, allocator);
+        EntityOutputSlots = new NativeParallelMultiHashMap<Entity, SlotReference>(5000, allocator);
+        pointToClusterId = new NativeParallelHashMap<int2, int> (5000, allocator);
+        roadsPoints = new NativeParallelMultiHashMap<int, int2> (5000, allocator);
+    }
+
     public void Dispose()
     {
-        clusterIDs.Dispose();
-        producersSlots.Dispose();
-        consumersSlots.Dispose();
-        storagesSlots.Dispose();
-        excessSlots.Dispose();
-        bluePrintsSlots.Dispose();
-        demolitionsSlots.Dispose();
-        roadsPoints.Dispose();
-        pointToClusterId.Dispose();
+        if (UniqueClusterIDs.IsCreated) UniqueClusterIDs.Dispose();
+        if (pointToClusterId.IsCreated) pointToClusterId.Dispose();
+        if (ClusterToProducers.IsCreated) ClusterToProducers.Dispose();
+        if (ClusterToConsumers.IsCreated) ClusterToConsumers.Dispose();
+        if (EntityInputSlots.IsCreated) EntityInputSlots.Dispose();
+        if (EntityOutputSlots.IsCreated) EntityOutputSlots.Dispose();
+        if (SlotGraph.IsCreated) SlotGraph.Dispose();
+        if (ReverseSlotGraph.IsCreated) ReverseSlotGraph.Dispose();
+        if (roadsPoints.IsCreated) roadsPoints.Dispose();
+    }
+}
+public enum SlotType : byte 
+{
+    Input, Output, Excess, StorageInput,StorageOutput, InputConstruction, OutputConstruction
+}
+public struct SlotReference : IEquatable<SlotReference>, IComparable<SlotReference>
+{
+    public Entity Owner;
+    public SlotType Type;
+    public int ItemID;
+    public int Index;
+    public byte Priority; 
+    // для продусеров 0 -лишние, 1-10 - конструктион, 11-20 - производители, 21-30 - сундук 
+    // для получателей 1-10 - конструктион, 11-20 - производители, 21-30 - сундук если максимум + 100
+    public bool Equals(SlotReference other) => 
+        Owner.Equals(other.Owner) && Type == other.Type && Index == other.Index&&ItemID==other.ItemID;
+
+    public override int GetHashCode() => 
+        HashCode.Combine(Owner, (int)Type, Index,ItemID);
+
+    public int CompareTo(SlotReference other)
+    {
+        int result = Priority.CompareTo(other.Priority);
+        
+        if (result == 0)
+            result = Owner.Index.CompareTo(other.Owner.Index);
+            
+        return result;
     }
 }
 public struct UpdateMapTag : IComponentData, IEnableableComponent { }
 public struct UpdateCLustersTag:IComponentData, IEnableableComponent{}
+public struct UpdateClusterSlots:IComponentData, IEnableableComponent{}
 public struct TickInfoData : IComponentData
 {
     public int currTickPerSecond;

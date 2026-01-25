@@ -151,23 +151,14 @@ public class GameController : IInitializable
         {
             Entities=new(250,Allocator.Persistent)
         });
-        World.EntityManager.AddComponentData(Map, new ClusterMap
-        {
-            clusterIDs=new(50,Allocator.Persistent),
-            producersSlots=new(2000,Allocator.Persistent),
-            consumersSlots=new(2000,Allocator.Persistent),
-            storagesSlots=new(2000,Allocator.Persistent),
-             excessSlots=new(2000,Allocator.Persistent),
-             bluePrintsSlots=new(2000,Allocator.Persistent),
-            demolitionsSlots=new(2000,Allocator.Persistent),
-             roadsPoints=new(2000,Allocator.Persistent),
-             pointToClusterId=new(2000,Allocator.Persistent),
-        });
+        World.EntityManager.AddComponentData(Map, new ClusterMap(Allocator.Persistent));
 
         World.EntityManager.AddComponent<UpdateMapTag>(Map);
         World.EntityManager.AddComponent<UpdateCLustersTag>(Map);
+        World.EntityManager.AddComponent<UpdateClusterSlots>(Map);
         World.EntityManager.SetComponentEnabled<UpdateMapTag>(Map,false);
         World.EntityManager.SetComponentEnabled<UpdateCLustersTag>(Map,false);
+        World.EntityManager.SetComponentEnabled<UpdateClusterSlots>(Map,false);
          World.EntityManager.AddComponentData(Map, new TickInfoData
         {
             currTickPerSecond=gameFieldSettings.tickPerSecond,

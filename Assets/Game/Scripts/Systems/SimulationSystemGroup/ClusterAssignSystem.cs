@@ -43,7 +43,9 @@ public partial struct ClusterAssignSystem : ISystem
         var map = SystemAPI.GetSingletonRW<BuildingMap>();
         var clusterMapRW = SystemAPI.GetSingletonRW<ClusterMap>();
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
-
+        
+        var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+        var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
         if (!_updateClustersMap.IsEmptyIgnoreFilter)
         {
             var updateTagLookup = SystemAPI.GetComponentLookup<UpdateCLustersTag>(false);
@@ -51,12 +53,14 @@ public partial struct ClusterAssignSystem : ISystem
             var roadJob = new RoadClusteringJob
             {
                 CellMapBuildingsIDs = map.ValueRO.CellMapBuildingsIDs,
+                CellEntityMultiMap=map.ValueRO.CellEntityMultiMap,
                 ClusterRoadsPoints = clusterMapRW.ValueRW.roadsPoints,
-                clusterIDs = clusterMapRW.ValueRW.clusterIDs,
+                clusterIDs = clusterMapRW.ValueRW.UniqueClusterIDs,
                 RoadTypeId = _buildingConfigs.roadID,
                 MapEntity = mapEntity,
                 pointToClusterId = clusterMapRW.ValueRW.pointToClusterId,
                 UpdateClusterTagLookup = updateTagLookup,
+                ClusterIdLookup=SystemAPI.GetComponentLookup<ClusterId>(false),
             };
             state.Dependency = roadJob.Schedule(state.Dependency);
             var pingJob=new PingBuildingClusterID
@@ -69,42 +73,27 @@ public partial struct ClusterAssignSystem : ISystem
 
         if (!_buildingsToAssignInCluster.IsEmptyIgnoreFilter)
         {
-            
-
-            clusterMapRW.ValueRW.producersSlots.Clear();
-            clusterMapRW.ValueRW.consumersSlots.Clear();
-            clusterMapRW.ValueRW.storagesSlots.Clear();
-            clusterMapRW.ValueRW.excessSlots.Clear();
-            clusterMapRW.ValueRW.bluePrintsSlots.Clear();
-            clusterMapRW.ValueRW.demolitionsSlots.Clear();
 
             var assignJob = new AssignClusterJob
             {
                 CellMapEntities = map.ValueRO.CellMapEntites,
-                clusterMap = clusterMapRW.ValueRW,
+                clusterMap = clusterMapRW.ValueRO,
                 IsBlueprintLookup = SystemAPI.GetComponentLookup<IsBlueprint>(false),
                 IsDemolitionLookup = SystemAPI.GetComponentLookup<IsDemolition>(false),
                 ClusterIDLookup = SystemAPI.GetComponentLookup<ClusterId>(false),
                 NeedsClusterAssignLookup = SystemAPI.GetComponentLookup<NeedsClusterAssign>(false),
                 IsLogicEnabledLookup = SystemAPI.GetComponentLookup<IsLogicEnabled>(false),
-                InputCraftSlotDataLookup = SystemAPI.GetBufferLookup<InputSlotData>(true),
-                IsInputCraftEnabled = SystemAPI.GetComponentLookup<IsInputCraftEnabled>(true),
-                OutputCraftSlotsDataLookup = SystemAPI.GetBufferLookup<OutputSlotData>(true),
-                IsOutputCraftEnabled = SystemAPI.GetComponentLookup<IsOutputCraftEnabled>(true),
-                InputConstructionSlotDataLookup = SystemAPI.GetBufferLookup<InputConstructionSlotData>(true),
-                IsInputConstructionEnabled = SystemAPI.GetComponentLookup<IsInputConstructionEnabled>(true),
-                OutputConstructionSlotsDataLookup = SystemAPI.GetBufferLookup<OutputConstructionSlotData>(true),
-                IsOutputConstructionEnabled = SystemAPI.GetComponentLookup<IsOutputConstuctionEnabled>(true),
-                ExcesSlotsDataLookup = SystemAPI.GetBufferLookup<ExcessSlotData>(false),
-                StorageSlotsDataLookup = SystemAPI.GetBufferLookup<StorageSlotData>(false),
                 RoadLookup = SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(false),
             };
 
             state.Dependency  = assignJob.Schedule(state.Dependency );
+            ecb.SetComponentEnabled<UpdateClusterSlots>(mapEntity,true);
+
         }
     }
     [BurstCompile]
     [WithAll(typeof(ClusterId))]
+    [WithNone(typeof(RoadTypeBuildingTag))]
     public partial struct PingBuildingClusterID : IJobEntity
     {
         public ComponentLookup<NeedsClusterAssign> NeedsClusterAssignLookup;
@@ -118,10 +107,12 @@ public partial struct ClusterAssignSystem : ISystem
     public struct RoadClusteringJob : IJob
     {
         [ReadOnly] public NativeParallelHashMap<int2, int> CellMapBuildingsIDs;
+        [ReadOnly] public NativeParallelMultiHashMap<Entity, int2> CellEntityMultiMap; 
         public NativeParallelMultiHashMap<int, int2> ClusterRoadsPoints;
         
         public Entity MapEntity;
         public ComponentLookup<UpdateCLustersTag> UpdateClusterTagLookup;
+        public ComponentLookup<ClusterId> ClusterIdLookup;
         public NativeList<int> clusterIDs;
         public NativeParallelHashMap<int2, int> pointToClusterId;
 
@@ -182,7 +173,20 @@ public partial struct ClusterAssignSystem : ISystem
 
                 currentClusterId++;
             }
-            
+            foreach (var entityPair in CellEntityMultiMap)
+            {
+                Entity entity = entityPair.Key;
+                int2 pos = entityPair.Value;
+
+                if (pointToClusterId.TryGetValue(pos, out int clusterId))
+                {
+                 
+                    if (ClusterIdLookup.HasComponent(entity))
+                    {
+                        ClusterIdLookup[entity] = new ClusterId { Value = clusterId };
+                    }
+                }
+            }
             if (UpdateClusterTagLookup.HasComponent(MapEntity))
             {
                 UpdateClusterTagLookup.SetComponentEnabled(MapEntity, false);
@@ -201,20 +205,6 @@ public partial struct ClusterAssignSystem : ISystem
         public ComponentLookup<NeedsClusterAssign> NeedsClusterAssignLookup;
         public ComponentLookup<IsLogicEnabled> IsLogicEnabledLookup;
         public ClusterMap clusterMap;
-        [ReadOnly] public BufferLookup<InputSlotData> InputCraftSlotDataLookup;
-        [ReadOnly] public ComponentLookup<IsInputCraftEnabled> IsInputCraftEnabled;
-        
-        [ReadOnly] public BufferLookup<OutputSlotData> OutputCraftSlotsDataLookup;
-        [ReadOnly] public ComponentLookup<IsOutputCraftEnabled> IsOutputCraftEnabled;
-
-        [ReadOnly] public BufferLookup<InputConstructionSlotData> InputConstructionSlotDataLookup;
-        [ReadOnly] public ComponentLookup<IsInputConstructionEnabled> IsInputConstructionEnabled;
-        
-        [ReadOnly] public BufferLookup<OutputConstructionSlotData> OutputConstructionSlotsDataLookup;
-        [ReadOnly] public ComponentLookup<IsOutputConstuctionEnabled> IsOutputConstructionEnabled;
-
-        public BufferLookup<ExcessSlotData> ExcesSlotsDataLookup;
-        public BufferLookup<StorageSlotData> StorageSlotsDataLookup;
         
         
 
@@ -246,26 +236,10 @@ public partial struct ClusterAssignSystem : ISystem
                         return; 
                     }
                 if(IsLogicEnabledLookup.HasComponent(entity)) IsLogicEnabledLookup.SetComponentEnabled(entity,true);
+                Debug.Log("true");
                 ClusterId data = ClusterIDLookup[entity];
                 data.Value = neighborClusters[0];
                 ClusterIDLookup[entity] = data;
-                NeedsClusterAssignLookup.SetComponentEnabled(entity, false);
-                if(OutputCraftSlotsDataLookup.HasBuffer(entity)&&IsOutputCraftEnabled.IsComponentEnabled(entity)) clusterMap.producersSlots.Add(data.Value,entity);
-                if(InputCraftSlotDataLookup.HasBuffer(entity)&&IsInputCraftEnabled.IsComponentEnabled(entity)) clusterMap.consumersSlots.Add(data.Value,entity);
-                if (StorageSlotsDataLookup.HasBuffer(entity))
-                {
-                    if(StorageSlotsDataLookup.TryGetBuffer(entity,out DynamicBuffer<StorageSlotData> buff))
-                        if(buff.Length>0)
-                            clusterMap.storagesSlots.Add(data.Value,entity);
-                }
-                if(ExcesSlotsDataLookup.HasBuffer(entity))
-                {
-                    if(ExcesSlotsDataLookup.TryGetBuffer(entity,out DynamicBuffer<ExcessSlotData> buff))
-                        if(buff.Length>0)
-                            clusterMap.excessSlots.Add(data.Value,entity);
-                }
-                if(InputConstructionSlotDataLookup.HasBuffer(entity)&&IsInputConstructionEnabled.IsComponentEnabled(entity)) clusterMap.bluePrintsSlots.Add(data.Value,entity);
-                if(OutputConstructionSlotsDataLookup.HasBuffer(entity)&&IsOutputConstructionEnabled.IsComponentEnabled(entity)) clusterMap.demolitionsSlots.Add(data.Value,entity);
             }
             else
             {

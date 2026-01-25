@@ -20,6 +20,7 @@ public class ConfigService
     public Dictionary<int, BuildingProcessionConfig> BuildingProcessionInfos { get; private set; }
     public Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; private set; }
 
+    public Dictionary<int, string> ItemClassButtonConfig  { get; private set; }
 
     Dictionary<int, Sprite> _spriteCache = new Dictionary<int, Sprite>();
     Dictionary<int, GameObject> _prefabCache = new Dictionary<int, GameObject>();
@@ -34,6 +35,7 @@ public class ConfigService
         MaterialInfos = new Dictionary<string, Material>();
         RecipeInfos = new Dictionary<int, RecipeConfig>();
         TypeBuildingButtonConfig=new Dictionary<int, string>();
+        ItemClassButtonConfig=new();
     }
 
     public async UniTask LoadConfigs()
@@ -84,6 +86,10 @@ public class ConfigService
         else
         {
             Debug.LogError("Failed to load items - wrapper or items list is null");
+        }
+        foreach (var t in Enum.GetValues(typeof(ItemClass)))
+        {
+            ItemClassButtonConfig[(int)t] = t.ToString();
         }
     }
 
@@ -205,6 +211,14 @@ public class ConfigService
 
         return GetOrLoadSprite($"Images/Items/{item.iconPath}");
     }
+    public Sprite GetItemClassBTSprite(int path)
+    {
+        if (!ItemClassButtonConfig.TryGetValue(path, out var info) || string.IsNullOrEmpty(info))
+            return null;
+
+        return GetOrLoadSprite($"Images/ItemClasses/{info}");
+    }
+
     public Sprite GetBuildingTypeBTSprite(int path)
     {
         if (!TypeBuildingButtonConfig.TryGetValue(path, out var info) || string.IsNullOrEmpty(info))
@@ -342,16 +356,14 @@ public class ConfigService
         }
     }
 
-    public List<RecipeConfig> GetRecipesByGroup(int groupId)
-    {
-        return RecipeInfos.Values.Where(r => r.groupIds.Contains(groupId)).ToList();
-    }
 }
 
 public interface IReadOnlyItemsInfo
 {
     Dictionary<int, ItemConfig> ItemsInfos { get; }
+    public Dictionary<int, string> ItemClassButtonConfig { get; }
     Sprite GetItemSprite(int itemId);
+    Sprite GetItemClassBTSprite(int itemClass);
 }
 
 public interface IReadOnlyBuildingInfo
@@ -372,7 +384,6 @@ public interface IReadOnlyMaterialInfo
 public interface IReadOnlyRecipeInfo
 {
     Dictionary<int, RecipeConfig> RecipeInfos { get; }
-    List<RecipeConfig> GetRecipesByGroup(int groupId);
     Sprite GetRecipeSprite(int recipeId);
 }
 public interface IReadOnlyTypeBuildingButtonInfo

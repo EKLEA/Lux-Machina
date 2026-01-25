@@ -105,5 +105,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         EntityManager.SetComponentEnabled<PlayerPlacingBuilding>(_playerState,false);
         Debug.Log("вызов");
         onBuildingDone?.Invoke();
+        
+        onBuildingDone=null;
     }
 }

@@ -27,9 +27,14 @@ public class SlotView : MonoBehaviour,IDisposable,IInitializable
        
         slotData.amount.Subscribe(data =>
         {
-            UpdateAmount(slotData.amount.Value,slotData.capacity.Value);
+            UpdateAmount(data,slotData.capacity.Value);
         }).AddTo(disposable);
-        
+
+        slotData.capacity.Subscribe(data =>
+        {
+            
+            UpdateAmount(slotData.amount.Value,data);
+        }).AddTo(disposable);
         UpdateAllSlot(slotData.ItemId,slotData.amount.Value,slotData.capacity.Value);
         
         gameObject.SetActive(true);
@@ -41,17 +46,9 @@ public class SlotView : MonoBehaviour,IDisposable,IInitializable
     }
     void UpdateAllSlot(int itemId,int amount,int capacity)
     {
-        if (itemId > 0)
-        {
-            icon.sprite = itemsInfo.GetItemSprite(itemId);
-            icon.gameObject.SetActive(true);
-            CountText.text = string.Format("{0}/{1}",amount.ToString(),capacity.ToString());
-        }
-        else
-        {
-            icon.gameObject.SetActive(false);
-            CountText.text = "";
-        }
+        icon.sprite = itemsInfo.GetItemSprite(itemId);
+        icon.gameObject.SetActive(true);
+        CountText.text = string.Format("{0}/{1}",amount.ToString(),capacity.ToString());
     }
     
 

@@ -3,6 +3,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
+using UnityEngine;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 [UpdateAfter(typeof(ItemDistributionSystem))]
@@ -11,43 +12,11 @@ using Unity.Jobs;
 public partial struct CraftSystem : ISystem
 {
     
-    EntityQuery _pingProducerCraftBuildings;
-    EntityQuery _pingConsumerCraftBuildings;
-    EntityQuery _producerQuery;
-    EntityQuery _consumerQuery;
-    EntityQuery _processorQuery;
     float _accumulatedTime;
     uint _frameCount;   
     public void OnCreate(ref SystemState state)
     {
-        state.RequireForUpdate<IsRecipeAssigned>();
-        state.RequireForUpdate<ProductionTable>();
-        _producerQuery= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<RecipeBuildingData,IsLogicEnabled,IsConnectedToEnegy,IsRecipeAssigned>()
-            .WithAll<ProducerTypeBuildingTag>()
-            .WithDisabled<IsBlueprint,IsDemolition>()
-            .Build(ref state);
-         _consumerQuery= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<RecipeBuildingData,IsLogicEnabled,IsConnectedToEnegy,IsRecipeAssigned>()
-            .WithAll<ConsumerTypeBuildingTag>()
-            .WithDisabled<IsBlueprint,IsDemolition>()
-            .Build(ref state);
-         _processorQuery= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<RecipeBuildingData,IsLogicEnabled,IsConnectedToEnegy,IsRecipeAssigned>()
-            .WithAll<ProducerTypeBuildingTag>()
-            .WithDisabled<IsBlueprint,IsDemolition>()
-            .Build(ref state);
         
-        
-         _pingProducerCraftBuildings= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<BuildingTag,IsConnectedToEnegy>()
-            .WithAny<ProducerTypeBuildingTag,ProcessorTypeBuildingTag>()
-            .WithDisabled<IsBlueprint,IsDemolition>()
-            .Build(ref state);
-        _pingProducerCraftBuildings= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<BuildingTag,IsConnectedToEnegy,ConsumerTypeBuildingTag>()
-            .WithDisabled<IsBlueprint,IsDemolition>()
-            .Build(ref state);
         
     }
    public void OnUpdate(ref SystemState state)
@@ -58,22 +27,33 @@ public partial struct CraftSystem : ISystem
 
         if (_frameCount % tickInfoData.currTickPerSecond == 0) 
         {   
+            
             var recipeCache = SystemAPI.GetSingleton<RecipeConfigRefernce>();
             var productionTable = SystemAPI.GetSingletonRW<ProductionTable>();
+            var canCraftLookup=SystemAPI.GetComponentLookup<CanCraft>(false);
             var recipesRef = recipeCache.RecipesConfig; 
 
             // ВАЖНО: Каждое следующее задание должно принимать handle предыдущего!
             
             // 1. Пинги (Читают RecipeBuildingData)
-            var handle = new PingProducerCraftBuildingJob 
+           
+
+            var handle = new PingConsumerCraftBuildingJob 
             { 
+                CanCraftLookup=canCraftLookup,
                 RecipesConfig = recipesRef 
             }.ScheduleParallel(state.Dependency);
-
-            handle = new PingConsumerCraftBuildingJob 
+             handle = new PingProducerCraftBuildingJob 
             { 
-                RecipesConfig = recipesRef 
-            }.ScheduleParallel(handle);
+                RecipesConfig = recipesRef,
+                CanCraftLookup=canCraftLookup
+            }.Schedule(handle);
+
+             handle = new PingProcessorCraftBuildingJob 
+            { 
+                RecipesConfig = recipesRef,
+                CanCraftLookup=canCraftLookup
+            }.Schedule(handle);
 
             // 2. Крафт (Пишут в RecipeBuildingData)
             // Теперь эти задания гарантированно ждут завершения Пингов
@@ -105,16 +85,16 @@ public partial struct CraftSystem : ISystem
 
 
     [BurstCompile]
-    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnegy),typeof(IsLogicEnabled))]
-    [WithAny(typeof(ProducerTypeBuildingTag),typeof(ProcessorTypeBuildingTag))]
-    [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition),typeof(CanCraft))]
+    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnegy),typeof(IsLogicEnabled),typeof(ProducerTypeBuildingTag))]
+    [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
     public partial struct PingProducerCraftBuildingJob : IJobEntity
     {
         [ReadOnly] public  BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
-                public void Execute(in RecipeBuildingData recipeData,in DynamicBuffer<OutputSlotData> outputs, EnabledRefRW<CanCraft> canCraftEnabled)
+        public ComponentLookup<CanCraft> CanCraftLookup;
+        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<OutputSlotData> outputs)
         {
             RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var res);
-            canCraftEnabled.ValueRW=CanCraft(outputs,res);
+            CanCraftLookup.SetComponentEnabled(entity,CanCraft(outputs,res));
         }
         
         bool CanCraft(in DynamicBuffer<OutputSlotData> slots,RecipeStructConfig recipe)
@@ -127,15 +107,18 @@ public partial struct CraftSystem : ISystem
         }
     }
     [BurstCompile]
-    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnegy),typeof(ConsumerTypeBuildingTag),typeof(IsLogicEnabled))]
-    [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition),typeof(CanCraft))]
+    
+    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnegy),typeof(IsLogicEnabled),typeof(ConsumerTypeBuildingTag))]
+    [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
     public partial struct PingConsumerCraftBuildingJob : IJobEntity
     {
         [ReadOnly] public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
-        public void Execute(in RecipeBuildingData recipeData,in DynamicBuffer<InputSlotData> inputs, EnabledRefRW<CanCraft> canCraftEnabled)
+        
+        public ComponentLookup<CanCraft> CanCraftLookup;
+        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<InputSlotData> inputs)
         {
             RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var res);
-            canCraftEnabled.ValueRW=CanCraft(inputs,res);
+            CanCraftLookup.SetComponentEnabled(entity,CanCraft(inputs,res));
         }
         
         bool CanCraft(in DynamicBuffer<InputSlotData> slots,RecipeStructConfig recipe)
@@ -147,10 +130,46 @@ public partial struct CraftSystem : ISystem
             return true;
         }
     }
+    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnegy),typeof(IsLogicEnabled),typeof(ProcessorTypeBuildingTag))]
+    [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
+    public partial struct PingProcessorCraftBuildingJob : IJobEntity
+    {
+        [ReadOnly] public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
+        
+        public ComponentLookup<CanCraft> CanCraftLookup;
+        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<InputSlotData> inputs,in DynamicBuffer<OutputSlotData> outputs)
+        {
+            RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var res);
+             CanCraftLookup.SetComponentEnabled(entity,CanCraft(inputs,outputs,res));
+        }
+        
+         bool CanCraft(in DynamicBuffer<InputSlotData> inSlots,in DynamicBuffer<OutputSlotData> outSlots,RecipeStructConfig recipe)
+        {
+            bool input=true;
+
+            for(int i=0;i<inSlots.Length;i++)
+            {
+                if (inSlots[i].Amount < recipe.InputItems[i].Amount)
+                {
+                    input=false;
+                    break;
+                }
+            }
+            bool output=true;
+            for(int i=0;i<outSlots.Length;i++)
+            {
+                if (outSlots[i].Capacity - outSlots[i].Amount < recipe.OutputItems[i].Amount)
+                {
+                    output=false;
+                    break;
+                }
+            }
+            return output&&input;
+        }
+    }
 
     [BurstCompile]
     [WithAll(typeof(IsConnectedToEnegy),typeof(IsRecipeAssigned),typeof(IsLogicEnabled),typeof(ProducerTypeBuildingTag))]
-    [WithNone(typeof(ProcessorTypeBuildingTag))]
     [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
     public partial struct ProducerCraftJob : IJobEntity
     {
@@ -267,7 +286,7 @@ public partial struct CraftSystem : ISystem
                     break;
                 }
             }
-            bool output=false;
+            bool output=true;
             for(int i=0;i<outSlots.Length;i++)
             {
                 if (outSlots[i].Capacity - outSlots[i].Amount < recipe.OutputItems[i].Amount)

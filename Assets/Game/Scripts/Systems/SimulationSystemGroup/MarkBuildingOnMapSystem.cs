@@ -86,7 +86,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         var entDic=state.EntityManager.GetComponentData<EntitiesDictionary>(mapEntity);
         if(entDic.Entities.IsCreated)entDic.Dispose();
         var clusterMap=state.EntityManager.GetComponentData<ClusterMap>(mapEntity);
-        if(clusterMap.clusterIDs.IsCreated)clusterMap.Dispose();
+        if(clusterMap.UniqueClusterIDs.IsCreated)clusterMap.Dispose();
         var productionTable=state.EntityManager.GetComponentData<ProductionTable>(mapEntity);
         if(productionTable.produced.IsCreated)productionTable.Dispose();
         state.EntityManager.DestroyEntity(mapEntity);

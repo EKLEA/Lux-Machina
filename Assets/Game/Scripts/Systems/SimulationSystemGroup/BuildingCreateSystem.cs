@@ -51,10 +51,10 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(MarkOnMap),
             typeof(CreateVisualTag),
             typeof(ClusterId),
-            typeof(NeedsClusterAssign),
             typeof(SaveInfo),
             typeof(LoadInfo),
             typeof(DestroyVisualTag),
+            
             typeof(ForceDestroyTag));
         
         _simpleBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -80,6 +80,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(SaveInfo),
             typeof(LoadInfo),
             typeof(DestroyVisualTag),
+            
             typeof(ForceDestroyTag));
 
         _propBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -105,6 +106,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(SaveInfo),
             typeof(LoadInfo),
             typeof(DestroyVisualTag),
+            
             typeof(ForceDestroyTag));
 
         _processorBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -144,6 +146,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
             typeof(LoadInfo),
+            
             typeof(ForceDestroyTag));
 
         _prodecerBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -181,6 +184,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
             typeof(LoadInfo),
+            
             typeof(ForceDestroyTag));
 
          _consumerBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -218,6 +222,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
             typeof(LoadInfo),
+            
             typeof(ForceDestroyTag));
 
         _storageBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -248,6 +253,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
             typeof(LoadInfo),
+            
             typeof(ForceDestroyTag) );
        
         _defenceBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -281,6 +287,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
             typeof(LoadInfo),
+            
             typeof(ForceDestroyTag));
         
         _createRoadQuery= new EntityQueryBuilder(Allocator.Temp)
@@ -298,7 +305,6 @@ public partial struct BuildingCreateSystem : ISystem
         
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
        
-
         if (!_createRoadQuery.IsEmptyIgnoreFilter)
         {
             var CreateRoadJob=new CreateRoad
@@ -401,144 +407,16 @@ public partial struct BuildingCreateSystem : ISystem
             
 
             ECB.SetComponent(road, new ClusterId{Value=-1});
-            ECB.SetComponentEnabled<NeedsClusterAssign>(road, true);
 
             ECB.SetComponentEnabled<CreateVisualTag>(road, true);
             ECB.SetComponentEnabled<DestroyVisualTag>(road, false);
+            
             
             // 5. Удаляем команду
             ECB.DestroyEntity(entity);
         }
     }
 
-
-    // [BurstCompile]
-    // public partial struct CreateBuilding : IJobEntity
-    // {
-    //     public BuildingMap MapData; 
-    //     public EntitiesDictionary EntitiesDict; 
-    //     public EntityCommandBuffer ECB;
-    //     public BuildingConfigReference config;
-    //     public Entity MapEntity;
-    //     public EntityArchetype SimpleBuildingArchetype;
-    //     public EntityArchetype PropBuildingArchetype;
-    //     public EntityArchetype ProdecerBuildingArchetype;
-    //     public EntityArchetype ConsumerBuildingArchetype;
-    //     public EntityArchetype ProcessorBuildingArchetype;
-    //     public EntityArchetype StorageBuildingArchetype;
-    //     public EntityArchetype DefenceBuildingArchetype;
-    //     public ComponentLookup<UpdateMapTag> UpdateMapTagLookup;
-    //     public ComponentLookup<AssignCluster> AssignClusterLookup;
-    //     public ComponentLookup<IsBlueprint> IsBluePrintLookUp;
-    //     public ComponentLookup<CreateFromSave> CreateFromSave;
-
-    //     public void Execute(
-    //                 Entity entity,
-    //                 in CreateBuildingEventData data
-    //     )
-    //     {
-    //         if(config.BuildingsConfig.Value.TryGetConfig(data.buildingID,out BuildingGeneralStructConfig BConfig))
-    //         {
-                
-    //             Entity building=ECB.CreateEntity(PropBuildingArchetype);
-    //             int id =entity.Index ^ (entity.Version * 397);
-    //             if(!(BConfig.buildingType==BuildingsTypes.Prop))
-    //             {
-    //                 if (BConfig.typeOfLogic == TypeOfLogic.None)
-    //                 {
-                        
-    //                    building=ECB.CreateEntity(SimpleBuildingArchetype);
-    //                 }
-    //                 if (BConfig.typeOfLogic == TypeOfLogic.WorkWithItems)
-    //                 {
-    //                     if (BConfig.buildingType == BuildingsTypes.Procession)
-    //                     {
-    //                         switch (BConfig.typeOfProcession)
-    //                         {
-    //                             case TypeOfProcession.Consumer:
-    //                                 building=ECB.CreateEntity(ConsumerBuildingArchetype);
-    //                                 ECB.SetComponentEnabled<IsInputCraftEnabled>(building,false);
-    //                             break;
-
-    //                             case TypeOfProcession.Generate:
-    //                                 building=ECB.CreateEntity(ProdecerBuildingArchetype);
-    //                                 ECB.SetComponentEnabled<IsOutputCraftEnabled>(building,false);
-    //                             break;
-
-    //                             case TypeOfProcession.Processing:
-    //                                 building=ECB.CreateEntity(ProcessorBuildingArchetype);
-    //                                 ECB.SetComponentEnabled<IsInputCraftEnabled>(building,false);
-    //                                 ECB.SetComponentEnabled<IsOutputCraftEnabled>(building,false);
-    //                             break;
-    //                         }
-    //                         ECB.SetComponent(building,new CountOfPackInBuildingData{CountOfPack=1});
-    //                         ECB.SetComponent(building,new BuildingRequiredRecipesGroupData{RequiredRecipesGroups=BConfig.requiredRecipesGroup});
-    //                         ECB.SetComponent(building,new CraftingPriorityData{CraftingPriority=2});
-    //                         ECB.SetComponentEnabled<IsRecipeAssigned>(building,false);
-    //                         ECB.SetComponentEnabled<IsConnectedToEnegy>(building,data.isConnected);
-    //                     }
-    //                     else
-    //                     {
-    //                         if(BConfig.buildingType == BuildingsTypes.Defence)
-    //                         {
-    //                             building=ECB.CreateEntity(DefenceBuildingArchetype);
-    //                             ECB.SetComponentEnabled<IsConnectedToEnegy>(building,data.isConnected);
-    //                             ECB.SetComponentEnabled<IsRecipeAssigned>(building,false);
-    //                         }
-    //                         else
-    //                         {
-    //                             building=ECB.CreateEntity(StorageBuildingArchetype);
-    //                         }
-                            
-    //                         ECB.SetComponent(building,new BuildingRequiredStorageGroupData{RequiredStorageGroup=BConfig.requiredStorageGroup});
-    //                     }
-                        
-    //                     AssignClusterLookup.SetComponentEnabled(building, true);
-    //                 }
-
-    //                 //тут энергитические башни и подключения
-    //             }
-    //             var size =
-    //                 data.rotation % 2 != 0
-    //                     ? new int2(BConfig.size.z, BConfig.size.x)
-    //                     : new int2(BConfig.size.x, BConfig.size.z);
-
-    //             for(int x = data.buildingPosition.x;x<data.buildingPosition.x+size.x;x++)
-    //             {
-    //                 for(int y = data.buildingPosition.y;y<data.buildingPosition.y+size.y;y++)
-    //                 {
-    //                     MapData.CellMapBuildingsIDs.TryAdd(new int2(x,y),data.buildingID);
-    //                     MapData.CellMapEntites.TryAdd(new int2(x,y),building);
-    //                     MapData.CellEntityMultiMap.Add(building,new int2(x,y));
-    //                 }
-    //             }
-    //             var posComponent=new BuildingPosData{LeftCornerPos=data.buildingPosition,Rotation=data.rotation,size=size};
-    //             ECB.SetComponent(building,posComponent);
-    //             ECB.SetComponentEnabled<IsRecipeAssigned>(building,false);
-    //             ECB.SetComponentEnabled<AssignCluster>(building,true);
-
-    //             ECB.SetComponentEnabled<ChangeDemolitionStateTag>(building,false);
-    //             ECB.SetComponentEnabled<IsDemolition>(building,false);
-    //             if(IsBluePrintLookUp.IsComponentEnabled(entity))
-    //             {
-    //                 ECB.SetComponentEnabled<ChangeBluePrintState>(building,true);
-    //                 ECB.SetComponentEnabled<IsBlueprint>(building,false);
-    //                 ECB.SetComponentEnabled<IsConstuctionSlotsAssigned>(building,false);
-    //                 ECB.SetComponentEnabled<IsInputConstructionEnabled>(building,false);
-    //                 ECB.SetComponentEnabled<IsOutputConstuctionEnabled>(building,false);
-    //                 ECB.SetComponent(building, new ConstructionPriorityData{ConstructionPriority=2});
-    //                 //добавить слоты строительства из конфига
-    //             }
-    //             var buildingData = new BuildingData{BuildingIDHash=data.buildingID,BuildingUniqueID=id};
-    //             ECB.SetComponent(building, buildingData);
-    //             EntitiesDict.Entities.TryAdd(id,building);
-    //             UpdateMapTagLookup.SetComponentEnabled(MapEntity, true);
-    //             ECB.SetComponentEnabled<CreateVisualTag>(building,true);
-    //             ECB.SetComponentEnabled<LoadInfo>(building,CreateFromSave.HasComponent(entity));
-    //         }
-    //         ECB.DestroyEntity(entity);
-    //     }
-    // }
     [BurstCompile]
     public partial struct CreateBuilding : IJobEntity
     {
@@ -607,7 +485,7 @@ public partial struct BuildingCreateSystem : ISystem
                 }
 
                 ECB.SetComponent(building,
-                    new CountOfPackInBuildingData { CountOfPack = 1 });
+                    new CountOfPackInBuildingData { CountOfPack = 2 });
                 ECB.SetComponent(building,
                     new BuildingRequiredRecipesGroupData
                     { RequiredRecipesGroups = processConfig.requiredRecipesGroups });
@@ -663,6 +541,7 @@ public partial struct BuildingCreateSystem : ISystem
             ECB.SetComponentEnabled<IsDemolition>(building, false);
             ECB.SetComponentEnabled<CreateVisualTag>(building, true);
             ECB.SetComponentEnabled<DestroyVisualTag>(building, false);
+            ECB.SetComponentEnabled<ForceDestroyTag>(building, false);
             ECB.SetComponent(building, new ClusterId{Value=-1});
             ECB.SetComponentEnabled<NeedsClusterAssign>(building, true);
 
@@ -696,8 +575,8 @@ public partial struct BuildingCreateSystem : ISystem
             }
             else
             {
-                ECB.SetComponentEnabled<ChangeBluePrintState>(building, true);
-                ECB.SetComponentEnabled<IsBlueprint>(building, true);
+                ECB.SetComponentEnabled<ChangeBluePrintState>(building, false);
+                ECB.SetComponentEnabled<IsBlueprint>(building, false);
             }
             
             

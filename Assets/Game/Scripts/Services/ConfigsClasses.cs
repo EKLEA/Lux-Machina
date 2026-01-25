@@ -24,14 +24,14 @@ public class BuildingProcessionConfig
 {
     public string BuildingID;
     public TypeOfProcession typeOfProcession;
-    public List<int> requiredRecipesGroup;
+    public List<RequiredRecipesGroup> requiredRecipesGroup;
 }
 [Serializable]
 public class BuildingStorageConfig
 {
     public string BuildingID;
     public int MaxSlots;
-    public List<int> ItemsTypes; 
+    public List<ItemClass> ItemsTypes; 
 }
 
 [Serializable]
@@ -82,7 +82,8 @@ public class RecipeConfig
 {
     public int id;
     public string title;
-    public List<int> groupIds;
+    public List<RequiredRecipesGroup> RecipesGroupIds;
+    public ItemClass ItemClass;
     public List<RecipeIngredient> inputItems = new List<RecipeIngredient>();
     public List<RecipeIngredient> outputItems = new List<RecipeIngredient>();
     public float craftTime;
@@ -112,13 +113,13 @@ public class RecipeConfigList:IWrapper
 public interface IWrapper{}
 public enum ItemClass: int
 {
-    Rawitems=0,
     Components=1,
     Assembly=2,
     Weapon=3
 }
 public enum ItemType: int
 {
+    None=0,
     RawMaterial=1,
     Ignot=2,
     AlloyIgnot=3,
@@ -162,7 +163,6 @@ public enum TypeOfLogic : int
 
 public enum RequiredRecipesGroup : int
 {
-    
     Generating = 1,
     Smeleting = 2,
     BlastSmelting=3,
