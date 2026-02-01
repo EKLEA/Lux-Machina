@@ -51,6 +51,8 @@ public class LoadingService : ILoadingService
         _loadingScreen.SetProgress(1f);
 
         await HideLoadingScreen();
+        
+        _loadingScreen.SetProgress(0f);
     }
 
     public async UniTask ShowBlackScreenForce(bool b) => await _loadingScreen.ShowBlackScreen(b);

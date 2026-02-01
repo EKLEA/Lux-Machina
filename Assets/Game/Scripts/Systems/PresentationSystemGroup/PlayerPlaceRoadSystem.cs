@@ -13,36 +13,35 @@ using UnityEngine;
 using Zenject;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(PresentationSystemGroup))]
-[UpdateAfter(typeof(BuildingChangeVisualSystem))]
+[UpdateAfter(typeof(GridUpdateSystem))]
 public partial class PlayerPlaceRoadSystem : SystemBase
 {
     [Inject] BuildingObjectFactory _factorty;
     [Inject] VisualBuildingFactory _visualBuildingFactory;
-    [Inject] EntityManager entityManager;
     int _buildingID;
     bool isSecondPoint;
     Vector2Int _pos;
     Vector2Int _cachedPos;
     Vector2Int _firstPos;
     EntityQuery _buildReadyQuery;
-    IPlaceRoadPlayerData _placeRoadPlayerData;
+    IPlayerData _placeRoadPlayerData;
     RoadOnScene _road;
     PhantomObject _preview;
-    List<MapPoint> _roadPoints;
+    List<int2> _roadPoints;
     
     Entity _playerState;
     bool _isProcessing = false;
     public  Action onBuildingDone;
     public bool canBuild{get;private set;}
-    public void SetUpBuilding(int buildingID,IPlaceRoadPlayerData placeRoadPlayerData, Entity playerState)
+    public void SetUpBuilding(int buildingID,IPlayerData placeRoadPlayerData, Entity playerState)
     {
-        if(_isProcessing || _road != null || EntityManager.IsComponentEnabled<PlayerPlacingRoad>(playerState)) return;
+        if(_isProcessing || _road != null || EntityManager.IsComponentEnabled<PlayerPlacingRoad>(playerState)||EntityManager.IsComponentEnabled<PlayerDeletePoints>(playerState)) return;
         _isProcessing = true; 
         _roadPoints?.Clear();
         _roadPoints=new();
         _buildingID=buildingID;
         _placeRoadPlayerData=placeRoadPlayerData;
-        _road = _factorty.CreateRoad(_buildingID,new Vector2Int[]{_placeRoadPlayerData.pos});
+        _road = _factorty.CreateRoad(_buildingID,new Vector2Int[]{_placeRoadPlayerData.pos},null,true);
         _preview=_visualBuildingFactory.PhantomizeObject(_road.gameObject);
         EntityManager.SetComponentEnabled<PlayerPlacingRoad>(playerState,true);
         
@@ -53,9 +52,10 @@ public partial class PlayerPlaceRoadSystem : SystemBase
     {
         _buildReadyQuery = new EntityQueryBuilder(Allocator.Temp)
         .WithAll<PlayerCommand>()
-        .WithPresent<PlayerPlacingRoad>()
+        .WithAll<PlayerPlacingRoad>()
         .WithPresent<PathfindingRequest>()
         .WithDisabled<PlayerPlacingBuilding>() 
+        .WithDisabled<PlayerDeletePoints>() 
         
         .Build(this);
         RequireForUpdate(_buildReadyQuery);
@@ -63,7 +63,9 @@ public partial class PlayerPlaceRoadSystem : SystemBase
     protected override void OnUpdate()
     {
         
-        if(_buildReadyQuery.IsEmptyIgnoreFilter) return;
+        var mapData = SystemAPI.GetSingleton<BuildingMap>();
+        var buildingConfig = SystemAPI.GetSingleton<BuildingConfigReference>();
+        if(_buildReadyQuery.IsEmpty) return;
         else
         {
              var ecbSystem = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
@@ -75,7 +77,9 @@ public partial class PlayerPlaceRoadSystem : SystemBase
             if (!isSecondPoint)
             {
                 _firstPos=_pos;
-                _road.GenerateRoadMesh(new Vector2Int[]{_firstPos});
+                _road.GenerateRoadMesh(new Vector2Int[]{_firstPos},null);
+                var pos=new int2(_pos.x,_pos.y);
+                _preview.CanBuild(!(mapData.CellMapBuildingsIDs.ContainsKey(pos)&&mapData.CellMapBuildingsIDs[pos]!=buildingConfig.roadID),_placeRoadPlayerData.isForce);
             }
             else
             {
@@ -88,9 +92,10 @@ public partial class PlayerPlaceRoadSystem : SystemBase
                 var buff=EntityManager.GetBuffer<MapPoint>(playerCommand,true);
                 foreach(var p in buff)
                 {
-                    _roadPoints.Add(p);
+                    _roadPoints.Add(p.pos);
                 }
-                _road.GenerateRoadMesh(_roadPoints.Select(f=>new Vector2Int(f.pos.x,f.pos.y)).ToArray());
+              
+                _road.GenerateRoadMesh(_roadPoints.Select(f=>new Vector2Int(f.x,f.y)).ToArray(),null);
             }
         }
         
@@ -98,19 +103,21 @@ public partial class PlayerPlaceRoadSystem : SystemBase
     } 
     public void PlaceRoad(bool IsHold,bool IsBlueprint)
     {
-        var ecb = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>().CreateCommandBuffer();
-
+        var ecb = World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>().CreateCommandBuffer();
+        
+        var mapData = SystemAPI.GetSingleton<BuildingMap>();
+        var buildingConfig = SystemAPI.GetSingleton<BuildingConfigReference>();
         if (isSecondPoint)
         {
             var command = ecb.CreateEntity();
-            ecb.AddComponent<CreateRoadEventTag>(command);
+            ecb.AddComponent<ProcessRoadPointsEventTag>(command);
             ecb.AddComponent<IsBlueprint>(command);
             ecb.SetComponentEnabled<IsBlueprint>(command,IsBlueprint);
             
             var buff = ecb.AddBuffer<MapPoint>(command);
             foreach (var p in _roadPoints)
             {
-                buff.Add(p);
+                buff.Add(new MapPoint{pos=p});
             }
 
             if (IsHold)
@@ -126,6 +133,8 @@ public partial class PlayerPlaceRoadSystem : SystemBase
         }
         else
         {
+            var pos=new int2(_pos.x,_pos.y);
+            if(mapData.CellMapBuildingsIDs.ContainsKey(pos)&&mapData.CellMapBuildingsIDs[pos]!=buildingConfig.roadID) return;
             _firstPos = _pos;
             isSecondPoint = true;
         }

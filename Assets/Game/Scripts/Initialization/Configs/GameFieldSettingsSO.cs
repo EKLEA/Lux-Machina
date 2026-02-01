@@ -10,4 +10,10 @@ public class GameFieldSettingsSO : ScriptableObject
     [Range(10, 30)]
     [SerializeField]
     public int tickPerSecond;
+    public DistributionPriority defaultDistributionPriority;
+    public Color selectBuildingColor;
+    public Color makeAsDemolitionBuidlingColor;
+    public Color forceDestoryBuidlingColor;
+    
+    public LayerMask removeLayer;
 }

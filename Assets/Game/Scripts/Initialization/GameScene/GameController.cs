@@ -82,10 +82,14 @@ public class GameController : IInitializable
         await CreateMap();
         await CreateSystems(World);
         await LoadSavedEntities(save);
+        var query = World.EntityManager.CreateEntityQuery(typeof(LoadingMapTag));
+    
+        await UniTask.WaitUntil(() => query.CalculateEntityCount() == 0);
 
         cameraController.SetUp(save.camData);
         cameraController.enabled = true;
         UIManager.Initialize();
+
         await UniTask.Yield();
     }
 
@@ -111,9 +115,8 @@ public class GameController : IInitializable
 
         world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>();
         world.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
-        AddUnmanaged<MarkBuildingOnMapSystem>(simGroup);
         AddUnmanaged<DestroyBuildingsSystem>(simGroup);
-        AddUnmanaged<DeleteMapPointsSystem>(simGroup);
+        AddUnmanaged<MarkBuildingOnMapSystem>(simGroup);
         AddUnmanaged<ProcessRoadPointsSystem>(simGroup);
         AddUnmanaged<BuildingCreateSystem>(simGroup);
         AddUnmanaged<EnergySystem>(simGroup);
@@ -127,12 +130,16 @@ public class GameController : IInitializable
         RegisterManagedSystem<BuildingCreateDestroyVisualSystem>(presGroup);
         RegisterManagedSystem<BuildingChangeVisualSystem>(presGroup);
         RegisterManagedSystem<BuildingGameObjectClusterAssignSystem>(presGroup);
+        RegisterManagedSystem<ProccessDeletePointsSystem>(presGroup);
+        RegisterManagedSystem<BuildingSaveSystem>(presGroup);
 
         var BuildSystem=RegisterManagedSystem<PlayerPlaceBuildingSystem>(presGroup);
         var RoadSystem= RegisterManagedSystem<PlayerPlaceRoadSystem>(presGroup);
+        var deleteSystem= RegisterManagedSystem<PlayerDeleteBuildingsSystem>(presGroup);
+        var gridSystem= RegisterManagedSystem<GridUpdateSystem>(presGroup);
 
          var player = _container.Resolve<PlayerController>();
-        player.Initialize(BuildSystem, RoadSystem);
+        player.Initialize(BuildSystem, RoadSystem,deleteSystem,gridSystem);
         simGroup.SortSystems();
         presGroup.SortSystems();
         await UniTask.Yield();
@@ -145,6 +152,7 @@ public class GameController : IInitializable
             CellMapBuildingsIDs=new(1000,Allocator.Persistent),
             CellMapEntites=new(1000,Allocator.Persistent),
             CellEntityMultiMap=new(1000,Allocator.Persistent),
+            IsBluePrintOrDemolitionPoints=new(1000,Allocator.Persistent),
         });
 
         World.EntityManager.AddComponentData(Map, new EntitiesDictionary
@@ -154,10 +162,10 @@ public class GameController : IInitializable
         World.EntityManager.AddComponentData(Map, new ClusterMap(Allocator.Persistent));
 
         World.EntityManager.AddComponent<UpdateMapTag>(Map);
-        World.EntityManager.AddComponent<UpdateCLustersTag>(Map);
+        World.EntityManager.AddComponent<UpdateClustersTag>(Map);
         World.EntityManager.AddComponent<UpdateClusterSlots>(Map);
         World.EntityManager.SetComponentEnabled<UpdateMapTag>(Map,false);
-        World.EntityManager.SetComponentEnabled<UpdateCLustersTag>(Map,false);
+        World.EntityManager.SetComponentEnabled<UpdateClustersTag>(Map,false);
         World.EntityManager.SetComponentEnabled<UpdateClusterSlots>(Map,false);
          World.EntityManager.AddComponentData(Map, new TickInfoData
         {
@@ -168,17 +176,17 @@ public class GameController : IInitializable
             produced=new(1000,Allocator.Persistent),
             consumed=new(1000,Allocator.Persistent),
         });
+        World.EntityManager.AddComponent<LoadingMapTag>(Map);
+        World.EntityManager.AddComponent<SavingMapTag>(Map);
+        World.EntityManager.SetComponentEnabled<SavingMapTag>(Map,false);
         await UniTask.Yield();
     }
     async UniTask LoadSavedEntities(GameStateData gameStateData)
     {
-        var buildingCommand = World.EntityManager.CreateArchetype(typeof(CreateFromSave),typeof(CreateBuildingEventData),typeof(IsBlueprint));
+        var buildingCommand = World.EntityManager.CreateArchetype(typeof(CreateBuildingEventData),typeof(IsBlueprint),typeof(IsDemolition));
 
-        var roadCommand = World.EntityManager.CreateArchetype(typeof(CreateFromSave),typeof(CreateRoadEventTag),typeof(MapPoint),typeof(IsBlueprint));
-        CreateBuildingCommand(buildingCommand,gameStateData.ProcessorsBuildings);
-        CreateBuildingCommand(buildingCommand,gameStateData.ConsumerBuildings);
-        CreateBuildingCommand(buildingCommand,gameStateData.ProducerBuildings);
-        CreateBuildingCommand(buildingCommand,gameStateData.baseBuildings);
+        var roadCommand = World.EntityManager.CreateArchetype(typeof(CreateRoadEventTag),typeof(MapPoint),typeof(IsBlueprint),typeof(IsDemolition));
+        CreateBuildingCommand(buildingCommand,gameStateData.Buildings);
 
         using var entities = new NativeArray<Entity>(gameStateData.RoadsBuildings.Count, Allocator.TempJob);
         World.EntityManager.CreateEntity(roadCommand, entities);
@@ -187,13 +195,13 @@ public class GameController : IInitializable
         {
             Entity entity = entities[index];
             int id = pair.Key;
-            World.EntityManager.SetComponentData(entity, new CreateFromSave { UniqueIDHash = id });
             var buff =World.EntityManager.AddBuffer<MapPoint>(entity);
             for(int i =0;i<pair.Value.points.Length;i++)
                 buff.Add(new MapPoint{pos=pair.Value.points[i]});
             
-            
+            World.EntityManager.SetComponentData(entity,new CreateRoadEventTag{UniqueBuildingID=id});
             World.EntityManager.SetComponentEnabled<IsBlueprint>(entity,pair.Value.isBlueprint);
+            World.EntityManager.SetComponentEnabled<IsDemolition>(entity,pair.Value.IsDemolition);
             index++;
         }
         await UniTask.Yield();
@@ -208,15 +216,16 @@ public class GameController : IInitializable
             Entity entity = entities[index];
             int id = pair.Key;
 
-            World.EntityManager.SetComponentData(entity, new CreateFromSave { UniqueIDHash = id });
             World.EntityManager.SetComponentData(entity, new CreateBuildingEventData
             {
+                UniqueBuildingID=id,
                 buildingID=pair.Value.buildingID,
                 buildingPosition=pair.Value.buildingPosition,
                 rotation=pair.Value.rotation,
                 isConnected=pair.Value.isConnected,
             });
             World.EntityManager.SetComponentEnabled<IsBlueprint>(entity,pair.Value.isBlueprint);
+            World.EntityManager.SetComponentEnabled<IsDemolition>(entity,pair.Value.IsDemolition);
             index++;
         }
     }

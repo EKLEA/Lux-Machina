@@ -26,9 +26,26 @@ public class BuildingObjectFactory
     public void DestoryObject(BuildingOnScene BuildingOnScene)
     {
         BuildingOnScene.Dispose();
-        Object.DestroyImmediate(BuildingOnScene);
+        Object.DestroyImmediate(BuildingOnScene.gameObject);
     }
-    public BuildingOnScene CreateBuilding(int buidlingID, Vector2Int pos, int rotation)
+    public GameObject CreatePrimitive(Vector2Int pos,bool IsRemove=false)
+    {
+        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cube.transform.localScale=(Vector3.one+Vector3.up*2)*_gameFieldSettings.cellSize;
+        cube.transform.position = CalculateWorldPosition(CenterGridPosition(pos, Vector3.one));
+        if (IsRemove)
+        {
+            int mask = _gameFieldSettings.removeLayer.value;
+            int layerIndex = 0;
+            while (mask > 1) { mask >>= 1; layerIndex++; }
+            
+            //cube.layer=layerIndex;
+        }
+            
+            
+        return cube;
+    }
+    public BuildingOnScene CreateBuilding(int buidlingID, Vector2Int pos, int rotation,bool IsPlaceDestroy=false)
     {
         var buildingInfo = _buildingInfo.BuildingInfos[buidlingID];
         var buildingPrefab = _buildingInfo.GetBuildingPrefab(buidlingID);
@@ -44,16 +61,22 @@ public class BuildingObjectFactory
             null
         );
         ApplyExactScale(buildingOnScene.transform);
+        if(IsPlaceDestroy)
+        {
+            int mask = _gameFieldSettings.removeLayer.value;
+            int layerIndex = 0;
+            while (mask > 1) { mask >>= 1; layerIndex++; }
+            
+            buildingOnScene.gameObject.layer = layerIndex;
+        }
         return buildingOnScene;
     }
 
-    public RoadOnScene CreateRoad(int buildingID, Vector2Int[] points)
+    public RoadOnScene CreateRoad(int buildingID, Vector2Int[] points,Dictionary<Vector2Int, bool> neighborsMap,bool IsPlaceDestroy=false)
     {
-        Debug.Log($"CreateRoad вызван с ID: {buildingID}, точек: {points.Length}");
 
         if (!_buildingInfo.BuildingInfos.TryGetValue(buildingID, out var info))
         {
-            Debug.LogError($"Не найден префаб для buildingID: {buildingID}");
             return null;
         }
 
@@ -63,25 +86,32 @@ public class BuildingObjectFactory
         if (roadOnScene != null)
         {
             roadOnScene.Init(_gameFieldSettings.cellSize);
-            roadOnScene.GenerateRoadMesh(points);
-            Debug.Log($"Дорога создана: {roadObject.name}");
+            roadOnScene.GenerateRoadMesh(points,neighborsMap);
         }
-        else
+        if(IsPlaceDestroy)
         {
-            Debug.LogError($"Компонент RoadOnScene не найден на префабе: {roadObject.name}");
+            int mask = _gameFieldSettings.removeLayer.value;
+            int layerIndex = 0;
+            while (mask > 1) { mask >>= 1; layerIndex++; }
+            
+            roadOnScene.gameObject.layer = layerIndex;
         }
-
         return roadOnScene;
     }
-    public void MoveBuilding(GameObject buildingOnScene,int buidlingID, Vector2Int pos,int rotation)
+    public void MoveBuilding(GameObject buildingOnScene, Vector2Int pos,int rotation=-1,int buidlingID=-1)
     {
-        var buildingInfo = _buildingInfo.BuildingInfos[buidlingID];
-        var size =
-            rotation % 2 != 0
-                ? new Vector3Int(buildingInfo.size.z, buildingInfo.size.y, buildingInfo.size.x)
-                : buildingInfo.size;
+        Vector3Int size=Vector3Int.FloorToInt( new Vector3(buildingOnScene.transform.localScale.x/_gameFieldSettings.cellSize,0,buildingOnScene.transform.localScale.z/_gameFieldSettings.cellSize));
+        if (buidlingID != -1)
+        {
+             var buildingInfo = _buildingInfo.BuildingInfos[buidlingID];
+            size =
+                rotation % 2 != 0
+                    ? new Vector3Int(buildingInfo.size.z, buildingInfo.size.y, buildingInfo.size.x)
+                    : buildingInfo.size;
+            
+            buildingOnScene.transform.rotation=   GetRotationFromData(rotation);
+        }
         buildingOnScene.transform.position=CalculateWorldPosition(CenterGridPosition(pos, size));
-        buildingOnScene.transform.rotation=   GetRotationFromData(rotation);
     }
     void ApplyExactScale(Transform buildingTransform)
     {

@@ -20,13 +20,16 @@ public partial class BuildingChangeVisualSystem : SystemBase
     {
         
         var ecb = new EntityCommandBuffer(Allocator.Temp);
+        Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
         foreach (var (reference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ChangeBluePrintState>().WithEntityAccess())
         {
             ChangeBluePrintState(reference,entity,ecb);
+            ecb.SetComponentEnabled<UpdateClusterSlots>(mapEntity,true);
         }
-        foreach (var (reference,data,entity) in SystemAPI.Query<BuildingOnSceneReference,BuildingData>().WithAll<ChangeDemolitionStateTag>().WithEntityAccess())
+        foreach (var (reference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ChangeDemolitionStateTag>().WithEntityAccess())
         {
-            ChangeDemolitionState(reference,data,entity,ecb);
+            ChangeDemolitionState(reference,entity,ecb);
+            ecb.SetComponentEnabled<UpdateClusterSlots>(mapEntity,true);
         }
 
         ecb.Playback(EntityManager);
@@ -34,64 +37,94 @@ public partial class BuildingChangeVisualSystem : SystemBase
     }
     void ChangeBluePrintState(BuildingOnSceneReference gameobject, Entity building,EntityCommandBuffer ecb)
     {
+        var MapData= SystemAPI.GetSingleton<BuildingMap>();
         if (EntityManager.IsComponentEnabled<IsBlueprint>(building))
         {
             _visualBuildingFactory.UnPhantomizeObject(gameobject.buildingOnScene.gameObject);       
             ecb.SetComponentEnabled<IsBlueprint>(building,false);
+            if (MapData.CellEntityMultiMap.ContainsKey(building))
+            {
+                if (EntityManager.HasComponent<BuildingPosData>(building))
+                {
+                    var buildingPosData= EntityManager.GetComponentData<BuildingPosData>(building);
+                    for(int x = 0; x < buildingPosData.size.x;x++)
+                    {
+                        for(int y = 0; y< buildingPosData.size.y;y++)
+                        {
+                            MapData.IsBluePrintOrDemolitionPoints.Remove(buildingPosData.LeftCornerPos+new int2(x,y));
+                        }
+                    }
+                }
+                else
+                {
+                    var points= EntityManager.GetBuffer<MapPoint>(building);
+                    foreach(var p in points)
+                    {
+                        MapData.IsBluePrintOrDemolitionPoints.Remove(p.pos);
+                    }
+                }
+            }
+
         }
         else
         {
             _visualBuildingFactory.PhantomizeObject(gameobject.buildingOnScene.gameObject);       
             ecb.SetComponentEnabled<IsBlueprint>(building,true);
+            if (MapData.CellEntityMultiMap.ContainsKey(building))
+            {
+                if (EntityManager.HasComponent<BuildingPosData>(building))
+                {
+                    var buildingPosData= EntityManager.GetComponentData<BuildingPosData>(building);
+                    for(int x = 0; x < buildingPosData.size.x;x++)
+                    {
+                        for(int y = 0; y< buildingPosData.size.y;y++)
+                        {
+                            MapData.IsBluePrintOrDemolitionPoints.Add(buildingPosData.LeftCornerPos+new int2(x,y),true);
+                        }
+                    }
+                }
+                else
+                {
+                    var points= EntityManager.GetBuffer<MapPoint>(building);
+                    foreach(var p in points)
+                    {
+                        MapData.IsBluePrintOrDemolitionPoints.Add(p.pos,true);
+                    }
+                }
+            }
         }
         ecb.SetComponentEnabled<ChangeBluePrintState>(building,false);
     }
-    void ChangeDemolitionState(BuildingOnSceneReference gameobject,BuildingData buildingData, Entity building,EntityCommandBuffer ecb)
+    void ChangeDemolitionState(BuildingOnSceneReference gameobject, Entity building,EntityCommandBuffer ecb)
     {
         
+        var MapData= SystemAPI.GetSingleton<BuildingMap>();
         if(_entityManager.HasComponent<CanCraft>(building)) ecb.SetComponentEnabled<CanCraft>(building,false);
         if (EntityManager.IsComponentEnabled<IsDemolition>(building))
         {
             _visualBuildingFactory.UnDemolitionObject(gameobject.buildingOnScene.gameObject);       
             ecb.SetComponentEnabled<IsDemolition>(building,false);
-            bool IsBlueprint=false;
-
-            var outputBuff = _entityManager.GetBuffer<OutputConstructionSlotData>(building);
-            var itemRequest=_buildingInfo.BuildingItemRequestsInfos[buildingData.BuildingIDHash];
-
-            var ecbInputBuff = ecb.SetBuffer<InputConstructionSlotData>(building);
-            var ecbOutputBuff = ecb.SetBuffer<OutputConstructionSlotData>(building);
-            for (int i = 0;i<itemRequest.itemsRequest.Count;i++)
+            if (MapData.CellEntityMultiMap.ContainsKey(building))
             {
-                if (outputBuff[i].Amount < itemRequest.itemsRequest[i].amount)
+                if (EntityManager.HasComponent<BuildingPosData>(building))
                 {
-                    IsBlueprint = true;
-                    ecbInputBuff[i] = new InputConstructionSlotData
+                    var buildingPosData= EntityManager.GetComponentData<BuildingPosData>(building);
+                    for(int x = 0; x < buildingPosData.size.x;x++)
                     {
-                        ItemId = itemRequest.itemsRequest[i].itemId,
-                        Capacity = itemRequest.itemsRequest[i].amount,
-                        Amount = outputBuff[i].Amount
-                    };
-                    ecbOutputBuff[i]= new OutputConstructionSlotData
-                    {
-                        ItemId = itemRequest.itemsRequest[i].itemId,
-                        Capacity = itemRequest.itemsRequest[i].amount,
-                        Amount = 0
-                    };
+                        for(int y = 0; y< buildingPosData.size.y;y++)
+                        {
+                            MapData.IsBluePrintOrDemolitionPoints.Remove(buildingPosData.LeftCornerPos+new int2(x,y));
+                        }
+                    }
                 }
-            }
-            if (IsBlueprint)
-            {
-                var buildingInfo=_buildingInfo.BuildingInfos[buildingData.BuildingIDHash];
-                ecb.SetComponentEnabled<ChangeBluePrintState>(building,true);
-                ecb.SetComponent(building,new HealthData
+                else
                 {
-                    CurrHealth=buildingInfo.maxHealth,
-                    MaxHealth=buildingInfo.maxHealth,
-                    TimeToRestore=buildingInfo.timeToStartRestore,
-                    CurrTimeToRestore=0,
-                    RestoreHpPerTick=buildingInfo.restoreHealthPerSecond
-                });
+                    var points= EntityManager.GetBuffer<MapPoint>(building);
+                    foreach(var p in points)
+                    {
+                        MapData.IsBluePrintOrDemolitionPoints.Remove(p.pos);
+                    }
+                }
             }
 
         }
@@ -99,48 +132,26 @@ public partial class BuildingChangeVisualSystem : SystemBase
         {
             _visualBuildingFactory.DemolitionObject(gameobject.buildingOnScene.gameObject);       
             ecb.SetComponentEnabled<IsDemolition>(building,true);
-            var itemRequest=_buildingInfo.BuildingItemRequestsInfos[buildingData.BuildingIDHash];
-            
-            var inputBuff = _entityManager.GetBuffer<InputConstructionSlotData>(building);
-            var ecbInputBuff = ecb.SetBuffer<InputConstructionSlotData>(building);
-            var ecbOutputBuff = ecb.SetBuffer<OutputConstructionSlotData>(building);
-            if (_entityManager.IsComponentEnabled<IsBlueprint>(building)&&inputBuff.Length>0)
+            if (MapData.CellEntityMultiMap.ContainsKey(building))
             {
-                for (int i = 0; i <itemRequest.itemsRequest.Count; i++)
+                if (EntityManager.HasComponent<BuildingPosData>(building))
                 {
-                    ecbOutputBuff[i] = new OutputConstructionSlotData
+                    var buildingPosData= EntityManager.GetComponentData<BuildingPosData>(building);
+                    for(int x = 0; x < buildingPosData.size.x;x++)
                     {
-                        ItemId = itemRequest.itemsRequest[i].itemId,
-                        Capacity = itemRequest.itemsRequest[i].amount,
-                        Amount = inputBuff[i].Amount
-                    };
-
-                    ecbInputBuff[i] = new InputConstructionSlotData
-                    {
-                        ItemId = itemRequest.itemsRequest[i].itemId,
-                        Capacity = itemRequest.itemsRequest[i].amount,
-                        Amount = 0,
-                    };
+                        for(int y = 0; y< buildingPosData.size.y;y++)
+                        {
+                            MapData.IsBluePrintOrDemolitionPoints.Add(buildingPosData.LeftCornerPos+new int2(x,y),false);
+                        }
+                    }
                 }
-            }
-            else
-            {
-                float k=1;
-                if (_entityManager.HasComponent<HealthData>(building))
+                else
                 {
-                    var healthData = _entityManager.GetComponentData<HealthData>(building);
-                    if (healthData.CurrHealth != healthData.MaxHealth)
-                        k=healthData.CurrHealth / healthData.MaxHealth;
-                }
-                for (int i = 0; i <itemRequest.itemsRequest.Count; i++)
-                {
-                    float amount=itemRequest.itemsRequest[i].amount*k;
-                    ecbOutputBuff[i] = new OutputConstructionSlotData
+                    var points= EntityManager.GetBuffer<MapPoint>(building);
+                    foreach(var p in points)
                     {
-                        ItemId = itemRequest.itemsRequest[i].itemId,
-                        Capacity = itemRequest.itemsRequest[i].amount,
-                        Amount = (int)amount
-                    };
+                        MapData.IsBluePrintOrDemolitionPoints.Add(p.pos,false);
+                    }
                 }
             }
         }

@@ -11,7 +11,7 @@ public class ConstructionButtonHandler : UIScreen
     [Inject] Button ButtonPrefab;
     [Inject] IReadOnlyTypeBuildingButtonInfo typeBuildingButtonInfo;
     Dictionary<int, Button> typeBts;
-    public Action<int> onBuildingSelected;
+    public Action<string> onBuildingSelected;
     public override void Initialize()
     {
         typeBts = new();
@@ -26,7 +26,7 @@ public class ConstructionButtonHandler : UIScreen
         base.Initialize();
 
     }
-    void InvokeData(int data) => onBuildingSelected?.Invoke(data);
+    void InvokeData(string data) => onBuildingSelected?.Invoke(data);
     public override void Close()
     {
         BuildingButtonsHolder.Close();

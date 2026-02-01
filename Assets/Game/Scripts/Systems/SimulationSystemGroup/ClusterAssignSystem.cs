@@ -23,7 +23,7 @@ public partial struct ClusterAssignSystem : ISystem
 
         _updateClustersMap= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<BuildingMap,ClusterMap>()
-            .WithAll<UpdateCLustersTag>()
+            .WithAll<UpdateClustersTag>()
             .Build(ref state);
         _buildingsToAssignInCluster= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<NeedsClusterAssign>()
@@ -40,16 +40,21 @@ public partial struct ClusterAssignSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        bool runUpdateClusters = !_updateClustersMap.IsEmpty;
+        bool runAssign = !_buildingsToAssignInCluster.IsEmpty;
+
+        if (!runUpdateClusters && !runAssign) return;
         var map = SystemAPI.GetSingletonRW<BuildingMap>();
         var clusterMapRW = SystemAPI.GetSingletonRW<ClusterMap>();
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
-        
-        var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
-        var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
-        if (!_updateClustersMap.IsEmptyIgnoreFilter)
+        var ecb = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>()
+                .CreateCommandBuffer(state.WorldUnmanaged);
+        if (runUpdateClusters)
         {
-            var updateTagLookup = SystemAPI.GetComponentLookup<UpdateCLustersTag>(false);
-            var needsClusterAssignLookup = SystemAPI.GetComponentLookup<NeedsClusterAssign>(false);
+            // Берем Lookup-ы ОДИН раз перед джобами этого блока
+            var updateTagLookup = SystemAPI.GetComponentLookup<UpdateClustersTag>(false);
+            var needsAssignLookup = SystemAPI.GetComponentLookup<NeedsClusterAssign>(false);
+            var clusterLinkLookup = SystemAPI.GetComponentLookup<ClusterLink>(false);
             var roadJob = new RoadClusteringJob
             {
                 CellMapBuildingsIDs = map.ValueRO.CellMapBuildingsIDs,
@@ -58,29 +63,25 @@ public partial struct ClusterAssignSystem : ISystem
                 clusterIDs = clusterMapRW.ValueRW.UniqueClusterIDs,
                 RoadTypeId = _buildingConfigs.roadID,
                 MapEntity = mapEntity,
-                pointToClusterId = clusterMapRW.ValueRW.pointToClusterId,
+                pointToClusterLink = clusterMapRW.ValueRW.pointToClusterId,
                 UpdateClusterTagLookup = updateTagLookup,
-                ClusterIdLookup=SystemAPI.GetComponentLookup<ClusterId>(false),
+                ClusterLinkLookup=SystemAPI.GetComponentLookup<ClusterLink>(false),
             };
             state.Dependency = roadJob.Schedule(state.Dependency);
-            var pingJob=new PingBuildingClusterID
+            state.Dependency = new PingBuildingClusterID
             {
-                NeedsClusterAssignLookup = needsClusterAssignLookup
-            };
-            
-            state.Dependency = pingJob.Schedule(state.Dependency);
+                NeedsClusterAssignLookup = needsAssignLookup
+            }.Schedule(state.Dependency);
         }
 
-        if (!_buildingsToAssignInCluster.IsEmptyIgnoreFilter)
+        if (runAssign)
         {
-
             var assignJob = new AssignClusterJob
             {
                 CellMapEntities = map.ValueRO.CellMapEntites,
                 clusterMap = clusterMapRW.ValueRO,
                 IsBlueprintLookup = SystemAPI.GetComponentLookup<IsBlueprint>(false),
                 IsDemolitionLookup = SystemAPI.GetComponentLookup<IsDemolition>(false),
-                ClusterIDLookup = SystemAPI.GetComponentLookup<ClusterId>(false),
                 NeedsClusterAssignLookup = SystemAPI.GetComponentLookup<NeedsClusterAssign>(false),
                 IsLogicEnabledLookup = SystemAPI.GetComponentLookup<IsLogicEnabled>(false),
                 RoadLookup = SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(false),
@@ -92,7 +93,7 @@ public partial struct ClusterAssignSystem : ISystem
         }
     }
     [BurstCompile]
-    [WithAll(typeof(ClusterId))]
+    [WithAll(typeof(ClusterLink))]
     [WithNone(typeof(RoadTypeBuildingTag))]
     public partial struct PingBuildingClusterID : IJobEntity
     {
@@ -111,10 +112,10 @@ public partial struct ClusterAssignSystem : ISystem
         public NativeParallelMultiHashMap<int, int2> ClusterRoadsPoints;
         
         public Entity MapEntity;
-        public ComponentLookup<UpdateCLustersTag> UpdateClusterTagLookup;
-        public ComponentLookup<ClusterId> ClusterIdLookup;
+        public ComponentLookup<UpdateClustersTag> UpdateClusterTagLookup;
+        public ComponentLookup<ClusterLink> ClusterLinkLookup;
         public NativeList<int> clusterIDs;
-        public NativeParallelHashMap<int2, int> pointToClusterId;
+        public NativeParallelHashMap<int2, int> pointToClusterLink;
 
         public int RoadTypeId;
 
@@ -122,7 +123,7 @@ public partial struct ClusterAssignSystem : ISystem
         {
             clusterIDs.Clear();
             ClusterRoadsPoints.Clear();
-            pointToClusterId.Clear(); 
+            pointToClusterLink.Clear(); 
 
             var roadPoints = new NativeParallelHashSet<int2>(CellMapBuildingsIDs.Count(), Allocator.Temp);
             
@@ -136,7 +137,7 @@ public partial struct ClusterAssignSystem : ISystem
             
             if (roadPoints.IsEmpty) return;
 
-            var currentClusterId = 0;
+            var currentClusterLink = 0;
             var directions = new NativeArray<int2>(4, Allocator.Temp) 
             { 
                 [0] = new int2(1,0), [1] = new int2(-1,0), 
@@ -145,7 +146,7 @@ public partial struct ClusterAssignSystem : ISystem
 
             while (!roadPoints.IsEmpty)
             {
-                clusterIDs.Add(currentClusterId); 
+                clusterIDs.Add(currentClusterLink); 
 
                 var enumerator = roadPoints.GetEnumerator();
                 enumerator.MoveNext();
@@ -157,8 +158,8 @@ public partial struct ClusterAssignSystem : ISystem
 
                 while(queue.TryDequeue(out int2 pos))
                 {
-                    ClusterRoadsPoints.Add(currentClusterId, pos);
-                    pointToClusterId[pos] = currentClusterId;
+                    ClusterRoadsPoints.Add(currentClusterLink, pos);
+                    pointToClusterLink[pos] = currentClusterLink;
 
                     for (int i = 0; i < 4; i++)
                     {
@@ -171,20 +172,36 @@ public partial struct ClusterAssignSystem : ISystem
                     }
                 }
 
-                currentClusterId++;
+                currentClusterLink++;
             }
+            var entityToClusters = new NativeParallelMultiHashMap<Entity, int>(CellEntityMultiMap.Count(), Allocator.Temp);
+
             foreach (var entityPair in CellEntityMultiMap)
             {
-                Entity entity = entityPair.Key;
-                int2 pos = entityPair.Value;
-
-                if (pointToClusterId.TryGetValue(pos, out int clusterId))
+                if (pointToClusterLink.TryGetValue(entityPair.Value, out int clusterId))
                 {
-                 
-                    if (ClusterIdLookup.HasComponent(entity))
+                    entityToClusters.Add(entityPair.Key, clusterId);
+                }
+            }
+
+            var entities = entityToClusters.GetKeyArray(Allocator.Temp);
+            var uniqueEntities = new NativeParallelHashSet<Entity>(entities.Length, Allocator.Temp);
+            for(int i = 0; i < entities.Length; i++) uniqueEntities.Add(entities[i]);
+
+            foreach (var entity in uniqueEntities)
+            {
+                if (ClusterLinkLookup.HasComponent(entity))
+                {
+                    var link = ClusterLinkLookup[entity];
+                    link.ClusterIds.Clear();
+                    
+                    var clusters = entityToClusters.GetValuesForKey(entity);
+                    while(clusters.MoveNext())
                     {
-                        ClusterIdLookup[entity] = new ClusterId { Value = clusterId };
+                        if (!link.ClusterIds.Contains(clusters.Current))
+                            link.ClusterIds.Add(clusters.Current);
                     }
+                    ClusterLinkLookup[entity] = link;
                 }
             }
             if (UpdateClusterTagLookup.HasComponent(MapEntity))
@@ -200,22 +217,20 @@ public partial struct ClusterAssignSystem : ISystem
     public partial struct AssignClusterJob : IJobEntity
     {
         [ReadOnly] public NativeParallelHashMap<int2, Entity> CellMapEntities;
-        
-        public ComponentLookup<ClusterId> ClusterIDLookup;
+    
         public ComponentLookup<NeedsClusterAssign> NeedsClusterAssignLookup;
         public ComponentLookup<IsLogicEnabled> IsLogicEnabledLookup;
-        public ClusterMap clusterMap;
         
-        
+        [ReadOnly] public ClusterMap clusterMap;
 
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBlueprintLookup;
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
         [ReadOnly] public ComponentLookup<RoadTypeBuildingTag> RoadLookup;
         void Execute(
             Entity entity, 
-            in BuildingPosData buildingPosData)
+            in BuildingPosData buildingPosData,ref ClusterLink clusterLink)
         {
-            var neighborClusters = new FixedList32Bytes<int>(); 
+             var neighborClusters = new FixedList128Bytes<int>(); 
 
             for(int x = buildingPosData.LeftCornerPos.x; x < buildingPosData.LeftCornerPos.x + buildingPosData.size.x; x++)
             {
@@ -227,46 +242,32 @@ public partial struct ClusterAssignSystem : ISystem
                 CheckPoint(new int2(buildingPosData.LeftCornerPos.x-1,y),ref neighborClusters);
                 CheckPoint(new int2(buildingPosData.LeftCornerPos.x+buildingPosData.size.x,y),ref neighborClusters);
             }
-            
-            
-            if (neighborClusters.Length == 1)
+             if (IsLogicEnabledLookup.HasComponent(entity))
             {
-                if (ClusterIDLookup[entity].Value == neighborClusters[0]) {
-                        NeedsClusterAssignLookup.SetComponentEnabled(entity, false);
-                        return; 
-                    }
-                if(IsLogicEnabledLookup.HasComponent(entity)) IsLogicEnabledLookup.SetComponentEnabled(entity,true);
-                Debug.Log("true");
-                ClusterId data = ClusterIDLookup[entity];
-                data.Value = neighborClusters[0];
-                ClusterIDLookup[entity] = data;
+                IsLogicEnabledLookup.SetComponentEnabled(entity, neighborClusters.Length>0);
             }
-            else
+            clusterLink.ClusterIds.Clear();
+            foreach(var n in neighborClusters)
             {
-                ClusterId data = ClusterIDLookup[entity];
-                data.Value = -1;
-                ClusterIDLookup[entity] = data;
-                if(IsLogicEnabledLookup.HasComponent(entity)) IsLogicEnabledLookup.SetComponentEnabled(entity,false);
-                NeedsClusterAssignLookup.SetComponentEnabled(entity, true);
+                clusterLink.ClusterIds.Add(n);
             }
+            NeedsClusterAssignLookup.SetComponentEnabled(entity, false);
         }
 
-        private void CheckPoint(int2 pos, ref FixedList32Bytes<int> list)
+        private void CheckPoint(int2 pos, ref FixedList128Bytes<int> list)
         {
-            if (clusterMap.pointToClusterId.TryGetValue(pos, out int clusterId))
+            if (clusterMap.pointToClusterId.TryGetValue(pos, out int clusterId)) 
             {
-               if (CellMapEntities.TryGetValue(pos, out Entity roadEntity))
+                if (CellMapEntities.TryGetValue(pos, out Entity roadEntity))
                 {
-                    if (roadEntity == Entity.Null || roadEntity.Index < 0) return;
-                    bool isDemolition = IsDemolitionLookup.HasComponent(roadEntity) && IsDemolitionLookup.IsComponentEnabled(roadEntity);
-                    bool isBlueprint = IsBlueprintLookup.HasComponent(roadEntity) && IsBlueprintLookup.IsComponentEnabled(roadEntity);
-                    if (!isDemolition && !isBlueprint&& RoadLookup.HasComponent(roadEntity))
+                    if (roadEntity == Entity.Null) return;
+
+                    bool isDemolition = IsDemolitionLookup.IsComponentEnabled(roadEntity);
+                    bool isBlueprint = IsBlueprintLookup.IsComponentEnabled(roadEntity);
+                    
+                    if (!isDemolition && !isBlueprint && RoadLookup.HasComponent(roadEntity))
                     {
-                        if (!list.Contains(clusterId))
-                        {
-                            if (list.Length < list.Capacity) 
-                                list.Add(clusterId);
-                        }
+                        if(!list.Contains(clusterId)) list.Add(clusterId);
                     }
                 }
             }

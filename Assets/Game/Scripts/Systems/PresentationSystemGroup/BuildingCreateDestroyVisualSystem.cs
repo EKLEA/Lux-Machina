@@ -9,6 +9,8 @@ using UnityEngine;
 using Zenject;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(PresentationSystemGroup))]
+
+[UpdateAfter(typeof(BuildingSaveSystem))]
 public partial class BuildingCreateDestroyVisualSystem : SystemBase
 {
     [Inject] BuildingObjectFactory _factorty;
@@ -23,6 +25,16 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
         foreach (var (buildingData,points,entity) in SystemAPI.Query<BuildingData,DynamicBuffer<MapPoint>>().WithAll<CreateVisualTag>().WithEntityAccess())
         {
             SpawnRoad(buildingData,points,entity,ecb);
+        }
+        foreach (var (buildingRef,updateRoad,buff,entity) in SystemAPI.Query<BuildingOnSceneReference,EnabledRefRW<UpdateRoad>,DynamicBuffer<MapPoint>>().WithEntityAccess())
+        {
+            var nativeArray = buff.AsNativeArray();
+            var managedArray = new MapPoint[nativeArray.Length];
+            nativeArray.CopyTo(managedArray);
+            nativeArray.Dispose();
+            UpdateRoad(buildingRef.buildingOnScene as RoadOnScene,managedArray);
+            updateRoad.ValueRW=false;
+            Debug.Log(entity);
         }
         foreach (var (buildingOnSceneReference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<DestroyVisualTag>().WithEntityAccess())
         {
@@ -42,13 +54,44 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
         ecb.SetComponent(building,new BuildingOnSceneReference{buildingOnScene=buildingOnScene});
         ecb.SetComponentEnabled<CreateVisualTag>(building,false);
     }
-
+    void UpdateRoad(RoadOnScene roadOnScene,MapPoint[] managedArray)
+    {
+        var _roadPoints =managedArray.Select(f=>new int2(f.pos.x,f.pos.y));
+        Dictionary<Vector2Int, bool> neighborsMap=new();
+         
+        var mapData = SystemAPI.GetSingleton<BuildingMap>();
+        var buildingConfig = SystemAPI.GetSingleton<BuildingConfigReference>();
+        var dirs = new NativeArray<int2>(4, Allocator.Temp);
+        dirs[0] = new int2(1, 0);
+        dirs[1] = new int2(-1, 0);
+        dirs[2] = new int2(0, -1);
+        dirs[3] = new int2(0, 1);
+        foreach(var p in _roadPoints)
+        {
+            foreach(var dir in dirs)
+            {
+                var pos =p + dir;
+                if (!_roadPoints.Contains(pos))
+                {
+                    if (mapData.CellMapBuildingsIDs.ContainsKey(pos))
+                    {
+                        neighborsMap.TryAdd(new Vector2Int(pos.x,pos.y),mapData.CellMapBuildingsIDs[pos]==buildingConfig.roadID);
+                    }
+                }
+            }
+        }
+        roadOnScene.GenerateRoadMesh(_roadPoints.Select(f=>new Vector2Int(f.x,f.y)).ToArray(),neighborsMap);
+    }
     void SpawnRoad(BuildingData buildingData,DynamicBuffer<MapPoint> points,Entity building,EntityCommandBuffer ecb)
     {
         var nativeArray = points.AsNativeArray();
         var managedArray = new MapPoint[nativeArray.Length];
         nativeArray.CopyTo(managedArray);
-        var  buildingOnScene=_factorty.CreateRoad(buildingData.BuildingIDHash, managedArray.Select(f=>new Vector2Int(f.pos.x,f.pos.y)).ToArray());
+        nativeArray.Dispose();
+      
+        var  buildingOnScene=_factorty.CreateRoad(buildingData.BuildingIDHash, new Vector2Int[]{new Vector2Int(points[0].pos.x,points[0].pos.y)},null);
+
+        UpdateRoad(buildingOnScene,managedArray);
         buildingOnScene.id=buildingData.BuildingUniqueID; 
         ecb.SetComponent(building,new BuildingOnSceneReference{buildingOnScene=buildingOnScene});
         ecb.SetComponentEnabled<CreateVisualTag>(building,false);
@@ -56,6 +99,7 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
     void DeleteVisual(BuildingOnSceneReference reference,Entity building,EntityCommandBuffer ecb)
     {
         _factorty.DestoryObject(reference.buildingOnScene);
+        Debug.Log("ssdds");
         ecb.SetComponent(building,new BuildingOnSceneReference{buildingOnScene=null});
     }
 }

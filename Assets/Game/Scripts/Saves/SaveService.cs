@@ -76,11 +76,12 @@ public class SaveService : IGameStateSaver,IReadOnlySave
     GameStateData GenerateDefault()
     {
         var save = new GameStateData();
-        save.ProcessorsBuildings=new();
-        save.baseBuildings=new();
-        save.ConsumerBuildings=new();
-        save.ProducerBuildings=new();
+        save.Buildings=new();
         save.RoadsBuildings=new();
+        save.constructionSlotsSaveData=new();
+        save.excessSlotsSaveData=new();
+        save.recipeBuildingSaveData=new();
+        save.storageSlotsSaveData=new();
 
         // save.buildingDatas = new();
         // save.roadPoints = new();
@@ -99,7 +100,7 @@ public class SaveService : IGameStateSaver,IReadOnlySave
             CamPosition = new Vector3(0, 25, -25),
         };
         var hash = "Core".GetStableHashCode();
-        save.baseBuildings.Add(
+        save.Buildings.Add(
             123,
             new BaseBuildingSaveData
             {

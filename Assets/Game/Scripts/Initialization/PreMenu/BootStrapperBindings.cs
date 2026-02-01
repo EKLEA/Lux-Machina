@@ -39,7 +39,11 @@ public class BootStrapperBindings : MonoInstaller
                     .Select(ls => new GameFieldSettings(
                         ls.cellSize,
                         ls.tickPerSecond,
-                        DistributionPriority.Middle
+                        ls.defaultDistributionPriority,
+                        ls.selectBuildingColor,
+                        ls.makeAsDemolitionBuidlingColor,
+                        ls.forceDestoryBuidlingColor,
+                        ls.removeLayer
                     ))
                     .First()
             )

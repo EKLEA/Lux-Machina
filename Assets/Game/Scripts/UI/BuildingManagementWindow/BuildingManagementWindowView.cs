@@ -67,6 +67,10 @@ public class BuildingManagementWindowView:DragableUIWindow
     [SerializeField] Transform ExcessHead;
     [SerializeField] Transform ExcessSlotsHead;
     [SerializeField] SlotView[] ExcessItemsSlots;
+
+
+    [SerializeField] Button addOne;
+    [SerializeField] Button removeOne;
     
     BuildingInfoViewModel model;
 
@@ -140,6 +144,11 @@ public class BuildingManagementWindowView:DragableUIWindow
         allDisposables?.Dispose();
         allDisposables=null;
         allDisposables=new();
+        addOne.onClick.RemoveAllListeners();
+        removeOne.onClick.RemoveAllListeners();
+        model.tempUpdate+=()=>{Close();SetUpData(buildingViewData.buildingEntity);};
+        addOne.onClick.AddListener(()=>model.AddAmount(buildingViewData.buildingEntity,1));
+        removeOne.onClick.AddListener(()=>model.AddAmount(buildingViewData.buildingEntity,-1));
         BuildingSprite.sprite=buildingInfo.GetBuildingSprite(buildingViewData.buildingID);
         BuildingText.text=buildingInfo.BuildingInfos[buildingViewData.buildingID].title;
         BuildingDescriptionText.text=buildingInfo.BuildingInfos[buildingViewData.buildingID].description;

@@ -22,7 +22,7 @@ public partial struct EnergySystem : ISystem
     }
     public void OnUpdate(ref SystemState state)
     {
-        if (!_connectCommand.IsEmptyIgnoreFilter)
+        if (!_connectCommand.IsEmpty)
         {
             state.Dependency=new ConnectEnergyJob().ScheduleParallel(state.Dependency);
         }

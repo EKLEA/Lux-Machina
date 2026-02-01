@@ -9,11 +9,11 @@ using Zenject;
 public class BuildingButtonsHolder : UIScreen
 {
 
-    public Action<int> onBuildingSelected;
+    public Action<string> onBuildingSelected;
     [SerializeField] Transform buttonHolder;
     [Inject] Button ButtonPrefab;
     [Inject] IReadOnlyBuildingInfo buildingInfo;
-    List<BuildingBaseConfig> buildings;
+    List<string> ids;
     Dictionary<int, Button> BTs;
     int prevType;
     int currType;
@@ -26,8 +26,23 @@ public class BuildingButtonsHolder : UIScreen
             bt.gameObject.SetActive(false);
         }
         
-        buildings.Clear();
-        buildings = buildingInfo.BuildingInfos.Values.Where(f => f.buildingType == (BuildingsTypes)type).ToList();
+        ids.Clear();
+        if ((BuildingsTypes)type == BuildingsTypes.DeleteBuilding)
+        {
+            foreach(DeleteType v in Enum.GetValues(typeof(DeleteType)))
+            {
+                ids.Add(v.ToString());
+            }
+        }
+        else
+        {
+            var buildings = buildingInfo.BuildingInfos.Values.Where(f => f.buildingType == (BuildingsTypes)type).ToList();
+            foreach(var b in buildings)
+            {
+                ids.Add(b.id);
+            }
+        }
+       
         if (type != currType||!isOpened.Value)
         {
             prevType = currType;
@@ -41,7 +56,7 @@ public class BuildingButtonsHolder : UIScreen
         prevType = -2;
         currType = -1;
         BTs = new();
-        buildings = new();
+        ids = new();
         
         for (int i = 0; i < 20; i++)
         {
@@ -54,7 +69,7 @@ public class BuildingButtonsHolder : UIScreen
     }
     public override void Open()
     {
-        if (buildings.Count == 0)
+        if (ids.Count == 0)
         {
             Close();
             return;
@@ -64,14 +79,12 @@ public class BuildingButtonsHolder : UIScreen
             
             isOpened.Value = false;
             base.Open();
-            for (int i = 0; i < buildings.Count; i++)
+            for (int i = 0; i < ids.Count; i++)
             {
                 var bt = BTs[i];
-                var buildingConfig = buildings[i];
-                var buildingId = buildingConfig.id.GetStableHashCode();
 
-                bt.image.sprite = buildingInfo.GetBuildingSprite(buildingId);
-                AddButtonListener(buildingId, bt);
+                bt.image.sprite = buildingInfo.GetBuildingSprite(ids[i].GetStableHashCode());
+                AddButtonListener(ids[i], bt);
                 bt.gameObject.SetActive(true);
                 bt.interactable = true;
             }
@@ -79,19 +92,19 @@ public class BuildingButtonsHolder : UIScreen
         
         
     }
-    private void AddButtonListener(int id, Button button)
+    private void AddButtonListener(string id, Button button)
     {
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(() => InvokeMethod(id));
     }
-    void InvokeMethod(int id)
+    void InvokeMethod(string id)
     {
         onBuildingSelected?.Invoke(id);
         Close();
     }
     public override void Close()
     {
-        buildings.Clear();
+        ids.Clear();
         foreach (var bt in BTs.Values)
         {
             

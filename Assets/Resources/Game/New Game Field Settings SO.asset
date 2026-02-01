@@ -12,5 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 30a2dc3ff2faefc4c802943f9f37e41b, type: 3}
   m_Name: New Game Field Settings SO
   m_EditorClassIdentifier: 
-  cellSize: 5
+  cellSize: 1
   tickPerSecond: 20
+  defaultDistributionPriority: 3
+  selectBuildingColor: {r: 0.23760104, g: 1, b: 0, a: 1}
+  makeAsDemolitionBuidlingColor: {r: 1, g: 0.5375431, b: 0, a: 1}
+  forceDestoryBuidlingColor: {r: 0, g: 0, b: 0, a: 1}
+  removeLayer:
+    serializedVersion: 2
+    m_Bits: 128

@@ -1,23 +1,25 @@
 using System;
 using UnityEngine;
-
+[RequireComponent(typeof(Outline))]
 public class BuildingOnScene : MonoBehaviour,IDisposable
 {
     public int id;
-    public int clusterID = -1;
+    public int[] clusterID;
     public Renderer clusterIndicator;
+    [SerializeField] Outline outlineScript;
 
-    public virtual void SetCluster(int newClusterID, Color clusterColor)
+    public void SetOutLine(Color? color)
     {
-        clusterID = newClusterID;
-
-        if (clusterIndicator != null)
+        if(!outlineScript.SetUpded) outlineScript.SetUp();
+        if(color!=null)
         {
-            clusterIndicator.material.color = clusterColor;
-            clusterIndicator.enabled = (clusterID != -1);
-        }
-    }
+            outlineScript.enabled=true;
 
+            outlineScript.OutlineColor=color.Value;
+        }
+        else 
+            outlineScript.enabled=false;
+    }
     public void CreateClusterIndicator(float height = 2f)
     {
         var indicatorObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -37,6 +39,6 @@ public class BuildingOnScene : MonoBehaviour,IDisposable
 
     public void Dispose()
     {
-        throw new NotImplementedException();
+       // throw new NotImplementedException();
     }
 }

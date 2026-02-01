@@ -10,13 +10,15 @@ public class PhantomObject : MonoBehaviour
 
     Material _trueMat;
     Material _falseMat;
+    Material _forceMat;
 
-    public void SetUp( Material trueMat, Material falseMat)
+    public void SetUp( Material trueMat, Material falseMat, Material forceMat)
     {
         meshRenderers.AddRange(GetComponentsInChildren<MeshRenderer>(true));
 
         _trueMat = trueMat;
         _falseMat = falseMat;
+        _forceMat =forceMat;
 
 
         foreach (MeshRenderer mr in meshRenderers)
@@ -73,10 +75,15 @@ public class PhantomObject : MonoBehaviour
         return newMat;
     }
 
-    public void CanBuild(bool canBuild)
+    public void CanBuild(bool canBuild,bool force)
     {
-        Material targetPhantomMat = canBuild ? _trueMat : _falseMat;
-
+        Material targetPhantomMat;
+        if (force)
+        {
+            targetPhantomMat=_forceMat;
+        }
+        else 
+            targetPhantomMat = canBuild ? _trueMat : _falseMat;
         for (int mrIndex = 0; mrIndex < meshRenderers.Count; mrIndex++)
         {
             if (meshRenderers[mrIndex] == null)

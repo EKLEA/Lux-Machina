@@ -3,6 +3,7 @@ using Unity.Mathematics;
 
 public struct CreateBuildingEventData : IComponentData
 {
+    public int UniqueBuildingID;
     public int buildingID;
     public int2 buildingPosition;
     public int rotation;
@@ -12,18 +13,15 @@ public struct ProcessRoadPointsEventTag: IComponentData
 {
     
 }
-public struct DeletePointFromMapTag: IComponentData{}
+public struct DeleteRoadPointsFromMap: IComponentData{public bool isForce;}
+public struct DeleteManyPointsFromMap: IComponentData{public bool isForce;}
 public struct CreateRoadEventTag: IComponentData
 {
-    
+    public int UniqueBuildingID;
 }
 public struct ConnectEntities: IComponentData
 {
     
-}
-public struct CreateFromSave : IComponentData
-{
-    public int UniqueIDHash;
 }
 public struct EntityToConnect : IBufferElementData
 {

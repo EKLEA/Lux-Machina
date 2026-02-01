@@ -29,7 +29,7 @@ public partial struct PathFindingSystem : ISystem
     public void OnUpdate(ref SystemState state)
     {
         var map = SystemAPI.GetSingleton<BuildingMap>();
-        if(!_pathFindingEntityQuery.IsEmptyIgnoreFilter)
+        if(!_pathFindingEntityQuery.IsEmpty)
         {
             state.Dependency = new PathfindingParallelJob
             {

@@ -16,7 +16,7 @@ public class VisualBuildingFactory
         if (get == null)
         {
             var ph = gameObject.AddComponent<PhantomObject>();
-            ph.SetUp(_materialInfo.MaterialInfos["True"], _materialInfo.MaterialInfos["False"]);
+            ph.SetUp(_materialInfo.MaterialInfos["True"], _materialInfo.MaterialInfos["False"],_materialInfo.MaterialInfos["Force"]);
             return ph;
         }
         else

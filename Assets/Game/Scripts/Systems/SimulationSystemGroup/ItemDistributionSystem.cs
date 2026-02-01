@@ -58,7 +58,8 @@ public partial struct ItemDistributionSystem : ISystem
 
         ComponentLookup<IsBlueprint> IsBlueprintLookup=SystemAPI.GetComponentLookup<IsBlueprint>(false);
         ComponentLookup<IsDemolition> IsDemolitionLookup=SystemAPI.GetComponentLookup<IsDemolition>(false);
-        if (!MapUpdate.IsEmptyIgnoreFilter)
+
+        if (!MapUpdate.IsEmpty)
         {
             CraftPriority.Update(ref state);
             InputCraftSlotDataLookup.Update(ref state);
@@ -76,7 +77,6 @@ public partial struct ItemDistributionSystem : ISystem
             IsDemolitionLookup.Update(ref state);
             
             var clusterMapData = clusterMap.ValueRW;
-
             var clearJob = new ClearClusterMapJob
             {
                 ClusterMap = clusterMapData
@@ -84,7 +84,8 @@ public partial struct ItemDistributionSystem : ISystem
             state.Dependency = clearJob.Schedule(state.Dependency);
             var collectJob = new CollectClusterSlots
             {
-                UniqueIDs= clusterMap.ValueRW.UniqueClusterIDs,
+                AllProducersWriter = clusterMap.ValueRW.AllProducersList.AsParallelWriter(),
+                SlotToClustersWriter = clusterMap.ValueRW.SlotToClusters.AsParallelWriter(),
                 ProducersWriter = clusterMap.ValueRW.ClusterToProducers.AsParallelWriter(),
                 ConsumersWriter = clusterMap.ValueRW.ClusterToConsumers.AsParallelWriter(),
                 InputSlotsWriter = clusterMap.ValueRW.EntityInputSlots.AsParallelWriter(),
@@ -106,18 +107,17 @@ public partial struct ItemDistributionSystem : ISystem
 
             };
             state.Dependency = collectJob.ScheduleParallel(state.Dependency);
-            var deferredArray = clusterMap.ValueRO.UniqueClusterIDs.AsDeferredJobArray();
-            var linkJob = new LinkSlotsInClustertGraphJob
+            var linkJob = new LinkSlotsCrossClusterJob
             {
-                UniqueClusterIDs = deferredArray,
-                ClusterToProducers = clusterMap.ValueRO.ClusterToProducers,
+                AllProducers = clusterMap.ValueRO.AllProducersList.AsDeferredJobArray(),
                 ClusterToConsumers = clusterMap.ValueRO.ClusterToConsumers,
+                SlotToClusters = clusterMap.ValueRO.SlotToClusters, 
+
                 SlotGraph = clusterMap.ValueRW.SlotGraph.AsParallelWriter(),
                 ReverseSlotGraph = clusterMap.ValueRW.ReverseSlotGraph.AsParallelWriter()
             };
 
-            state.Dependency= linkJob.Schedule(clusterMap.ValueRO.UniqueClusterIDs, 1, state.Dependency);
-
+            state.Dependency= linkJob.Schedule(clusterMap.ValueRO.AllProducersList, 1, state.Dependency);
         }
         _accumulatedTime += SystemAPI.Time.DeltaTime;
         var tickInfoData = SystemAPI.GetSingleton<TickInfoData>();
@@ -141,14 +141,16 @@ public partial struct ItemDistributionSystem : ISystem
             ExcesSlotsDataLookup.Update(ref state);
             StorageSlotsDataLookup.Update(ref state);
             IsBlueprintLookup.Update(ref state);
-            IsDemolitionLookup.Update(ref state);
 
+
+            var transactions = new NativeStream(1024, Allocator.TempJob);
             var distJob = new LogisticsDistributionJob
             {
-                UniqueClusterIDs = clusterMap.ValueRO.UniqueClusterIDs.AsDeferredJobArray(),
-                ClusterToProducers = clusterMap.ValueRO.ClusterToProducers,
+                
+                 AllProducers = clusterMap.ValueRO.AllProducersList.AsDeferredJobArray(),
                 SlotGraph = clusterMap.ValueRO.SlotGraph,
-
+                Transactions = transactions.AsWriter(),
+                 MaxStreamPockets = 1024,
                 InputLookup = InputCraftSlotDataLookup,
                 OutputLookup = OutputCraftSlotsDataLookup,
                 InputConstructionLookup = InputConstructionSlotDataLookup,
@@ -156,19 +158,25 @@ public partial struct ItemDistributionSystem : ISystem
                 StorageLookup = StorageSlotsDataLookup,
                 ExcessLookup = ExcesSlotsDataLookup
             };
-            state.Dependency = distJob.Schedule(clusterMap.ValueRO.UniqueClusterIDs, 1, state.Dependency);
-             if (!_realizeBuildingsQuery.IsEmptyIgnoreFilter)
+            state.Dependency = distJob.Schedule(clusterMap.ValueRO.AllProducersList, 64,  state.Dependency);
+
+            var applyJob = new ApplyLogisticsJob
             {
-                var bJob=new RealizeBluePrintBuildingJob();
-                state.Dependency=bJob.ScheduleParallel( state.Dependency);
-            }
-            if (!_deleteBuildingsQuery.IsEmptyIgnoreFilter)
-            {
-                var dJob=new DestroyBuildingJob();
-                state.Dependency=dJob.ScheduleParallel( state.Dependency);
-            }
+                Transactions = transactions.AsReader(),
+                
+                InputLookup = InputCraftSlotDataLookup,
+                OutputLookup = OutputCraftSlotsDataLookup,
+                InputConstructionLookup = InputConstructionSlotDataLookup,
+                OutputConstructionLookup = OutputConstructionSlotsDataLookup,
+                StorageLookup = StorageSlotsDataLookup,
+                ExcessLookup = ExcesSlotsDataLookup
+            };
+            state.Dependency=applyJob.Schedule( state.Dependency);
+            
             
             state.Dependency= new ExcessCleanupJob{ECB=ecb.AsParallelWriter(),mapEntity=mapEntity}.ScheduleParallel(state.Dependency);
+            
+            transactions.Dispose(state.Dependency);
             _accumulatedTime = 0; 
         }
     }
@@ -209,55 +217,13 @@ public partial struct ItemDistributionSystem : ISystem
             ClusterMap.EntityOutputSlots.Clear();
             ClusterMap.SlotGraph.Clear();
             ClusterMap.ReverseSlotGraph.Clear();
+            
+            ClusterMap.AllProducersList.Clear();
+            ClusterMap.SlotToClusters.Clear();
             enabledRefRW.ValueRW=false;
         }
     }
-    [BurstCompile]
-    [WithAll(typeof(IsDemolition))]
-    [WithDisabled(typeof(ForceDestroyTag),typeof(ChangeDemolitionStateTag))]
-    public partial struct DestroyBuildingJob : IJobEntity
-    {
-        public void Execute(in DynamicBuffer<OutputConstructionSlotData> output,EnabledRefRW<ForceDestroyTag> state)
-        {
-            bool shouldDelete=true;
-            foreach(var s in output)
-            {
-                if (s.Amount != 0)
-                {
-                    shouldDelete=false;
-                    break;  
-                }
-            }
-            if(shouldDelete)state.ValueRW=true;
-        }
-    }
-    
-    //передалть
-    [BurstCompile]
-    [WithAll(typeof(IsBlueprint))]
-    [WithDisabled(typeof(ForceDestroyTag),typeof(ChangeBluePrintState),typeof(IsDemolition))]
-    public partial struct RealizeBluePrintBuildingJob : IJobEntity
-    {
-        public void Execute(in DynamicBuffer<InputConstructionSlotData> input,
-                                        EnabledRefRW<ChangeBluePrintState> state,
-                                        EnabledRefRW<IsLogicEnabled> logicState)
-        {
-            bool shouldRealize=true;
-            foreach(var s in input)
-            {
-                if(s.Amount!=s.Capacity)
-                {
-                    shouldRealize=false;
-                    break;
-                }
-            }
-            if (shouldRealize)
-            {
-                 state.ValueRW=true;
-                 logicState.ValueRW=true;
-            }
-        }
-    }
+   
     [BurstCompile]
     NativeArray<Entity> GetEntityArrayByID(int id, NativeParallelMultiHashMap<int, Entity> map)
     {
@@ -276,14 +242,15 @@ public partial struct ItemDistributionSystem : ISystem
     }
 
     [BurstCompile]
+    [WithDisabled(typeof(LoadInfo))]
     public partial struct CollectClusterSlots : IJobEntity
-    {
-        public NativeParallelMultiHashMap<int, SlotReference>.ParallelWriter ProducersWriter;
+    { 
+        public NativeList<SlotReference>.ParallelWriter AllProducersWriter;
+        public NativeParallelHashMap<SlotReference, FixedList32Bytes<int>>.ParallelWriter SlotToClustersWriter;       
+         public NativeParallelMultiHashMap<int, SlotReference>.ParallelWriter ProducersWriter;
         public NativeParallelMultiHashMap<int, SlotReference>.ParallelWriter ConsumersWriter;
         public NativeParallelMultiHashMap<Entity, SlotReference>.ParallelWriter InputSlotsWriter;
         public NativeParallelMultiHashMap<Entity, SlotReference>.ParallelWriter OutputSlotsWriter;
-
-        [ReadOnly] public NativeList<int> UniqueIDs;
 
         [ReadOnly] public ComponentLookup<CraftingPriorityData> CraftPriority;
         [ReadOnly] public BufferLookup<InputSlotData> InputCraftSlotDataLookup;
@@ -305,136 +272,151 @@ public partial struct ItemDistributionSystem : ISystem
 
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBlueprintLookup;
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
-        public void Execute(Entity entity,in ClusterId clusterId)
+        public void Execute(Entity entity, in ClusterLink clusterLink)
         {
-            if (clusterId.Value != -1)
+            var ids = clusterLink.ClusterIds;
+            if (ids.Length == 0) return;
+             if (ExcesSlotsDataLookup.HasBuffer(entity))
             {
-                if (ExcesSlotsDataLookup[entity].Length > 0)
+                var buff = ExcesSlotsDataLookup[entity];
+                for (int i = 0; i < buff.Length; i++)
                 {
-                    var buff=ExcesSlotsDataLookup[entity];
-                    for(int i=0;i<buff.Length;i++)
+                    if (buff[i].Amount < 1) continue;
+                    var slot=new SlotReference
                     {
-                        if(buff[i].Amount<1) continue;
+                        Owner=entity,
+                        ItemID=buff[i].ItemId,
+                        Type=SlotType.Excess,
+                        Index=i,
+                        Priority=0,
+                    };
+                    AllProducersWriter.AddNoResize(slot); 
+                    SlotToClustersWriter.TryAdd(slot, ids);
+                    OutputSlotsWriter.Add(entity, slot);
+                    for (int j = 0; j < ids.Length; j++) 
+                         ProducersWriter.Add(ids[j], slot);
+                }
+            }
+            if (IsBlueprintLookup.IsComponentEnabled(entity) || IsDemolitionLookup.IsComponentEnabled(entity))
+            {
+                byte priority = (byte)ConstructionPriority[entity].ConstructionPriority;
+                if (IsInputConstructionEnabled.IsComponentEnabled(entity))
+                {
+                    var buff = InputConstructionSlotDataLookup[entity];
+                    for (int i = 0; i < buff.Length; i++)
+                    {
                         var slot=new SlotReference
                         {
                             Owner=entity,
                             ItemID=buff[i].ItemId,
-                            Type=SlotType.Excess,
+                            Type=SlotType.InputConstruction,
                             Index=i,
-                            Priority=0,
+                            Priority=buff[i].Amount<buff[i].Capacity?priority:(byte)(priority+100),
                         };
-                        ProducersWriter.Add(clusterId.Value,slot);
+                        InputSlotsWriter.Add(entity, slot);
+                        for (int j = 0; j < ids.Length; j++) 
+                            ConsumersWriter.Add(ids[j], slot);
+                    }
+                }
+                if (IsOutputConstructionEnabled.IsComponentEnabled(entity))
+                {
+                    var buff = OutputConstructionSlotsDataLookup[entity];
+                    for (int i = 0; i < buff.Length; i++)
+                    {
+                        var slot=new SlotReference
+                        {
+                            Owner=entity,
+                            ItemID=buff[i].ItemId,
+                            Type=SlotType.OutputConstruction,
+                            Index=i,
+                            Priority=priority,
+                        }; 
+                        AllProducersWriter.AddNoResize(slot); 
+                        SlotToClustersWriter.TryAdd(slot, ids);
+                        OutputSlotsWriter.Add(entity, slot);
+                        for (int j = 0; j < ids.Length; j++) 
+                            ProducersWriter.Add(ids[j], slot);
+                    }
+                }
+            }
+               
+            if (CraftPriority.HasComponent(entity))
+            {
+                byte Priority=(byte)(10+CraftPriority[entity].CraftingPriority);
+                if (IsInputCraftEnabled.HasComponent(entity) && IsInputCraftEnabled.IsComponentEnabled(entity))
+                {
+                    var buff=InputCraftSlotDataLookup[entity];
+                    for(int i=0;i<buff.Length;i++)
+                    {
+                        var slot=new SlotReference
+                        {
+                            Owner=entity,
+                            ItemID=buff[i].ItemId,
+                            Type=SlotType.Input,
+                            Index=i,
+                            Priority=buff[i].Amount<buff[i].Capacity?Priority:(byte)(Priority+100),
+                        };
+                        InputSlotsWriter.Add(entity,slot);
+                        for (int j = 0; j < ids.Length; j++) 
+                            ConsumersWriter.Add(ids[j], slot);
+                    }
+                }
+                if (IsOutputCraftEnabled.HasComponent(entity) && IsOutputCraftEnabled.IsComponentEnabled(entity))
+                {
+                    var buff=OutputCraftSlotsDataLookup[entity];
+                    for(int i=0;i<buff.Length;i++)
+                    {
+                        var slot=new SlotReference
+                        {
+                            Owner=entity,
+                            ItemID=buff[i].ItemId,
+                            Type=SlotType.Output,
+                            Index=i,
+                            Priority=Priority,
+                        };
+                        AllProducersWriter.AddNoResize(slot); 
+                        SlotToClustersWriter.TryAdd(slot, ids);
                         OutputSlotsWriter.Add(entity,slot);
+                        for (int j = 0; j < ids.Length; j++) 
+                            ProducersWriter.Add(ids[j], slot);
                     }
                 }
-                if (IsBlueprintLookup.IsComponentEnabled(entity) || IsDemolitionLookup.IsComponentEnabled(entity))
+                if (StorageSlotsDataLookup.HasBuffer(entity))
                 {
-                    byte Priority=(byte)ConstructionPriority[entity].ConstructionPriority;
-                    if(IsInputConstructionEnabled.IsComponentEnabled(entity))
+                    Priority=(byte)(Priority+10);
+                    var buff=StorageSlotsDataLookup[entity];
+                    for(int i=0;i<buff.Length;i++)
                     {
-                        var buff=InputConstructionSlotDataLookup[entity];
-                        for(int i=0;i<buff.Length;i++)
+                        var buffSlot=buff[i];
+                        if(buffSlot.IsInputEnabled)
                         {
                             var slot=new SlotReference
                             {
                                 Owner=entity,
-                                ItemID=buff[i].ItemId,
-                                Type=SlotType.InputConstruction,
+                                ItemID=buffSlot.ItemId,
+                                Type=SlotType.StorageInput,
                                 Index=i,
-                                Priority=buff[i].Amount<buff[i].Capacity?Priority:(byte)(Priority+100),
-                            };
-                           InputSlotsWriter.Add(entity,slot);
-                           ConsumersWriter.Add(clusterId.Value,slot);
-                        }
-                    }
-                    if(IsOutputConstructionEnabled.IsComponentEnabled(entity))
-                    {
-                        var buff=OutputConstructionSlotsDataLookup[entity];
-                        for(int i=0;i<buff.Length;i++)
-                        {
-                            var slot=new SlotReference
-                            {
-                                Owner=entity,
-                                ItemID=buff[i].ItemId,
-                                Type=SlotType.OutputConstruction,
-                                Index=i,
-                                Priority=Priority,
-                            };
-                            ProducersWriter.Add(clusterId.Value,slot);
-                            OutputSlotsWriter.Add(entity,slot);
-                        }
-                    }
-                }
-                if (CraftPriority.HasComponent(entity))
-                {
-                    byte Priority=(byte)(10+CraftPriority[entity].CraftingPriority);
-                    if (IsInputCraftEnabled.HasComponent(entity) && IsInputCraftEnabled.IsComponentEnabled(entity))
-                    {
-                        var buff=InputCraftSlotDataLookup[entity];
-                        for(int i=0;i<buff.Length;i++)
-                        {
-                            var slot=new SlotReference
-                            {
-                                Owner=entity,
-                                ItemID=buff[i].ItemId,
-                                Type=SlotType.Input,
-                                Index=i,
-                                Priority=buff[i].Amount<buff[i].Capacity?Priority:(byte)(Priority+100),
+                                Priority=buffSlot.Amount<buffSlot.Capacity?Priority:(byte)(Priority+100),
                             };
                             InputSlotsWriter.Add(entity,slot);
-                            ConsumersWriter.Add(clusterId.Value,slot);;
+                            for (int j = 0; j < ids.Length; j++) 
+                                ConsumersWriter.Add(ids[j], slot);
                         }
-                    }
-                    if (IsOutputCraftEnabled.HasComponent(entity) && IsOutputCraftEnabled.IsComponentEnabled(entity))
-                    {
-                        var buff=OutputCraftSlotsDataLookup[entity];
-                        for(int i=0;i<buff.Length;i++)
+                        if (buffSlot.IsOutputEnabled)
                         {
                             var slot=new SlotReference
                             {
                                 Owner=entity,
-                                ItemID=buff[i].ItemId,
-                                Type=SlotType.Output,
+                                ItemID=buffSlot.ItemId,
+                                Type=SlotType.StorageOutput,
                                 Index=i,
                                 Priority=Priority,
                             };
-                            ProducersWriter.Add(clusterId.Value,slot);
+                            AllProducersWriter.AddNoResize(slot); 
+                            SlotToClustersWriter.TryAdd(slot, ids);
                             OutputSlotsWriter.Add(entity,slot);
-                        }
-                    }
-                    if (StorageSlotsDataLookup.HasBuffer(entity))
-                    {
-                        Priority=(byte)(Priority+10);
-                        var buff=StorageSlotsDataLookup[entity];
-                        for(int i=0;i<buff.Length;i++)
-                        {
-                            var buffSlot=buff[i];
-                            if(buffSlot.IsInputEnabled)
-                            {
-                                var slot=new SlotReference
-                                {
-                                    Owner=entity,
-                                    ItemID=buffSlot.ItemId,
-                                    Type=SlotType.StorageInput,
-                                    Index=i,
-                                    Priority=buffSlot.Amount<buffSlot.Capacity?Priority:(byte)(Priority+100),
-                                };
-                                InputSlotsWriter.Add(entity,slot);
-                                ConsumersWriter.Add(clusterId.Value,slot);;
-                            }
-                            if (buffSlot.IsOutputEnabled)
-                            {
-                                var slot=new SlotReference
-                                {
-                                    Owner=entity,
-                                    ItemID=buffSlot.ItemId,
-                                    Type=SlotType.StorageOutput,
-                                    Index=i,
-                                    Priority=Priority,
-                                };
-                                ProducersWriter.Add(clusterId.Value,slot);
-                                OutputSlotsWriter.Add(entity,slot);
-                            }
+                            for (int j = 0; j < ids.Length; j++) 
+                                ProducersWriter.Add(ids[j], slot);
                         }
                     }
                 }
@@ -444,40 +426,31 @@ public partial struct ItemDistributionSystem : ISystem
     }
 
 
-    [BurstCompile]
-    public struct LinkSlotsInClustertGraphJob : IJobParallelForDefer
+   [BurstCompile]
+    public struct LinkSlotsCrossClusterJob : IJobParallelForDefer
     {
-        [ReadOnly] public NativeArray<int> UniqueClusterIDs;
+        [ReadOnly] public NativeArray<SlotReference> AllProducers;
         
-        [ReadOnly] public NativeParallelMultiHashMap<int, SlotReference> ClusterToProducers;
         [ReadOnly] public NativeParallelMultiHashMap<int, SlotReference> ClusterToConsumers;
+        [ReadOnly] public NativeParallelHashMap<SlotReference, FixedList32Bytes<int>> SlotToClusters;
 
         public NativeParallelMultiHashMap<SlotReference, SlotReference>.ParallelWriter SlotGraph;
         public NativeParallelMultiHashMap<SlotReference, SlotReference>.ParallelWriter ReverseSlotGraph;
 
         public void Execute(int index)
         {
-            int clusterId = UniqueClusterIDs[index];
-
-            var consumersInCluster = ClusterToConsumers.GetValuesForKey(clusterId);
-            var tempConsumers = new NativeList<SlotReference>(32, Allocator.Temp);
+            SlotReference producer = AllProducers[index];
             
-            while (consumersInCluster.MoveNext())
+            if (!SlotToClusters.TryGetValue(producer, out var clusterList)) return;
+            if(clusterList[0]==-1) return;
+            for (int i = 0; i < clusterList.Length; i++)
             {
-                tempConsumers.Add(consumersInCluster.Current);
-            }
-
-            if (tempConsumers.Length == 0) return;
-
-            var producers = ClusterToProducers.GetValuesForKey(clusterId);
-
-            while (producers.MoveNext())
-            {
-                SlotReference producer = producers.Current;
-
-                for (int i = 0; i < tempConsumers.Length; i++)
+                int clusterId = clusterList[i];
+                
+                var consumersInCluster = ClusterToConsumers.GetValuesForKey(clusterId);
+                while (consumersInCluster.MoveNext())
                 {
-                    SlotReference consumer = tempConsumers[i];
+                    SlotReference consumer = consumersInCluster.Current;
 
                     if (producer.ItemID == consumer.ItemID)
                     {
@@ -489,12 +462,14 @@ public partial struct ItemDistributionSystem : ISystem
         }
     }
 
-    [BurstCompile]
+     [BurstCompile]
     public struct LogisticsDistributionJob : IJobParallelForDefer 
     {
-        [ReadOnly] public NativeArray<int> UniqueClusterIDs;
-        [ReadOnly] public NativeParallelMultiHashMap<int, SlotReference> ClusterToProducers;
+        [ReadOnly] public NativeArray<SlotReference> AllProducers;
         [ReadOnly] public NativeParallelMultiHashMap<SlotReference, SlotReference> SlotGraph;
+        public int MaxStreamPockets;
+
+        public NativeStream.Writer Transactions;
          [NativeDisableParallelForRestriction] 
         public BufferLookup<InputSlotData> InputLookup;
          [NativeDisableParallelForRestriction] 
@@ -508,148 +483,219 @@ public partial struct ItemDistributionSystem : ISystem
          [NativeDisableParallelForRestriction] 
         public BufferLookup<ExcessSlotData> ExcessLookup;
 
+
         public void Execute(int index)
         {
-            int clusterId = UniqueClusterIDs[index];
+            int pocketIdx = index % MaxStreamPockets;
+            Transactions.BeginForEachIndex(pocketIdx);
 
-            var producerEnumerator = ClusterToProducers.GetValuesForKey(clusterId);
-            var sortedProducers = new NativeList<SlotReference>(64, Allocator.Temp);
-            while (producerEnumerator.MoveNext())
+            SlotReference pRef = AllProducers[index];
+            int available = GetAmountReadOnly(pRef); 
+            if (available > 0) 
             {
-                sortedProducers.Add(producerEnumerator.Current);
-            }
-
-            if (sortedProducers.Length == 0) return;
-
-            sortedProducers.Sort(new ProducerAmountComparer { 
-                InputLookup = InputLookup, OutputLookup = OutputLookup, 
-                InputConstructionLookup = InputConstructionLookup, OutputConstructionLookup = OutputConstructionLookup,
-                StorageLookup = StorageLookup, ExcessLookup = ExcessLookup 
-            });
-
-            // 2. Начинаем распределение
-            var sortedConsumers = new NativeList<SlotReference>(32, Allocator.Temp);
-
-            for (int pIdx = 0; pIdx < sortedProducers.Length; pIdx++)
-            {
-                SlotReference pRef = sortedProducers[pIdx];
-                int availableItems = GetAmount(pRef);
-                if (availableItems <= 0) continue;
-
-                var consumerEnumerator = SlotGraph.GetValuesForKey(pRef);
-                sortedConsumers.Clear();
-                while (consumerEnumerator.MoveNext())
+                var consumers = new NativeList<SlotReference>(16, Allocator.Temp);
+                if (SlotGraph.TryGetFirstValue(pRef, out var cRef, out var it))
                 {
-                    sortedConsumers.Add(consumerEnumerator.Current);
+                    do { consumers.Add(cRef); } 
+                    while (SlotGraph.TryGetNextValue(out cRef, ref it));
                 }
 
-                sortedConsumers.Sort();
+                consumers.Sort();
 
-                for (int cIdx = 0; cIdx < sortedConsumers.Length; cIdx++)
+                for (int j = 0; j < consumers.Length; j++)
                 {
-                    if (availableItems <= 0) break;
-
-                    SlotReference cRef = sortedConsumers[cIdx];
-                    int currentAmount = GetAmount(cRef);
-                    int capacity = GetCapacity(cRef);
-                    int space = capacity - currentAmount;
+                    if (available <= 0) break;
+                    
+                    var target = consumers[j];
+                    int space = GetCapacityReadOnly(target) - GetAmountReadOnly(target);
 
                     if (space > 0)
                     {
-                        int transfer = math.min(availableItems, space);
+                        int transfer = math.min(available, space);
                         
-                        AddAmount(ref pRef, -transfer);
-                        AddAmount(ref cRef, transfer);
-                        
-                        availableItems -= transfer;
+                        Transactions.Write(new LogisticsTransaction {
+                            Source = pRef,
+                            Target = target,
+                            Amount = transfer
+                        });
+
+                        available -= transfer;
                     }
                 }
             }
-        }
-        public static int StaticGetAmount(SlotReference s, 
-        in BufferLookup<InputSlotData> inL, in BufferLookup<OutputSlotData> outL,
-        in BufferLookup<InputConstructionSlotData> inConL, in BufferLookup<OutputConstructionSlotData> outConL,
-        in BufferLookup<StorageSlotData> stL, in BufferLookup<ExcessSlotData> exL)
-        {
-            return s.Type switch
-            {
-                SlotType.Input => inL[s.Owner][s.Index].Amount,
-                SlotType.Output => outL[s.Owner][s.Index].Amount,
-                SlotType.InputConstruction => inConL[s.Owner][s.Index].Amount,
-                SlotType.OutputConstruction => outConL[s.Owner][s.Index].Amount,
-                SlotType.StorageInput or SlotType.StorageOutput => stL[s.Owner][s.Index].Amount,
-                SlotType.Excess => exL[s.Owner][s.Index].Amount,
-                _ => 0
-            };
-        }
-        private int GetAmount(SlotReference s) => StaticGetAmount(s, InputLookup, OutputLookup, 
-        InputConstructionLookup, OutputConstructionLookup, StorageLookup, ExcessLookup);
-        private int GetCapacity(SlotReference s)
-        {
-            return s.Type switch
-            {
-                SlotType.Input => InputLookup[s.Owner][s.Index].Capacity,
-                SlotType.Output => OutputLookup[s.Owner][s.Index].Capacity,
-                SlotType.InputConstruction => InputConstructionLookup[s.Owner][s.Index].Capacity,
-                SlotType.OutputConstruction => OutputConstructionLookup[s.Owner][s.Index].Capacity,
-                SlotType.StorageInput or SlotType.StorageOutput => StorageLookup[s.Owner][s.Index].Capacity,
-                SlotType.Excess => ExcessLookup[s.Owner][s.Index].Capacity,
-                _ => 0
-            };
-        }
-        private void AddAmount(ref SlotReference s, int change)
-        {
-            int finalAmount = 0;
-            int capacity = 0;
 
-            switch (s.Type)
+            Transactions.EndForEachIndex();
+        }
+        private int GetAmountReadOnly(SlotReference slot)
+        {
+            switch (slot.Type)
             {
                 case SlotType.Input:
-                    var b1 = InputLookup[s.Owner]; var d1 = b1[s.Index]; d1.Amount += change; 
-                    finalAmount = d1.Amount; capacity = d1.Capacity; b1[s.Index] = d1; break;
+                    return InputLookup[slot.Owner][slot.Index].Amount;
                 case SlotType.Output:
-                    var b2 = OutputLookup[s.Owner]; var d2 = b2[s.Index]; d2.Amount += change; 
-                    finalAmount = d2.Amount; capacity = d2.Capacity; b2[s.Index] = d2; break;
+                    return OutputLookup[slot.Owner][slot.Index].Amount;
                 case SlotType.InputConstruction:
-                    var b3 = InputConstructionLookup[s.Owner]; var d3 = b3[s.Index]; d3.Amount += change; 
-                    finalAmount = d3.Amount; capacity = d3.Capacity; b3[s.Index] = d3; break;
+                    return InputConstructionLookup[slot.Owner][slot.Index].Amount;
                 case SlotType.OutputConstruction:
-                    var b4 = OutputConstructionLookup[s.Owner]; var d4 = b4[s.Index]; d4.Amount += change; 
-                    finalAmount = d4.Amount; capacity = d4.Capacity; b4[s.Index] = d4; break;
-                case SlotType.StorageInput:
-                    var b5 = StorageLookup[s.Owner]; var d5 = b5[s.Index]; d5.Amount += change; 
-                    finalAmount = d5.Amount; capacity = d5.Capacity; b5[s.Index] = d5; break;
+                    return OutputConstructionLookup[slot.Owner][slot.Index].Amount;
+                case SlotType.StorageInput: 
                 case SlotType.StorageOutput:
-                    var b6 = StorageLookup[s.Owner]; var d6 = b6[s.Index]; d6.Amount += change; 
-                    finalAmount = d6.Amount; capacity = d6.Capacity; b6[s.Index] = d6; break;
+                    return StorageLookup[slot.Owner][slot.Index].Amount;
                 case SlotType.Excess:
-                    var b7 = ExcessLookup[s.Owner]; var d7 = b7[s.Index]; d7.Amount += change; 
-                    finalAmount = d7.Amount; capacity = d7.Capacity; b7[s.Index] = d7; break;
-            } 
-            if (change > 0 && finalAmount >= capacity)
-            {
-                s.Priority = (byte)math.min(255, s.Priority + 100);
+                    return ExcessLookup[slot.Owner][slot.Index].Amount;
+                default:
+                    return 0;
             }
         }
-        public struct ProducerAmountComparer : IComparer<SlotReference>
+
+        private int GetCapacityReadOnly(SlotReference slot)
         {
-            [ReadOnly] public BufferLookup<InputSlotData> InputLookup;
-            [ReadOnly] public BufferLookup<OutputSlotData> OutputLookup;
-            [ReadOnly] public BufferLookup<InputConstructionSlotData> InputConstructionLookup;
-            [ReadOnly] public BufferLookup<OutputConstructionSlotData> OutputConstructionLookup;
-            [ReadOnly] public BufferLookup<StorageSlotData> StorageLookup;
-            [ReadOnly] public BufferLookup<ExcessSlotData> ExcessLookup;
-
-            public int Compare(SlotReference x, SlotReference y)
+            switch (slot.Type)
             {
-                int amountX = LogisticsDistributionJob.StaticGetAmount(x, InputLookup, OutputLookup, 
-                    InputConstructionLookup, OutputConstructionLookup, StorageLookup, ExcessLookup);
-                
-                int amountY = LogisticsDistributionJob.StaticGetAmount(y, InputLookup, OutputLookup, 
-                    InputConstructionLookup, OutputConstructionLookup, StorageLookup, ExcessLookup);
-
-                return amountX.CompareTo(amountY);
+                case SlotType.Input:
+                    return InputLookup[slot.Owner][slot.Index].Capacity;
+                case SlotType.InputConstruction:
+                    return InputConstructionLookup[slot.Owner][slot.Index].Capacity;
+                case SlotType.StorageInput:
+                    return StorageLookup[slot.Owner][slot.Index].Capacity;
+                case SlotType.Output:
+                    return OutputLookup[slot.Owner][slot.Index].Capacity;
+                case SlotType.OutputConstruction:
+                    return OutputConstructionLookup[slot.Owner][slot.Index].Capacity;
+                case SlotType.StorageOutput:
+                    return StorageLookup[slot.Owner][slot.Index].Capacity;
+                case SlotType.Excess:
+                    return ExcessLookup[slot.Owner][slot.Index].Capacity;
+                default:
+                    return 0;
             }
+        }
+        
+    }
+}
+
+[BurstCompile]
+public struct ApplyLogisticsJob : IJob
+{
+    public NativeStream.Reader Transactions;
+
+    public BufferLookup<InputSlotData> InputLookup;
+    public BufferLookup<OutputSlotData> OutputLookup;
+    public BufferLookup<InputConstructionSlotData> InputConstructionLookup;
+    public BufferLookup<OutputConstructionSlotData> OutputConstructionLookup;
+    public BufferLookup<StorageSlotData> StorageLookup;
+    public BufferLookup<ExcessSlotData> ExcessLookup;
+
+    public void Execute()
+    {
+        for (int i = 0; i < Transactions.ForEachCount; i++)
+        {
+            Transactions.BeginForEachIndex(i);
+            while (Transactions.RemainingItemCount > 0)
+            {
+                var tx = Transactions.Read<LogisticsTransaction>();
+                
+                int actualAvailable = GetAmount(tx.Source);
+                int actualSpace = GetCapacity(tx.Target) - GetAmount(tx.Target);
+
+                int finalTransfer = math.min(tx.Amount, math.min(actualAvailable, actualSpace));
+
+                if (finalTransfer > 0)
+                {
+                    AddAmount(tx.Source, -finalTransfer);
+                    AddAmount(tx.Target, finalTransfer);
+                }
+            }
+            Transactions.EndForEachIndex();
         }
     }
+
+    private int GetAmount(SlotReference slot)
+    {
+        switch (slot.Type)
+        {
+            case SlotType.Input: return InputLookup[slot.Owner][slot.Index].Amount;
+            case SlotType.Output: return OutputLookup[slot.Owner][slot.Index].Amount;
+            case SlotType.InputConstruction: return InputConstructionLookup[slot.Owner][slot.Index].Amount;
+            case SlotType.OutputConstruction: return OutputConstructionLookup[slot.Owner][slot.Index].Amount;
+            case SlotType.StorageInput: 
+            case SlotType.StorageOutput: return StorageLookup[slot.Owner][slot.Index].Amount;
+            case SlotType.Excess: return ExcessLookup[slot.Owner][slot.Index].Amount;
+            default: return 0;
+        }
+    }
+
+     private int GetCapacity(SlotReference slot)
+    {
+        switch (slot.Type)
+        {
+            case SlotType.Input:
+                return InputLookup[slot.Owner][slot.Index].Capacity;
+            case SlotType.InputConstruction:
+                return InputConstructionLookup[slot.Owner][slot.Index].Capacity;
+            case SlotType.StorageInput:
+                return StorageLookup[slot.Owner][slot.Index].Capacity;
+            case SlotType.Output:
+                return OutputLookup[slot.Owner][slot.Index].Capacity;
+            case SlotType.OutputConstruction:
+                return OutputConstructionLookup[slot.Owner][slot.Index].Capacity;
+            case SlotType.StorageOutput:
+                return StorageLookup[slot.Owner][slot.Index].Capacity;
+            case SlotType.Excess:
+                return ExcessLookup[slot.Owner][slot.Index].Capacity;
+            default:
+                return 0;
+        }
+    }
+
+    private void AddAmount(SlotReference slot, int change)
+    {
+        switch (slot.Type)
+        {
+            case SlotType.Input:
+                var input = InputLookup[slot.Owner];
+                var inputVal = input[slot.Index];
+                inputVal.Amount += change;
+                input[slot.Index] = inputVal;
+                break;
+            case SlotType.Output:
+                var output = OutputLookup[slot.Owner];
+                var outputVal = output[slot.Index];
+                outputVal.Amount += change;
+                output[slot.Index] = outputVal;
+                break;
+            case SlotType.StorageInput:
+            case SlotType.StorageOutput:
+                var storage = StorageLookup[slot.Owner];
+                var storageVal = storage[slot.Index];
+                storageVal.Amount += change;
+                storage[slot.Index] = storageVal;
+                break;
+            case SlotType.InputConstruction:
+                var inputConst = InputConstructionLookup[slot.Owner];
+                var inputConstVal = inputConst[slot.Index];
+                inputConstVal.Amount += change;
+                inputConst[slot.Index] = inputConstVal;
+                break;
+            case SlotType.OutputConstruction:
+                var outputConst = OutputConstructionLookup[slot.Owner];
+                var outputConstVal = outputConst[slot.Index];
+                outputConstVal.Amount += change;
+                outputConst[slot.Index] = outputConstVal;
+                break;
+            case SlotType.Excess:
+                var excess = ExcessLookup[slot.Owner];
+                var excessVal = excess[slot.Index];
+                excessVal.Amount += change;
+                excess[slot.Index] = excessVal;
+                break;
+        }
+    }
+}
+
+public struct LogisticsTransaction
+{
+    public SlotReference Source;
+    public SlotReference Target;
+    public int Amount;
 }

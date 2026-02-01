@@ -9,6 +9,7 @@ using UnityEngine;
 
 [BurstCompile]
 
+[UpdateAfter(typeof(DestroyBuildingsSystem))]
 public partial struct  MarkBuildingOnMapSystem: ISystem
 {
     EntityQuery _markRoad;
@@ -21,7 +22,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             .WithAll<RoadTypeBuildingTag,BuildingData,BuildingTag,MapPoint,MarkOnMap>()
             .Build(ref state);
         _markBuilding= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<BuildingTag,BuildingPosData,BuildingData,MarkOnMap>()
+            .WithAll<BuildingPosData,BuildingData,MarkOnMap>()
             .WithNone<RoadTypeBuildingTag,MapPoint>()
             .Build(ref state);
         _mapUpdate= new EntityQueryBuilder(Allocator.Temp)
@@ -30,49 +31,57 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
     }
     void OnUpdate(ref SystemState state)
     {
-        var buildingMap = SystemAPI.GetSingletonRW<BuildingMap>();
-        
-        var entitiesRW= SystemAPI.GetSingletonRW<EntitiesDictionary>();
-        
-        Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
-        if (!_markBuilding.IsEmptyIgnoreFilter)
+        bool runBuilding = !_markBuilding.IsEmpty;
+        bool runRoad = !_markRoad.IsEmpty;
+        bool runUpdate = !_mapUpdate.IsEmpty;
+
+        // Если делать нечего - выходим сразу
+        if (!runBuilding && !runRoad && !runUpdate) return;
+
+        // 2. Получаем данные
+        var updateMapLookup = SystemAPI.GetComponentLookup<UpdateMapTag>(false);
+        var updateClusterLookup = SystemAPI.GetComponentLookup<UpdateClustersTag>(false);
+        var buildingMapRW = SystemAPI.GetSingletonRW<BuildingMap>();
+        var entitiesRW = SystemAPI.GetSingletonRW<EntitiesDictionary>();
+        var mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
+        if (runBuilding)
         {
-            var markBuildingJob = new MarkBuildingJob
+            state.Dependency = new MarkBuildingJob
             {
-                MapData = buildingMap.ValueRW,
-                EntityDictionary=entitiesRW.ValueRW,
-                MapEntity=mapEntity,
-                UpdateMapTagLookup=SystemAPI.GetComponentLookup<UpdateMapTag>(false),
-                UpdateClusterTagLookup=SystemAPI.GetComponentLookup<UpdateCLustersTag>(false),
-            };
-            
-            state.Dependency = markBuildingJob.Schedule(state.Dependency);
+                MapData = buildingMapRW.ValueRW,
+                EntityDictionary = entitiesRW.ValueRW,
+                MapEntity = mapEntity,
+                UpdateMapTagLookup = updateMapLookup,
+                UpdateClusterTagLookup = updateClusterLookup,
+            }.Schedule(state.Dependency);
         }
-        if (!_markRoad.IsEmptyIgnoreFilter)
+        if (runRoad)
         {
-            var markRoadJob = new MarkRoadJob
+            updateMapLookup = SystemAPI.GetComponentLookup<UpdateMapTag>(false);
+            updateClusterLookup = SystemAPI.GetComponentLookup<UpdateClustersTag>(false);
+
+            state.Dependency = new MarkRoadJob
             {
-                MapData = buildingMap.ValueRW,
-                MapEntity=mapEntity,
-                EntityDictionary=entitiesRW.ValueRW,
-                UpdateMapTagLookup=SystemAPI.GetComponentLookup<UpdateMapTag>(false),
-                UpdateClusterTagLookup=SystemAPI.GetComponentLookup<UpdateCLustersTag>(false),
-            };
-            
-            state.Dependency = markRoadJob.Schedule(state.Dependency);
+                MapData = buildingMapRW.ValueRW,
+                MapEntity = mapEntity,
+                EntityDictionary = entitiesRW.ValueRW,
+                UpdateMapTagLookup = updateMapLookup,
+                UpdateClusterTagLookup = updateClusterLookup,
+            }.Schedule(state.Dependency);
         }
-        if (!_mapUpdate.IsEmptyIgnoreFilter)
+        if (runUpdate)
         {
-            var resizeMapJob=new ResizeMapJob
+            updateMapLookup = SystemAPI.GetComponentLookup<UpdateMapTag>(false);
+
+            state.Dependency = new ResizeMapJob
             {
-                CellMapEntites = buildingMap.ValueRW.CellMapEntites,
-                CellMapBuildingsIDs = buildingMap.ValueRW.CellMapBuildingsIDs,
-                CellEntityMultiMap = buildingMap.ValueRW.CellEntityMultiMap,
-                Entities=entitiesRW.ValueRW.Entities,
-                MapEntity=mapEntity,
-                UpdateMapTagLookup=SystemAPI.GetComponentLookup<UpdateMapTag>(false),
-            };
-            state.Dependency = resizeMapJob.Schedule(state.Dependency);
+                CellMapEntites = buildingMapRW.ValueRW.CellMapEntites,
+                CellMapBuildingsIDs = buildingMapRW.ValueRW.CellMapBuildingsIDs,
+                CellEntityMultiMap = buildingMapRW.ValueRW.CellEntityMultiMap,
+                Entities = entitiesRW.ValueRW.Entities,
+                MapEntity = mapEntity,
+                UpdateMapTagLookup = updateMapLookup,
+            }.Schedule(state.Dependency);
         }
     }
     void OnDestroy(ref SystemState state)
@@ -111,7 +120,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         public EntitiesDictionary EntityDictionary; 
         public Entity MapEntity;
         public ComponentLookup<UpdateMapTag> UpdateMapTagLookup;
-        public ComponentLookup<UpdateCLustersTag> UpdateClusterTagLookup;
+        public ComponentLookup<UpdateClustersTag> UpdateClusterTagLookup;
 
         public void Execute(Entity entity,in BuildingData buildingData, in BuildingPosData buildingPosData,EnabledRefRW<MarkOnMap> markOnMap)
         {
@@ -139,13 +148,14 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
 
         public EntitiesDictionary EntityDictionary;         
         public ComponentLookup<UpdateMapTag> UpdateMapTagLookup;
-        public ComponentLookup<UpdateCLustersTag> UpdateClusterTagLookup;
+        public ComponentLookup<UpdateClustersTag> UpdateClusterTagLookup;
         public void Execute(Entity entity,in BuildingData buildingData, in DynamicBuffer<MapPoint> mapPoints,EnabledRefRW<MarkOnMap> markOnMap )
         {
             foreach(var p in mapPoints)
             {
                 MapData.CellMapBuildingsIDs.TryAdd(p.pos, buildingData.BuildingIDHash);
                 MapData.CellMapEntites.TryAdd(p.pos, entity); 
+                 MapData.CellEntityMultiMap.Add(entity, p.pos);
             }
             
             markOnMap.ValueRW=false;

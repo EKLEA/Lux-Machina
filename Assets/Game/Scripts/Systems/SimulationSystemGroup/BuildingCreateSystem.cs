@@ -49,8 +49,11 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(IsConstuctionSlotsAssigned),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
+            typeof(UpdateRoad),
+            typeof(ExcessSlotData),
+            
             typeof(CreateVisualTag),
-            typeof(ClusterId),
+            typeof(ClusterLink),
             typeof(SaveInfo),
             typeof(LoadInfo),
             typeof(DestroyVisualTag),
@@ -74,8 +77,10 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(IsConstuctionSlotsAssigned),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
+            typeof(ExcessSlotData),
+            
             typeof(CreateVisualTag),
-            typeof(ClusterId),
+            typeof(ClusterLink),
             typeof(NeedsClusterAssign),
             typeof(SaveInfo),
             typeof(LoadInfo),
@@ -100,8 +105,10 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(IsConstuctionSlotsAssigned),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
+            typeof(ExcessSlotData),
+            
             typeof(CreateVisualTag),
-            typeof(ClusterId),
+            typeof(ClusterLink),
             typeof(NeedsClusterAssign),
             typeof(SaveInfo),
             typeof(LoadInfo),
@@ -136,12 +143,13 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(BuildingRequiredRecipesGroupData),
             typeof(CountOfPackInBuildingData),
             typeof(IsConnectedToEnegy),
-            typeof(ClusterId),
+            typeof(ClusterLink),
             typeof(NeedsClusterAssign),
             typeof(CanCraft),
             typeof(IsLogicEnabled),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
+            
             typeof(CreateVisualTag),
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
@@ -174,12 +182,13 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(BuildingRequiredRecipesGroupData),
             typeof(CountOfPackInBuildingData),
             typeof(IsConnectedToEnegy),
-            typeof(ClusterId),
+            typeof(ClusterLink),
             typeof(NeedsClusterAssign),
             typeof(CanCraft),
             typeof(IsLogicEnabled),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
+            
             typeof(CreateVisualTag),
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
@@ -212,12 +221,13 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(BuildingRequiredRecipesGroupData),
             typeof(CountOfPackInBuildingData),
             typeof(IsConnectedToEnegy),
-            typeof(ClusterId),
+            typeof(ClusterLink),
             typeof(NeedsClusterAssign),
             typeof(CanCraft),
             typeof(IsLogicEnabled),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
+            
             typeof(CreateVisualTag),
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
@@ -245,10 +255,11 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(StorageSlotData),
             typeof(ExcessSlotData),
             typeof(BuildingRequiredStorageGroupData),
-            typeof(ClusterId),
+            typeof(ClusterLink),
             typeof(NeedsClusterAssign),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
+            
             typeof(CreateVisualTag),
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
@@ -278,11 +289,12 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(IsConnectedToEnegy),
             //доп компоненты для оружия
             typeof(BuildingRequiredStorageGroupData),
-            typeof(ClusterId),
+            typeof(ClusterLink),
             typeof(NeedsClusterAssign),
             typeof(IsLogicEnabled),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
+            
             typeof(CreateVisualTag),
             typeof(DestroyVisualTag),
             typeof(SaveInfo),
@@ -305,7 +317,7 @@ public partial struct BuildingCreateSystem : ISystem
         
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
        
-        if (!_createRoadQuery.IsEmptyIgnoreFilter)
+        if (!_createRoadQuery.IsEmpty)
         {
             var CreateRoadJob=new CreateRoad
             {
@@ -313,12 +325,13 @@ public partial struct BuildingCreateSystem : ISystem
                 RoadArchetype=_roadArchetype,
                 MapEntity=mapEntity,
                 config=_buildingConfigs,
-                CreateFromSaveLookup=SystemAPI.GetComponentLookup<CreateFromSave>(false),
                 IsBluePrintLookup=SystemAPI.GetComponentLookup<IsBlueprint>(false),
+                IsDemolitionLookup=SystemAPI.GetComponentLookup<IsDemolition>(false),
+                TransitionSlotDataLookup=SystemAPI.GetBufferLookup<TransitionSlotData>(false),
             };
             state.Dependency=CreateRoadJob.Schedule(state.Dependency);
         }
-        if (!_createBuildingQuery.IsEmptyIgnoreFilter)
+        if (!_createBuildingQuery.IsEmpty)
         {
              var CreateBuildingJob=new CreateBuilding
             {
@@ -332,14 +345,13 @@ public partial struct BuildingCreateSystem : ISystem
                 ProcessorBuildingArchetype=_processorBuildingArchetype,
                 StorageBuildingArchetype=_storageBuildingArchetype,
                 DefenceBuildingArchetype=_defenceBuildingArchetype,
-                CreateFromSaveLookup=SystemAPI.GetComponentLookup<CreateFromSave>(false),
                 IsBluePrintLookup=SystemAPI.GetComponentLookup<IsBlueprint>(false),
+                IsDemolitionLookup=SystemAPI.GetComponentLookup<IsDemolition>(false),
             };
             state.Dependency=CreateBuildingJob.Schedule(state.Dependency);
         }
     }
     [BurstCompile]
-    [WithAll(typeof(CreateRoadEventTag))]
     public partial struct CreateRoad : IJobEntity
     {
         public EntityCommandBuffer ECB;
@@ -349,17 +361,18 @@ public partial struct BuildingCreateSystem : ISystem
         public Entity MapEntity;
         
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBluePrintLookup;
-        [ReadOnly] public ComponentLookup<CreateFromSave> CreateFromSaveLookup;
+        [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
+        [ReadOnly] public BufferLookup<TransitionSlotData> TransitionSlotDataLookup;
 
         public void Execute(
                     Entity entity,
+                    in CreateRoadEventTag roadData,
                     in DynamicBuffer<MapPoint> points
         )
         {
             Entity road = ECB.CreateEntity(RoadArchetype);
             var buffer = ECB.AddBuffer<MapPoint>(road);
             
-            int id = entity.Index ^ (entity.Version * 397);
             
             foreach(var p in points)
             {
@@ -367,50 +380,56 @@ public partial struct BuildingCreateSystem : ISystem
             }
             
             ECB.SetComponentEnabled<MarkOnMap>(road,true);
-            
-            bool shouldBluprint=IsBluePrintLookup.IsComponentEnabled(entity);
 
-            if(CreateFromSaveLookup.HasComponent(entity))
-                ECB.SetComponentEnabled<LoadInfo>(road, true);
-            else
+
+            if (IsBluePrintLookup.HasComponent(entity)&&IsBluePrintLookup.IsComponentEnabled(entity))
             {
-                ECB.SetComponentEnabled<LoadInfo>(road, false);
-                if(config.BuildingItemRequestsStructConfigs.Value.TryGetConfig(config.roadID,out var itemRequests))
+                if (TransitionSlotDataLookup.HasBuffer(entity))
                 {
-                    var buff=ECB.SetBuffer<InputConstructionSlotData>(road);
-                    foreach(var iR in itemRequests.itemsRequests)
+                  
+                    var buff=ECB.AddBuffer<TransitionSlotData>(road);
+                    var slots=TransitionSlotDataLookup[entity];
+                    foreach(var sl in slots)
                     {
-                        buff.Add(new InputConstructionSlotData{ItemId=iR.ItemId,Amount=0,Capacity=iR.Amount*points.Length});
+                        buff.Add(sl);
                     }
+                    ECB.SetComponentEnabled<LoadInfo>(road, false);
                 }
-                else shouldBluprint=false;
-            }
-            if(shouldBluprint)
-            {
                 ECB.SetComponentEnabled<ChangeBluePrintState>(road, true);
                 ECB.SetComponentEnabled<IsBlueprint>(road, false);
                 ECB.SetComponentEnabled<IsConstuctionSlotsAssigned>(road, false);
                 ECB.SetComponentEnabled<IsInputConstructionEnabled>(road, false);
                 ECB.SetComponentEnabled<IsOutputConstuctionEnabled>(road, false);
                 ECB.SetComponent(road, new ConstructionPriorityData { ConstructionPriority = 2 });
-                
             }
             else
             {
-                ECB.SetComponentEnabled<ChangeBluePrintState>(road, true);
-                ECB.SetComponentEnabled<IsBlueprint>(road, true);
+                ECB.SetComponentEnabled<ChangeBluePrintState>(road, false);
+                ECB.SetComponentEnabled<IsBlueprint>(road, false);
             }
-
-            ECB.SetComponentEnabled<ChangeDemolitionStateTag>(road, false);
-            ECB.SetComponentEnabled<IsDemolition>(road, false);
-            ECB.SetComponent(road, new BuildingData { BuildingIDHash = config.roadID, BuildingUniqueID = id });
+            
+            if (IsDemolitionLookup.HasComponent(entity)&&IsDemolitionLookup.IsComponentEnabled(entity))
+            {
+                ECB.SetComponentEnabled<ChangeDemolitionStateTag>(road, true);
+                ECB.SetComponentEnabled<IsDemolition>(road, false);
+            }
+            else
+            {
+                ECB.SetComponentEnabled<ChangeDemolitionStateTag>(road, false);
+                ECB.SetComponentEnabled<IsDemolition>(road, false);
+            }
+            
+            ECB.SetComponentEnabled<LoadInfo>(road, true);
+            ECB.SetComponentEnabled<UpdateRoad>(road, false);
+            
+            ECB.SetComponent(road, new BuildingData { BuildingIDHash = config.roadID, BuildingUniqueID = roadData.UniqueBuildingID });
             
 
-            ECB.SetComponent(road, new ClusterId{Value=-1});
+            ECB.SetComponent(road, new ClusterLink{ClusterIds=new()});
 
             ECB.SetComponentEnabled<CreateVisualTag>(road, true);
             ECB.SetComponentEnabled<DestroyVisualTag>(road, false);
-            
+            ECB.SetComponentEnabled<ForceDestroyTag>(road, false);
             
             // 5. Удаляем команду
             ECB.DestroyEntity(entity);
@@ -432,8 +451,8 @@ public partial struct BuildingCreateSystem : ISystem
         public EntityArchetype StorageBuildingArchetype;
         public EntityArchetype DefenceBuildingArchetype;
 
-        [ReadOnly] public ComponentLookup<CreateFromSave> CreateFromSaveLookup;
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBluePrintLookup;
+        [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
 
         public void Execute(
             Entity entity,
@@ -447,7 +466,7 @@ public partial struct BuildingCreateSystem : ISystem
             }
 
             Entity building;
-            int uniqueId = entity.Index ^ (entity.Version * 397);
+           
 
             if (BConfig.buildingType == BuildingsTypes.Prop)
             {
@@ -485,13 +504,9 @@ public partial struct BuildingCreateSystem : ISystem
                 }
 
                 ECB.SetComponent(building,
-                    new CountOfPackInBuildingData { CountOfPack = 2 });
-                ECB.SetComponent(building,
                     new BuildingRequiredRecipesGroupData
                     { RequiredRecipesGroups = processConfig.requiredRecipesGroups });
 
-                ECB.SetComponent(building,
-                    new CraftingPriorityData { CraftingPriority = 2 });
 
                 ECB.SetComponentEnabled<IsRecipeAssigned>(building, false);
                 ECB.SetComponentEnabled<IsConnectedToEnegy>(building, data.isConnected);
@@ -514,8 +529,6 @@ public partial struct BuildingCreateSystem : ISystem
                     new BuildingRequiredStorageGroupData
                     { RequiredStorageGroup = storageConfig.requiredItemTypesGroups });
                 
-                ECB.SetComponent(building,
-                    new CraftingPriorityData { CraftingPriority = 2 });
 
                     
             }
@@ -534,50 +547,44 @@ public partial struct BuildingCreateSystem : ISystem
             ECB.SetComponent(building, new BuildingData
             {
                 BuildingIDHash = data.buildingID,
-                BuildingUniqueID = uniqueId
+                BuildingUniqueID = data.UniqueBuildingID
             });
 
-            ECB.SetComponentEnabled<ChangeDemolitionStateTag>(building, false);
-            ECB.SetComponentEnabled<IsDemolition>(building, false);
             ECB.SetComponentEnabled<CreateVisualTag>(building, true);
             ECB.SetComponentEnabled<DestroyVisualTag>(building, false);
             ECB.SetComponentEnabled<ForceDestroyTag>(building, false);
-            ECB.SetComponent(building, new ClusterId{Value=-1});
+            ECB.SetComponent(building, new ClusterLink{ClusterIds=new()});
             ECB.SetComponentEnabled<NeedsClusterAssign>(building, true);
 
-            bool shouldBluprint=IsBluePrintLookup.IsComponentEnabled(entity);
-            if(CreateFromSaveLookup.HasComponent(entity))
-                ECB.SetComponentEnabled<LoadInfo>(building, true);
-            else
-            {
-                ECB.SetComponentEnabled<LoadInfo>(building, false);
-                if(config.BuildingItemRequestsStructConfigs.Value.TryGetConfig(data.buildingID,out var itemRequests))
-                {
-                    var buff=ECB.SetBuffer<InputConstructionSlotData>(building);
-                    foreach(var iR in itemRequests.itemsRequests)
-                    {
-                        buff.Add(new InputConstructionSlotData{ItemId=iR.ItemId,Amount=0,Capacity=iR.Amount});
-                    }
-                }
-                else shouldBluprint=false;
-            }
+         
 
-            if (shouldBluprint)
+            if (IsBluePrintLookup.HasComponent(entity)&&IsBluePrintLookup.IsComponentEnabled(entity))
             {
                 ECB.SetComponentEnabled<ChangeBluePrintState>(building, true);
                 ECB.SetComponentEnabled<IsBlueprint>(building, false);
                 ECB.SetComponentEnabled<IsConstuctionSlotsAssigned>(building, false);
                 ECB.SetComponentEnabled<IsInputConstructionEnabled>(building, false);
                 ECB.SetComponentEnabled<IsOutputConstuctionEnabled>(building, false);
-
-                ECB.SetComponent(building,
-                    new ConstructionPriorityData { ConstructionPriority = 2 });
+                ECB.SetComponent(building, new ConstructionPriorityData { ConstructionPriority = 2 });
             }
             else
             {
                 ECB.SetComponentEnabled<ChangeBluePrintState>(building, false);
                 ECB.SetComponentEnabled<IsBlueprint>(building, false);
             }
+            
+            if (IsDemolitionLookup.HasComponent(entity)&&IsDemolitionLookup.IsComponentEnabled(entity))
+            {
+                ECB.SetComponentEnabled<ChangeDemolitionStateTag>(building, true);
+                ECB.SetComponentEnabled<IsDemolition>(building, false);
+            }
+            else
+            {
+                ECB.SetComponentEnabled<ChangeDemolitionStateTag>(building, false);
+                ECB.SetComponentEnabled<IsDemolition>(building, false);
+            }
+            
+            ECB.SetComponentEnabled<LoadInfo>(building, true);
             
             
 

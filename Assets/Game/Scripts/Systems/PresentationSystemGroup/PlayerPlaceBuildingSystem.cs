@@ -12,7 +12,7 @@ using UnityEngine;
 using Zenject;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(PresentationSystemGroup))]
-[UpdateAfter(typeof(BuildingChangeVisualSystem))]
+[UpdateAfter(typeof(GridUpdateSystem))]
 public partial class PlayerPlaceBuildingSystem : SystemBase
 {
     [Inject] BuildingObjectFactory _factorty;
@@ -31,11 +31,11 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
     public bool canBuild{get;private set;}
     public void SetUpBuilding(int buildingID,bool isConnected,IPlaceBuildingPlayerData buildingPlayerData,Entity playerState)
     {
-        if(EntityManager.IsComponentEnabled<PlayerPlacingBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerPlacingRoad>(playerState)) return;
+        if(EntityManager.IsComponentEnabled<PlayerPlacingBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerPlacingRoad>(playerState)||EntityManager.IsComponentEnabled<PlayerDeletePoints>(playerState)) return;
         _buildingID=buildingID;
         _isConnected=isConnected;
         _buildingPlayerData=buildingPlayerData;
-        var gm = _factorty.CreateBuilding(_buildingID,_buildingPlayerData.pos,_buildingPlayerData.rotation);
+        var gm = _factorty.CreateBuilding(_buildingID,_buildingPlayerData.pos,_buildingPlayerData.rotation,true);
         _preview=_visualBuildingFactory.PhantomizeObject(gm.gameObject);
         EntityManager.SetComponentEnabled<PlayerPlacingBuilding>(playerState,true);
         _playerState=playerState;
@@ -45,8 +45,9 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
     {
         _buildReadyQuery = new EntityQueryBuilder(Allocator.Temp)
         .WithAll<PlayerCommand>()
-        .WithPresent<PlayerPlacingBuilding>()
+        .WithAll<PlayerPlacingBuilding>()
         .WithDisabled<PlayerPlacingRoad>()
+        .WithDisabled<PlayerDeletePoints>()
         .WithDisabled<PathfindingRequest>()
         
         .Build(this);
@@ -54,7 +55,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
     }
     protected override void OnUpdate()
     {
-        if(_buildReadyQuery.IsEmptyIgnoreFilter) return;
+        if(_buildReadyQuery.IsEmpty) return;
         if(_buildingPlayerData==null) return;
         _rotation=_buildingPlayerData.rotation;
         _pos=_buildingPlayerData.pos;
@@ -75,17 +76,19 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
                 }
             }
         }
-        _preview.CanBuild(canBuild);
-        _factorty.MoveBuilding(_preview.gameObject,_buildingID,_pos,_rotation);
+        _preview.CanBuild(canBuild,_buildingPlayerData.isForce);
+        _factorty.MoveBuilding(_preview.gameObject,_pos,_rotation,_buildingID);
 
     } 
     public void PlaceBuilding(bool isHold,bool IsBlueprint)
     {
-        var ecb = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>().CreateCommandBuffer();
+        var ecb = World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>().CreateCommandBuffer();
         if (canBuild)
         {
             var command=ecb.CreateEntity();
-            ecb.AddComponent(command,new CreateBuildingEventData{buildingID=_buildingID,rotation=_rotation,isConnected=_isConnected,buildingPosition=new int2(_pos.x,_pos.y)});
+            Guid newGuid = Guid.NewGuid();
+            int uniqueId = newGuid.GetHashCode(); 
+            ecb.AddComponent(command,new CreateBuildingEventData{UniqueBuildingID=uniqueId,buildingID=_buildingID,rotation=_rotation,isConnected=_isConnected,buildingPosition=new int2(_pos.x,_pos.y)});
             
             ecb.AddComponent<IsBlueprint>(command);
             ecb.SetComponentEnabled<IsBlueprint>(command,IsBlueprint);

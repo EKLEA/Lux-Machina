@@ -111,13 +111,13 @@ public class RecipeConfigList:IWrapper
 
 #endregion
 public interface IWrapper{}
-public enum ItemClass: int
+public enum ItemClass
 {
     Components=1,
     Assembly=2,
     Weapon=3
 }
-public enum ItemType: int
+public enum ItemType
 {
     None=0,
     RawMaterial=1,
@@ -131,7 +131,7 @@ public enum ItemType: int
     Bullets=9,
     Artillery=10,
 }
-public enum BuildingsTypes : int
+public enum BuildingsTypes 
 {
     Prop=0,
     Special = 1,
@@ -139,21 +139,22 @@ public enum BuildingsTypes : int
     Enegry = 3,
     Logistic = 4,
     Defence = 5,
+    DeleteBuilding=99,
 }
-public enum TypeOfProcession : int
+public enum TypeOfProcession 
 {
     Consumer = 0,
     Processing = 1,
     Generate = 2,
 }
 
-public enum ActionType : int
+public enum ActionType 
 {
     Building = 0,
     TwoPointBuilding = 1,
 }
 
-public enum TypeOfLogic : int
+public enum TypeOfLogic 
 {
     None=0,
     WorkWithItems = 1,
@@ -161,7 +162,7 @@ public enum TypeOfLogic : int
     Unlock=3,
 }
 
-public enum RequiredRecipesGroup : int
+public enum RequiredRecipesGroup 
 {
     Generating = 1,
     Smeleting = 2,

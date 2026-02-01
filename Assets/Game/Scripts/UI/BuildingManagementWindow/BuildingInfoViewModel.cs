@@ -5,6 +5,7 @@ using UniRx;
 using Unity.Entities;
 using Unity.Entities.UniversalDelegates;
 using Unity.IO.LowLevel.Unsafe;
+using Unity.Mathematics;
 using Unity.VisualScripting;
 using UnityEngine;
 using Zenject;
@@ -37,6 +38,7 @@ public class BuildingInfoViewModel
     ReactiveProperty<int> CountInPack;
     CompositeDisposable disposables;
     CompositeDisposable storageDisposables;
+    public Action tempUpdate;
     
     public BuildingInfoViewModel(World world)
     {
@@ -52,6 +54,7 @@ public class BuildingInfoViewModel
                 out (bool,BuildingCraftViewData) recipeViewData,
                 out ReactiveProperty<StorageSlotViewData[]>StorageSlots)
     {
+        tempUpdate=null;
         disposables?.Dispose();
         disposables=new();
         buildingViewData=null;
@@ -347,6 +350,34 @@ public class BuildingInfoViewModel
             ExcessSlots.SetValueAndForceNotify(currentSlots);
         }
     }
+    public void AddAmount(Entity entity,int amount)
+    {
+        
+        if (entityManager.HasComponent<IsDemolition>(entity)&&entityManager.IsComponentEnabled<IsDemolition>(entity))
+        {
+            var buff = entityManager.GetBuffer<OutputConstructionSlotData>(entity);
+            if(buff.Length<1) return;
+            for(int i =0; i < buff.Length; i++)
+            {
+                var b = buff[i];
+                b.Amount=math.clamp(b.Amount+amount,0,b.Capacity);
+                buff[i]=b;
+                if(b.Amount==b.Capacity) tempUpdate?.Invoke();
+            }
+        }
+        if (entityManager.HasComponent<IsBlueprint>(entity)&&entityManager.IsComponentEnabled<IsBlueprint>(entity))
+        {
+            var buff = entityManager.GetBuffer<InputConstructionSlotData>(entity);
+            if(buff.Length<1) return;
+            for(int i =0; i < buff.Length; i++)
+            {
+                var b = buff[i];
+                b.Amount=math.clamp(b.Amount+amount,0,b.Capacity);
+                buff[i]=b;
+                if(b.Amount==b.Capacity) tempUpdate?.Invoke();
+            }
+        }
+    }
     public void SetRecipe(Entity entity, int RecipeID)
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
@@ -361,9 +392,7 @@ public class BuildingInfoViewModel
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
                .CreateCommandBuffer();
-        Entity Command=ecb.CreateEntity();
-        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
-        ecb.AddComponent(Command,new MarkAsDemolitionData{IsDemolition=IsDemolition});
+        ecb.SetComponentEnabled<ChangeDemolitionStateTag>(entity,IsDemolition);
     }
     public void MarkAsForceDestory(Entity entity)
     {
@@ -461,10 +490,6 @@ public class BuildingInfoViewModel
     {
         public int ItemID;
         public int Capacity;
-    }
-    public struct MarkAsDemolitionData : IComponentData
-    {
-        public bool IsDemolition;
     }
     public struct MarkAsForceDestoroyData : IComponentData
     {

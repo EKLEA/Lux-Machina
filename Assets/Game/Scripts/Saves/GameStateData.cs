@@ -6,9 +6,10 @@ using Unity.Mathematics;
 public class GameStateData
 {
     public PlayerCamData camData;
-    public Dictionary<int,BaseBuildingSaveData> baseBuildings;
-    public Dictionary<int,ProcessorBuildingSaveData> ProcessorsBuildings;
-    public Dictionary<int,ConsumerBuildingSaveData> ConsumerBuildings;
-    public Dictionary<int,ProducerBuildingSaveData> ProducerBuildings;
+    public Dictionary<int,BaseBuildingSaveData> Buildings;
     public Dictionary<int,RoadSaveData> RoadsBuildings;
+    public Dictionary<int,ConstructionSlotsSaveData> constructionSlotsSaveData;
+    public Dictionary<int,ExcessSlotsSaveData> excessSlotsSaveData;
+    public Dictionary<int,RecipeAndCraftBuildingSaveData> recipeBuildingSaveData;
+    public Dictionary<int,StorageSlotsSaveData> storageSlotsSaveData;
 }

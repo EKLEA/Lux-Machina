@@ -8,6 +8,8 @@ public class GameSceneBindings : MonoInstaller
 {
     [SerializeField]
     PlayerController playerController;
+     [SerializeField]
+    GridVisualizer gridVisualizer;
 
     [SerializeField]
     CameraController cameraController;
@@ -83,7 +85,14 @@ public class GameSceneBindings : MonoInstaller
         Container.Bind<PlayerPlaceRoadSystem>().FromMethod(ctx => 
             ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerPlaceRoadSystem>()
         ).AsSingle();
+        Container.Bind<PlayerDeleteBuildingsSystem>().FromMethod(ctx => 
+            ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerDeleteBuildingsSystem>()
+        ).AsSingle();
+         Container.Bind<GridUpdateSystem>().FromMethod(ctx => 
+            ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<GridUpdateSystem>()
+        ).AsSingle();
         Container.Bind<PlayerController>().FromInstance(playerController).AsSingle();
+        Container.Bind<GridVisualizer>().FromInstance(gridVisualizer).AsSingle();
         
 
     }

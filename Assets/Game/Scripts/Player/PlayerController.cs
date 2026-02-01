@@ -9,7 +9,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using Zenject;
 
-public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerData,IPlaceRoadPlayerData
+public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerData
 
 {
 
@@ -19,11 +19,15 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     [SerializeField] int distanceToBuildingWithOpenWindow;
     [SerializeField] LayerMask BuildingMask;
     [SerializeField] LayerMask GroundMask;
+    [SerializeField] GridVisualizer gridVisualizer;
 
     [SerializeField] CameraController cameraController;
     [Inject] GameController gameController;
+    [Inject] GameFieldSettings GameFieldSettings;
     [Inject] PlayerPlaceBuildingSystem playerPlaceBuildingSystem;
-    [Inject] PlayerPlaceRoadSystem playerPlaceRoadSystem;
+    [Inject] PlayerPlaceRoadSystem playerPlaceRoadSystem; 
+    [Inject] PlayerDeleteBuildingsSystem playerDeleteBuildingsSystem; 
+    [Inject] GridUpdateSystem gridUpdateSystem; 
     InputActionMap GamePlay;
     InputActionMap UI;
     InputActionMap Building;
@@ -44,6 +48,8 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     public int rotation {get;private set;}
     public Vector2Int pos {get;private set;}
     public bool isForce {get;private set;}
+
+
     Action<bool,bool> PlaceDelegate;
     Action BackDelegate;
 
@@ -52,10 +58,16 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     EntityManager entityManager;
     IDisposable disposUI;
     bool UiState;
-    public void Initialize(PlayerPlaceBuildingSystem buildSystem, PlayerPlaceRoadSystem roadSystem)
+    Color selectColor;
+    BuildingOnScene cachedBuilding;
+    PlayerState playerState;
+
+    public void Initialize(PlayerPlaceBuildingSystem buildSystem, PlayerPlaceRoadSystem roadSystem,PlayerDeleteBuildingsSystem deleteBuildingsSystem,GridUpdateSystem gridSystem)
     {
         playerPlaceBuildingSystem = buildSystem;
         playerPlaceRoadSystem = roadSystem;
+        playerDeleteBuildingsSystem=deleteBuildingsSystem;
+        gridUpdateSystem=gridSystem;
     }
     void Start()
     {
@@ -68,13 +80,17 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
         entityManager.AddComponent<PlayerCommand>(PlaceCommand);
         entityManager.AddComponent<PlayerPlacingBuilding>(PlaceCommand);
         entityManager.AddComponent<PlayerPlacingRoad>(PlaceCommand);
+        entityManager.AddComponent<PlayerDeletePoints>(PlaceCommand);
         entityManager.AddComponent<PathfindingRequest>(PlaceCommand);
         
 
         entityManager.SetComponentEnabled<PathfindingRequest>(PlaceCommand,false);
         entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
         entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,false);
+        entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,false);
+        
         entityManager.AddBuffer<MapPoint>(PlaceCommand); 
+        gridVisualizer.Init();
     }
     void BindMaps()
     {
@@ -112,49 +128,112 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
 
     void Update()
     {
-        if (!isLoaded)
-            return;
+        if (!isLoaded) return;
+        if (cachedBuilding == null) cachedBuilding = null; 
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
-        if (Physics.Raycast(ray, out hit))
+        // 1. Логика координат (земля)
+        if (Physics.Raycast(ray, out hit, Mathf.Infinity,GroundMask))
         {
-            pos=gameController.GetMapPos(hit.point);
-            isForce=ForceBuilding.IsPressed();
+            pos = gameController.GetMapPos(hit.point);
+            isForce = ForceBuilding.IsPressed();
+            if(playerState == PlayerState.Destroy&&playerDeleteBuildingsSystem.DeleteType==DeleteType.DeleteBuilding)
+            {
+                selectColor = isForce ? GameFieldSettings.forceDestoryBuidlingColor : GameFieldSettings.makeAsDemolitionBuidlingColor;
+                cachedBuilding?.SetOutLine(selectColor); 
+            }
+        }
+        
+        // 2. Логика выделения зданий
+        if (Physics.Raycast(ray, out hit, Mathf.Infinity, BuildingMask))
+        {
+            if(playerState==PlayerState.Building||playerState == PlayerState.Destroy&&playerDeleteBuildingsSystem.DeleteType!=DeleteType.DeleteBuilding) return;
+            var building = hit.collider.GetComponent<BuildingOnScene>();
+            
+            if (building != null)
+            {
+                
+                if (cachedBuilding != building)
+                {
+                    cachedBuilding?.SetOutLine(null);
+                    cachedBuilding = building;
+                    cachedBuilding.SetOutLine(selectColor); 
+                }
+            }
+        }
+        else
+        {
+            if (cachedBuilding != null)
+            {
+                cachedBuilding.SetOutLine(null);
+                cachedBuilding = null;
+            }
         }
     }
 
    
-    public void SetUpAction(int buildingID)
+    public void SetUpAction(string info)
     {
+        
+        gridUpdateSystem.SetUpGrid(gridVisualizer,this);
         ClearAction();
-        Debug.Log(buildingID);
-        if (buildingID == "Road".GetStableHashCode())
+        if(info.Contains("Delete"))
         {
-            playerPlaceRoadSystem.onBuildingDone -= SwitchToUIMode;
-            playerPlaceRoadSystem.onBuildingDone += SwitchToUIMode;
-            PlaceDelegate=playerPlaceRoadSystem.PlaceRoad;
-            BackDelegate=playerPlaceRoadSystem.Back;
-            playerPlaceRoadSystem.SetUpBuilding(buildingID,this,PlaceCommand);
-            entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,true);
+            
+            playerState=PlayerState.Destroy;
+            playerDeleteBuildingsSystem.onBuildingDone -= SwitchToUIMode;
+            playerDeleteBuildingsSystem.onBuildingDone += SwitchToUIMode;
+            PlaceDelegate=playerDeleteBuildingsSystem.DeletePoints;
+            BackDelegate=playerDeleteBuildingsSystem.Back;
+            if (info == DeleteType.DeleteRoadPoints.ToString())
+            {
+                playerDeleteBuildingsSystem.SetUpDelete(DeleteType.DeleteRoadPoints,this,PlaceCommand);
+            }
+            else
+            {
+                 playerDeleteBuildingsSystem.SetUpDelete(info==DeleteType.DeleteManyPoints.ToString()?
+                    DeleteType.DeleteManyPoints:DeleteType.DeleteBuilding,this,PlaceCommand);
+            }
+            
+            entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
             entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,false);
+            entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,true);
         }
         else
         {
             
-            playerPlaceBuildingSystem.onBuildingDone -= SwitchToUIMode;
-            playerPlaceBuildingSystem.onBuildingDone += SwitchToUIMode;
-            PlaceDelegate=playerPlaceBuildingSystem.PlaceBuilding;
-            BackDelegate=playerPlaceBuildingSystem.Back;
-            //неучитываыет коннектед
-            playerPlaceBuildingSystem.SetUpBuilding(buildingID,true,this,PlaceCommand);
-            entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
-            entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,true);
-            
+            playerState=PlayerState.Building;
+            if (info == "Road")
+            {
+                playerPlaceRoadSystem.onBuildingDone -= SwitchToUIMode;
+                playerPlaceRoadSystem.onBuildingDone += SwitchToUIMode;
+                PlaceDelegate=playerPlaceRoadSystem.PlaceRoad;
+                BackDelegate=playerPlaceRoadSystem.Back;
+                playerPlaceRoadSystem.SetUpBuilding(info.GetStableHashCode(),this,PlaceCommand);
+                entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,true);
+                entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,false);
+                entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,false);
+                
+            }
+            else
+            {
+                playerPlaceBuildingSystem.onBuildingDone -= SwitchToUIMode;
+                playerPlaceBuildingSystem.onBuildingDone += SwitchToUIMode;
+                PlaceDelegate=playerPlaceBuildingSystem.PlaceBuilding;
+                BackDelegate=playerPlaceBuildingSystem.Back;
+                //неучитываыет коннектед
+                playerPlaceBuildingSystem.SetUpBuilding(info.GetStableHashCode(),true,this,PlaceCommand);
+                entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
+                entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,true);
+                entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,false);
+                
+            }
         }
+        
 
         SwitchToBuildingMode();
 
-        PlacePoint.performed += OnPlacePerformed;
+        PlacePoint.performed += OnBuildingPlacePerformed;
         Back.performed += OnBackPerformed;
         RotateBuilding.performed += OnRotateBuildingPerformed;
     }
@@ -169,10 +248,12 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
 
     void SwitchToUIMode()
     {
+        gridVisualizer.Clear();
+        selectColor=GameFieldSettings.selectBuildingColor;
+        playerState=PlayerState.UiMode;
         UiState=true;
-        Debug.Log("свитч");
         Building.Disable();
-        PlacePoint.performed-= OnPlacePerformed;
+        PlacePoint.performed-= OnBuildingPlacePerformed;
         Back.performed -= OnBackPerformed;
         RotateBuilding.performed -= OnRotateBuildingPerformed;
         playerPlaceRoadSystem.onBuildingDone -= SwitchToUIMode;
@@ -195,19 +276,10 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
         if (context.performed )
         {
             if (IsPointerOverUI()) return; 
-
-            Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
-            if (Physics.Raycast(ray, out hit,BuildingMask))
+            if (cachedBuilding != null)
             {
-                if (hit.collider != null)
-                {
-                    var building = hit.collider.GetComponent<BuildingOnScene>();
-                    if (building != null)
-                    {
-                        OpenBuildingMenu(building.id);
-                        return;
-                    }
-                }
+                OpenBuildingMenu(cachedBuilding.id);
+                return;
             }
         }
     }
@@ -237,7 +309,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
         }
     }
 
-    void OnPlacePerformed(InputAction.CallbackContext context)
+    void OnBuildingPlacePerformed(InputAction.CallbackContext context)
     {
         if (context.performed)
         {
@@ -265,7 +337,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     void ClearAction()
     {
         UIClick.performed -= OnUIClickPerformed;
-        PlacePoint.performed-= OnPlacePerformed;
+        PlacePoint.performed-= OnBuildingPlacePerformed;
         Back.performed -= OnBackPerformed;
         RotateBuilding.performed -= OnRotateBuildingPerformed;
 
@@ -288,16 +360,21 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
         if (handler != null)
             handler.onBuildingSelected -= SetUpAction;
     }
+    enum PlayerState
+    {
+        UiMode,
+        Building,
+        Destroy
+    }
+   
 }
 
 
-public interface IPlaceBuildingPlayerData
+public interface IPlaceBuildingPlayerData:IPlayerData
 {
     int rotation{get;}
-    Vector2Int pos{get;}
-    bool isForce{get;}
 }
-public interface IPlaceRoadPlayerData
+public interface IPlayerData
 {
     Vector2Int pos{get;}
     bool isForce{get;}

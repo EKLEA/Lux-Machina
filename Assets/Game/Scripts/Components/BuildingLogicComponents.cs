@@ -31,8 +31,13 @@
     
     public struct ForceDestroyTag: IComponentData, IEnableableComponent{}
     public struct MarkOnMap: IComponentData, IEnableableComponent{}
+    public struct UpdateRoad: IComponentData, IEnableableComponent{}
     
-    
+    public struct TransitionSlotData : IBufferElementData
+    {
+        public int itemID;
+        public int amount;
+    }
 
     #endregion
 
@@ -147,11 +152,10 @@
     }
     #endregion
     #region кластеризация
-    public struct ClusterId : IComponentData
+    public struct ClusterLink : IComponentData
     {
-        public int Value;
+        public FixedList64Bytes<int> ClusterIds; 
     }
-
     public struct NeedsClusterAssign : IComponentData, IEnableableComponent {}
     public struct IsLogicEnabled : IComponentData, IEnableableComponent{}
     #endregion
@@ -170,8 +174,8 @@
 
     }
     
-
-    public enum DistributionPriority : int
+    [Serializable]
+    public enum DistributionPriority 
     {
         Low = 1,
         MiddleLow = 2,
@@ -180,7 +184,7 @@
         Height = 5,
     }
 
-    public enum WorkStateEnum : int
+    public enum WorkStateEnum 
     {
         Phantom=0,
         Demolition=1,

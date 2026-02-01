@@ -1,12 +1,9 @@
+
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Entities.UniversalDelegates;
-using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.InputSystem;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 
@@ -16,7 +13,7 @@ using UnityEngine.InputSystem;
 public partial struct BuildingConfigManagerSystem : ISystem
 {
     EntityQuery _changeRecipeQuery;
-    EntityQuery _markAsDemolitionQuery;
+    EntityQuery _changeDemolitionQuery;
     EntityQuery _markAsForceDestoryQuery;
     EntityQuery _addStorageSlotQuery;
     EntityQuery _removeStorageSlotQuery;
@@ -37,8 +34,8 @@ public partial struct BuildingConfigManagerSystem : ISystem
             .WithAll<ChangeBuildingData,SetRecipeData>()
             .Build(ref state);
             
-        _markAsDemolitionQuery = new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<ChangeBuildingData,MarkAsDemolitionData>()
+        _changeDemolitionQuery = new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<BuildingData,ChangeDemolitionStateTag>()
             .Build(ref state);
 
         _markAsForceDestoryQuery = new EntityQueryBuilder(Allocator.Temp)
@@ -96,7 +93,7 @@ public partial struct BuildingConfigManagerSystem : ISystem
 
         var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
-         var ecbParallel = ecb.AsParallelWriter();
+        var ecbParallel = ecb.AsParallelWriter();
         var StorageSlotDataLookup= SystemAPI.GetBufferLookup<StorageSlotData>(false);
         var ConstructionPriorityDataLookup= SystemAPI.GetComponentLookup<ConstructionPriorityData>(false);
         var CraftingPriorityDataLookup= SystemAPI.GetComponentLookup<CraftingPriorityData>(false);
@@ -106,10 +103,21 @@ public partial struct BuildingConfigManagerSystem : ISystem
         var BuildingDataLookup= SystemAPI.GetComponentLookup<BuildingData>(true);
         var CountOfPackBuildingDataLookup= SystemAPI.GetComponentLookup<CountOfPackInBuildingData>(false);
         var RecipeBuildingDataLookup= SystemAPI.GetComponentLookup<RecipeBuildingData>(false);
+        var MapPointLookup= SystemAPI.GetBufferLookup<MapPoint>(false);
 
         
+        var IsDemolitionLookup= SystemAPI.GetComponentLookup<IsDemolition>(false);
+        var IsBlueprintLookup= SystemAPI.GetComponentLookup<IsBlueprint>(false);
+        var RoadTypeLookup= SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(false);
+        var HealthLookup= SystemAPI.GetComponentLookup<HealthData>(false);
+
+        var buildingCache = SystemAPI.GetSingleton<BuildingConfigReference>();
+        var itemRequestRef = buildingCache.BuildingItemRequestsStructConfigs; 
         var mapEntity= SystemAPI.GetSingletonEntity<ClusterMap>();
-        if(!_changeRecipeQuery.IsEmptyIgnoreFilter)
+        
+        var InputConstLookup= SystemAPI.GetBufferLookup<InputConstructionSlotData>(false);
+        var OutputConstLookup= SystemAPI.GetBufferLookup<OutputConstructionSlotData>(false);
+        if(!_changeRecipeQuery.IsEmpty)
             state.Dependency= new AssignRecipeJob{RecipesConfig=_recipeConfig.RecipesConfig,
                                                      BuildingProcessionStructConfig=_buildingConfigs.BuildingProcessionStructConfigs,
                                                     RecipeBuildingDataLookup=RecipeBuildingDataLookup,
@@ -121,39 +129,49 @@ public partial struct BuildingConfigManagerSystem : ISystem
                                                     mapEntity=mapEntity,
                                                     ECB=ecbParallel}.Schedule(state.Dependency);
         
-        if(!_markAsDemolitionQuery.IsEmptyIgnoreFilter)
-            state.Dependency= new MarkAsDemolitionJob{ ECB=ecbParallel}.Schedule(state.Dependency); 
+        if(!_changeDemolitionQuery.IsEmpty)
+            state.Dependency= new ChangeDemolitionJob{ ECB=ecbParallel,
+                                                        IsDemolitionLookup=IsDemolitionLookup,
+                                                        IsBlueprintLookup=IsBlueprintLookup,
+                                                        BuildingDataLookup=BuildingDataLookup,
+                                                        RoadTypeLookup=RoadTypeLookup,
+                                                        HealthLookup=HealthLookup,
+                                                        ItemRequestsConfig=itemRequestRef,
+                                                        OutputConstLookup=OutputConstLookup,
+                                                        InputConstLookup=InputConstLookup,
+                                                        MapPointLookup=MapPointLookup}.Schedule(state.Dependency); 
 
-        if(!_markAsForceDestoryQuery.IsEmptyIgnoreFilter)
+
+        if(!_markAsForceDestoryQuery.IsEmpty)
             state.Dependency= new MarkAsForceDestoryJob{ECB=ecbParallel}.Schedule(state.Dependency);
 
-        if(!_addStorageSlotQuery.IsEmptyIgnoreFilter)
+        if(!_addStorageSlotQuery.IsEmpty)
             state.Dependency= new AddStorageSlotJob{ECB=ecbParallel,StorageSlotDataLookup= StorageSlotDataLookup,mapEntity=mapEntity,
                                                     ExcessSlotDataLookup=ExceessBufferLookup}.Schedule(state.Dependency);
 
-        if(!_removeStorageSlotQuery.IsEmptyIgnoreFilter)
+        if(!_removeStorageSlotQuery.IsEmpty)
             state.Dependency= new RemoveStorageSlotJob{ECB=ecbParallel,StorageSlotDataLookup= StorageSlotDataLookup,mapEntity=mapEntity,
                                                     ExcessSlotDataLookup=ExceessBufferLookup}.Schedule(state.Dependency);
         
-        if(!_changeConstructionPriotiyQuery.IsEmptyIgnoreFilter)
+        if(!_changeConstructionPriotiyQuery.IsEmpty)
             state.Dependency= new ChangeConstructionPriorityJob{ECB=ecbParallel,ConstructionPriorityDataLookup= ConstructionPriorityDataLookup, mapEntity=mapEntity}.Schedule(state.Dependency);
 
-        if(!_changeCraftPriotiyQuery.IsEmptyIgnoreFilter)
+        if(!_changeCraftPriotiyQuery.IsEmpty)
             state.Dependency= new ChangeCraftPriorityJob{ECB=ecbParallel,CraftingPriorityDataLookup= CraftingPriorityDataLookup, mapEntity=mapEntity}.Schedule(state.Dependency);
 
-        if(!_changeConstructionBuildingAccessQuery.IsEmptyIgnoreFilter)
+        if(!_changeConstructionBuildingAccessQuery.IsEmpty)
             state.Dependency= new ChangeConstructionBuildingAccessDataJob{ECB=ecbParallel,ConstructionPriorityDataLookup= ConstructionPriorityDataLookup, mapEntity=mapEntity}.Schedule(state.Dependency);
 
-        if(!_changeProcessorBuildingAccessData.IsEmptyIgnoreFilter)
+        if(!_changeProcessorBuildingAccessData.IsEmpty)
             state.Dependency= new ChangeProcessorBuildingAccessDataJob{ECB=ecbParallel,CraftingPriorityDataLookup= CraftingPriorityDataLookup, mapEntity=mapEntity}.Schedule(state.Dependency);
         
-        if(!_changeStorageSlotAccessData.IsEmptyIgnoreFilter)
+        if(!_changeStorageSlotAccessData.IsEmpty)
             state.Dependency= new ChangeStorageSlotAccessDataJob{ECB=ecbParallel,StorageSlotDataLookup= StorageSlotDataLookup, mapEntity=mapEntity}.Schedule(state.Dependency);
 
-        if(!_changeStorageSlotCapacityData.IsEmptyIgnoreFilter)
+        if(!_changeStorageSlotCapacityData.IsEmpty)
             state.Dependency= new ChangeStorageSlotCapacityDataJob{ECB=ecbParallel,StorageSlotDataLookup= StorageSlotDataLookup,ExcessSlotDataLookup=ExceessBufferLookup,mapEntity=mapEntity,}.Schedule(state.Dependency);
       
-        if(!_changeCountOfPackData.IsEmptyIgnoreFilter)
+        if(!_changeCountOfPackData.IsEmpty)
             state.Dependency= new ChangeCountOfPackDataJob{
                 ECB=ecbParallel,
                 RecipesConfig=_recipeConfig.RecipesConfig,
@@ -186,6 +204,7 @@ public partial struct BuildingConfigManagerSystem : ISystem
             {
                 var excessSlots=ECB.SetBuffer<ExcessSlotData>(sortKey, changeBuildingData.targetEntity);
                 var ex =ExcessSlotDataLookup[changeBuildingData.targetEntity];
+                var newRecipeData = new RecipeBuildingData { RecipeIDHash = recipeData.RecipeID,TimeToCraft = 0,CurrTime=0 };
                 if (recipeData.RecipeID!=-1&&RecipesConfig.Value.TryGetConfig(recipeData.RecipeID, out var res))
                 {
                     if(BuildingProcessionStructConfig.Value.TryGetConfig(BuildingDataLookup[changeBuildingData.targetEntity].BuildingIDHash,out var building))
@@ -212,81 +231,68 @@ public partial struct BuildingConfigManagerSystem : ISystem
                             
                             if (res.InputItems.Length > 0)
                             {
-                                var input=ECB.SetBuffer<InputSlotData>(sortKey, changeBuildingData.targetEntity);
-                                for(int j = 0; j < res.InputItems.Length; j++)
+                                var inputBuff=ECB.SetBuffer<InputSlotData>(sortKey,changeBuildingData.targetEntity);
+                                for(int i=0;i< res.InputItems.Length; i++)
                                 {
-                                    int max =res.InputItems[j].Amount*CountOfPack;
-                                    input.Add(new InputSlotData{ItemId=res.InputItems[j].ItemId,Amount=0,Capacity=max});
-                                }
-
-                                for(int i = 0; i < ex.Length; i++)
-                                {
-                                    var exS=ex[i];
-                                    if(exS.Amount==0) continue;
-                                    for(int j = 0; j < res.InputItems.Length; j++)
+                                    
+                                    int max =res.InputItems[i].Amount*CountOfPack;
+                                    var data = new InputSlotData{ItemId=res.InputItems[i].ItemId,Amount=0,Capacity=max};
+                                    for(int j = 0; j < ex.Length; j++)
                                     {
-                                        if(exS.Amount==0) break;
-                                        
-                                        if (exS.ItemId == res.InputItems[j].ItemId)
+                                        var exS=ex[j];
+                                        if(exS.Amount==0) continue;
+                                            
+                                        if (exS.ItemId == res.InputItems[i].ItemId)
                                         {
-                                            var inputData=input[j];
-                                            int max =res.InputItems[j].Amount*CountOfPack;
-                                            if (exS.Amount > max)
+                                            int fillSpace = max-data.Amount;
+                                            if (exS.Amount > fillSpace)
                                             {
-                                                inputData.Amount=max;
-                                                exS.Amount-=max;
+                                                data.Amount=data.Capacity;
+                                                exS.Amount-=fillSpace;
                                             }
                                             else
                                             {
-                                                inputData.Amount=exS.Amount;
+                                                data.Amount=exS.Amount;
                                                 exS.Amount=0;
                                             }
-                                            input[j]=inputData;
                                         }
-                                        
+                                        ex[j]=exS;
                                     }
-                                    ex[i]=exS;
+                                    inputBuff.Add(data);
                                 }
                             }
                             if (res.OutputItems.Length > 0)
                             {
-                                var output=ECB.SetBuffer<OutputSlotData>(sortKey, changeBuildingData.targetEntity);
-                                for(int j = 0; j < res.OutputItems.Length; j++)
+                                var outputBuff=ECB.SetBuffer<OutputSlotData>(sortKey, changeBuildingData.targetEntity);
+                                for(int i = 0; i < res.OutputItems.Length; i++)
                                 {
-                                     int max =res.OutputItems[j].Amount*CountOfPack;
-                                    output.Add(new OutputSlotData{ItemId=res.OutputItems[j].ItemId,Amount=0,Capacity=max});
-                                }
-                                for(int i = 0; i < ex.Length; i++)
-                                {
-                                    var exS=ex[i];
-                                    if(exS.Amount==0) continue;
-                                    for(int j = 0; j < res.OutputItems.Length; j++)
+                                    int max =res.OutputItems[i].Amount*CountOfPack;
+                                    var data=new OutputSlotData{ItemId=res.OutputItems[i].ItemId,Amount=0,Capacity=max};
+                                    for(int j = 0; j < ex.Length; j++)
                                     {
-                                        if(exS.Amount==0) break;
-                                        if (exS.ItemId == res.OutputItems[j].ItemId)
+                                        var exS=ex[j];
+                                        if(exS.Amount==0) continue;
+                                        if (exS.ItemId == res.OutputItems[i].ItemId)
                                         {
-                                            var outputData=output[j];
-                                            int max =res.OutputItems[j].Amount*CountOfPack;
-                                            if (exS.Amount > max)
+                                            int fillSpace =max-data.Amount;
+                                            if (exS.Amount > fillSpace)
                                             {
-                                                outputData.Amount=max;
-                                                exS.Amount-=max;
+                                                data.Amount=data.Capacity;
+                                                exS.Amount-=fillSpace;
                                             }
                                             else
                                             {
-                                                outputData.Amount=exS.Amount;
+                                                data.Amount=exS.Amount;
                                                 exS.Amount=0;
                                             }
-                                            
-                                            output[j]=outputData;
                                         }
+                                        ex[j]=exS;
                                     }
-                                    ex[i]=exS;
+                                    
+                                    outputBuff.Add(data);
                                 }
                             }
-                            var data = new RecipeBuildingData { RecipeIDHash = recipeData.RecipeID,TimeToCraft = res.CraftTime,CurrTime=0 };
-                            ECB.SetComponent(sortKey, changeBuildingData.targetEntity, data);
-                            ECB.SetComponentEnabled<IsRecipeAssigned>(sortKey, changeBuildingData.targetEntity, true);
+                            newRecipeData.TimeToCraft=res.CraftTime;
                         }
                        
                     }
@@ -303,7 +309,6 @@ public partial struct BuildingConfigManagerSystem : ISystem
                             if(inputData.Amount<1) continue;
                             for(int j = 0; j < ex.Length; j++)
                             {
-                                if(inputData.Amount<1) break;
                                 var exS=ex[j];
                                 if(exS.Amount==exS.Capacity) continue;
                                 if (exS.ItemId == inputData.ItemId)
@@ -313,13 +318,6 @@ public partial struct BuildingConfigManagerSystem : ISystem
                                     {
                                         inputData.Amount-=fillSpace;
                                         exS.Amount=exS.Capacity;
-                                        do
-                                        {
-                                            int add=inputData.Amount>100?100:inputData.Amount;
-                                            excessSlots.Add(new ExcessSlotData{ItemId=inputData.ItemId,Amount=add,Capacity=100});
-                                            inputData.Amount-=add;
-                                        }
-                                        while(inputData.Amount>0);
                                     }
                                     else
                                     {
@@ -329,8 +327,19 @@ public partial struct BuildingConfigManagerSystem : ISystem
                                 }
                                 ex[j]=exS;
                             }
+                            if (inputData.Amount > 0)
+                            {
+                                
+                                do
+                                {
+                                    int add=inputData.Amount>100?100:inputData.Amount;
+                                    excessSlots.Add(new ExcessSlotData{ItemId=inputData.ItemId,Amount=add,Capacity=100});
+                                    inputData.Amount-=add;
+                                }
+                                while(inputData.Amount>0);
+                            }
                         }
-                        ECB.SetBuffer<InputSlotData>(sortKey,changeBuildingData.targetEntity);
+                        input.Clear();
                     }
                     if (OutputSlotDataLookup.HasBuffer(changeBuildingData.targetEntity))
                     {
@@ -341,9 +350,8 @@ public partial struct BuildingConfigManagerSystem : ISystem
                             if(outputData.Amount<1) continue;
                             for(int j = 0; j < ex.Length; j++)
                             {
-                                if(outputData.Amount<1) break;
                                 var exS=ex[j];
-                                 if(exS.Amount==exS.Capacity) continue;
+                                if(exS.Amount==exS.Capacity) continue;
                                 if (exS.ItemId == outputData.ItemId)
                                 {
                                     int fillSpace=exS.Capacity-exS.Amount;
@@ -351,13 +359,6 @@ public partial struct BuildingConfigManagerSystem : ISystem
                                     {
                                         outputData.Amount-=fillSpace;
                                         exS.Amount=exS.Capacity;
-                                        do
-                                        {
-                                            int add=outputData.Amount>100?100:outputData.Amount;
-                                            excessSlots.Add(new ExcessSlotData{ItemId=outputData.ItemId,Amount=add,Capacity=100});
-                                            outputData.Amount-=add;
-                                        }
-                                        while(outputData.Amount>0);
                                     }
                                     else
                                     {
@@ -367,17 +368,19 @@ public partial struct BuildingConfigManagerSystem : ISystem
                                 }
                                 ex[j]=exS;
                             }
+                            if (outputData.Amount > 0)
+                            {
+                                 do
+                                {
+                                    int add=outputData.Amount>100?100:outputData.Amount;
+                                    excessSlots.Add(new ExcessSlotData{ItemId=outputData.ItemId,Amount=add,Capacity=100});
+                                    outputData.Amount-=add;
+                                }
+                                while(outputData.Amount>0);
+                            }
                         }
-                        ECB.SetBuffer<OutputSlotData>(sortKey,changeBuildingData.targetEntity);
+                        output.Clear();
                     }
-                    
-                    var data = new RecipeBuildingData { RecipeIDHash = recipeData.RecipeID};
-                    ex.Clear();
-                    data.TimeToCraft = 0;
-                    data.CurrTime = 0;
-                    
-                    ECB.SetComponent(sortKey, changeBuildingData.targetEntity, data);
-                    ECB.SetComponentEnabled<IsRecipeAssigned>(sortKey, changeBuildingData.targetEntity, false);
                 }
                 foreach(var exS in ex)
                 {
@@ -385,21 +388,108 @@ public partial struct BuildingConfigManagerSystem : ISystem
                         excessSlots.Add(new ExcessSlotData{ItemId=exS.ItemId,Amount=exS.Amount,Capacity=100});
                 }
                 ECB.SetComponentEnabled<UpdateClusterSlots>(sortKey,mapEntity,true);
+                ECB.SetComponent<RecipeBuildingData>(sortKey, changeBuildingData.targetEntity, newRecipeData);
+                ECB.SetComponentEnabled<IsRecipeAssigned>(sortKey, changeBuildingData.targetEntity, recipeData.RecipeID!=-1);
             }
             
             ECB.DestroyEntity(sortKey, entity);
         }
     }
     [BurstCompile]
-    public partial struct MarkAsDemolitionJob : IJobEntity
+    public partial struct ChangeDemolitionJob : IJobEntity
     {
         public EntityCommandBuffer.ParallelWriter ECB; 
-
-        public void Execute(Entity entity, [EntityIndexInQuery] int sortKey, in ChangeBuildingData changeBuildingData, in MarkAsDemolitionData markAsDemolition)
+        [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
+        [ReadOnly] public ComponentLookup<IsBlueprint> IsBlueprintLookup;
+        [ReadOnly] public ComponentLookup<BuildingData> BuildingDataLookup;
+        [ReadOnly] public ComponentLookup<RoadTypeBuildingTag> RoadTypeLookup;
+        [ReadOnly] public ComponentLookup<HealthData> HealthLookup;
+        [ReadOnly] public BlobAssetReference<BlobLibrary<BuildingItemRequestsStructConfig>> ItemRequestsConfig;
+        [ReadOnly] public BufferLookup<OutputConstructionSlotData> OutputConstLookup;
+        [ReadOnly] public BufferLookup<InputConstructionSlotData> InputConstLookup;
+        [ReadOnly] public BufferLookup<MapPoint> MapPointLookup;
+        public void Execute(Entity entity, [EntityIndexInQuery] int sortKey,EnabledRefRO<ChangeDemolitionStateTag> demolutuinState)
         {
-            ECB.SetComponentEnabled<ChangeDemolitionStateTag>(sortKey,changeBuildingData.targetEntity,markAsDemolition.IsDemolition);
-            
-            ECB.DestroyEntity(sortKey, entity);
+            if (IsDemolitionLookup.IsComponentEnabled(entity))
+            {
+
+                var outputBuff = OutputConstLookup[entity];
+                ItemRequestsConfig.Value.TryGetConfig(BuildingDataLookup[entity].BuildingIDHash,out var itemRequest);
+
+                var ecbInputBuff = ECB.SetBuffer<InputConstructionSlotData>(sortKey,entity);
+                var ecbOutputBuff = ECB.SetBuffer<OutputConstructionSlotData>(sortKey,entity);
+
+                for (int i = 0;i<itemRequest.itemsRequests.Length;i++)
+                {
+                    ecbInputBuff.Add( new InputConstructionSlotData
+                    {
+                        ItemId = itemRequest.itemsRequests[i].ItemId,
+                        Capacity = itemRequest.itemsRequests[i].Amount,
+                        Amount = outputBuff[i].Amount
+                    });
+                    ecbOutputBuff.Add( new OutputConstructionSlotData
+                    {
+                        ItemId = itemRequest.itemsRequests[i].ItemId,
+                        Capacity = itemRequest.itemsRequests[i].Amount,
+                        Amount = 0
+                    });
+                }
+            }
+            else
+            {
+                var inputBuff = InputConstLookup[entity];
+                ItemRequestsConfig.Value.TryGetConfig(BuildingDataLookup[entity].BuildingIDHash,out var itemRequest);
+
+                var ecbInputBuff = ECB.SetBuffer<InputConstructionSlotData>(sortKey,entity);
+                var ecbOutputBuff = ECB.SetBuffer<OutputConstructionSlotData>(sortKey,entity);
+                if (IsBlueprintLookup.IsComponentEnabled(entity))
+                {
+                    for (int i = 0; i <itemRequest.itemsRequests.Length; i++)
+                    {
+                        ecbOutputBuff.Add( new OutputConstructionSlotData
+                        {
+                            ItemId = itemRequest.itemsRequests[i].ItemId,
+                            Capacity = itemRequest.itemsRequests[i].Amount,
+                            Amount = inputBuff[i].Amount
+                        });
+
+                        ecbInputBuff.Add( new InputConstructionSlotData
+                        {
+                            ItemId = itemRequest.itemsRequests[i].ItemId,
+                            Capacity = itemRequest.itemsRequests[i].Amount,
+                            Amount = 0,
+                        });
+                    }
+                    
+                }
+                else
+                {
+                    float ak=1;
+                    int ck=1;
+                    if (HealthLookup.HasComponent(entity))
+                    {
+                        var healthData = HealthLookup[entity];
+                        if (healthData.CurrHealth != healthData.MaxHealth)
+                            ak=healthData.CurrHealth / healthData.MaxHealth;
+                    }
+                    if (RoadTypeLookup.HasComponent(entity))
+                    {
+                        int l =MapPointLookup[entity].Length;
+                        ak=ak*l;
+                        ck=ck*l;
+                    }
+                    for (int i = 0; i <itemRequest.itemsRequests.Length; i++)
+                    {
+                        float amount=itemRequest.itemsRequests[i].Amount*ak;
+                        ecbOutputBuff.Add( new OutputConstructionSlotData
+                        {
+                            ItemId = itemRequest.itemsRequests[i].Amount,
+                            Capacity = itemRequest.itemsRequests[i].Amount*ck,
+                            Amount = (int)amount
+                        });
+                    }
+                }
+            }
         }
     }
     [BurstCompile]
@@ -409,7 +499,8 @@ public partial struct BuildingConfigManagerSystem : ISystem
 
         public void Execute(Entity entity, [EntityIndexInQuery] int sortKey, in ChangeBuildingData changeBuildingData, in MarkAsForceDestoroyData markAsForceDestoroyData)
         {
-            ECB.SetComponentEnabled<ChangeDemolitionStateTag>(sortKey,changeBuildingData.targetEntity,true);
+            ECB.SetComponentEnabled<ForceDestroyTag>(sortKey,changeBuildingData.targetEntity,true);
+            ECB.SetComponentEnabled<DestroyVisualTag>(sortKey,changeBuildingData.targetEntity,true);
             
             ECB.DestroyEntity(sortKey, entity);
         }
@@ -1002,24 +1093,5 @@ public partial struct BuildingConfigManagerSystem : ISystem
             ECB.DestroyEntity(sortKey, entity);
         }
     }
-    //  [BurstCompile]
-    // public partial struct CleanExcess : IJobEntity
-    // {
-        
-    //     public EntityCommandBuffer.ParallelWriter ECB; 
-        
-    //      public Entity mapEntity;
-    //     public void Execute(Entity entity,[EntityIndexInQuery] int sortKey,in DynamicBuffer<ExcessSlotData> slotDatas)
-    //     {
-    //         if(slotDatas.Length<1) return;
-    //         var buff =ECB.SetBuffer<ExcessSlotData>(sortKey,entity);
-    //         foreach(var slot in slotDatas)
-    //         {
-    //             if(slot.Amount>0) buff.Add(slot);
-
-    //         }
-    //         if(buff.Length!=slotDatas.Length) ECB.SetComponentEnabled<UpdateClusterSlots>(sortKey,mapEntity,true);
-    //     }
-    // }
     
 }

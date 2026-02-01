@@ -24,7 +24,7 @@
             "description": "выфывф",
             "iconPath": "core",
             "prefabPath": "corePrefab",
-            "buildingType": 0,
+            "buildingType": 1,
             "actionType": 0,
             "size": {
                 "x": 5,
