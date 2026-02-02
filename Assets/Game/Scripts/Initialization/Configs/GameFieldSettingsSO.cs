@@ -14,6 +14,8 @@ public class GameFieldSettingsSO : ScriptableObject
     public Color selectBuildingColor;
     public Color makeAsDemolitionBuidlingColor;
     public Color forceDestoryBuidlingColor;
-    
+    public PhantomConfig BluePrintPhantomConfig;
+    public PhantomConfig DemolitionAndFalsePhantomConfig;
+    public PhantomConfig ForceDestroyPhantomConfig;
     public LayerMask removeLayer;
 }

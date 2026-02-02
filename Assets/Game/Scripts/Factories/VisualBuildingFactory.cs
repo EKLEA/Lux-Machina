@@ -4,25 +4,22 @@ using Zenject;
 
 public class VisualBuildingFactory
 {
-    private readonly IReadOnlyMaterialInfo _materialInfo;
+    [Inject] IReadOnlyPhantomConfig _PhantomConfig;
 
-    public VisualBuildingFactory(IReadOnlyMaterialInfo materialInfo)
-    {
-        _materialInfo = materialInfo;
-    }
     public PhantomObject PhantomizeObject(GameObject gameObject)
     {
+        Debug.Log(_PhantomConfig);
         var get = gameObject.GetComponent<PhantomObject>();
         if (get == null)
         {
-            var ph = gameObject.AddComponent<PhantomObject>();
-            ph.SetUp(_materialInfo.MaterialInfos["True"], _materialInfo.MaterialInfos["False"],_materialInfo.MaterialInfos["Force"]);
-            return ph;
+            get = gameObject.AddComponent<PhantomObject>();
+            
         }
-        else
-            return get;
+        
+        get.SetUp(_PhantomConfig);
+        get.SetPhantomMode(true,true);
+        return get;
     }
-
     public void UnPhantomizeObject(GameObject gameObject)
     {
         var get = gameObject.GetComponent<PhantomObject>();
@@ -32,17 +29,28 @@ public class VisualBuildingFactory
             GameObject.DestroyImmediate(get);
         }
     }
-    public PhantomObject DemolitionObject(GameObject gameObject)
-    {
-        return null;
-    }
-     public void UnDemolitionObject(GameObject gameObject)
+    public void SetProgress(GameObject gameObject, float progress)
     {
         var get = gameObject.GetComponent<PhantomObject>();
-        if (get != null)
+        if (get == null)
         {
-            get.UnPhantom();
-            GameObject.DestroyImmediate(get);
+            get= gameObject.AddComponent<PhantomObject>();
         }
+        
+        
+        get.SetProgress(progress);
+    }
+    public PhantomObject DemolitionObject(GameObject gameObject,bool Demolition)
+    {
+        var get = gameObject.GetComponent<PhantomObject>();
+        if (get == null)
+        {
+            get= gameObject.AddComponent<PhantomObject>();
+        }
+        
+        
+        get.SetUp(_PhantomConfig);
+        get.SetPhantomMode(Demolition,false);
+        return get;
     }
 }

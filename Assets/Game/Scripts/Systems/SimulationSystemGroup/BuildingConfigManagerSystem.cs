@@ -424,22 +424,43 @@ public partial struct BuildingConfigManagerSystem : ISystem
                     ecbInputBuff.Add( new InputConstructionSlotData
                     {
                         ItemId = itemRequest.itemsRequests[i].ItemId,
-                        Capacity = itemRequest.itemsRequests[i].Amount,
+                        Capacity = outputBuff[i].Capacity,
                         Amount = outputBuff[i].Amount
                     });
-                    ecbOutputBuff.Add( new OutputConstructionSlotData
+                }
+                bool shouldDelete=false;
+                foreach(var iS in ecbInputBuff)
+                {
+                    if (iS.Amount < iS.Capacity)
                     {
-                        ItemId = itemRequest.itemsRequests[i].ItemId,
-                        Capacity = itemRequest.itemsRequests[i].Amount,
-                        Amount = 0
-                    });
+                        shouldDelete=true;
+                        break;
+                    }
+                }
+                if (shouldDelete&&!IsBlueprintLookup.IsComponentEnabled(entity))
+                {
+                    ECB.SetComponentEnabled<ChangeBluePrintState>(sortKey,entity,true);
                 }
             }
             else
             {
                 var inputBuff = InputConstLookup[entity];
                 ItemRequestsConfig.Value.TryGetConfig(BuildingDataLookup[entity].BuildingIDHash,out var itemRequest);
-
+                
+                float ak=1;
+                int ck=1;
+                if (HealthLookup.HasComponent(entity))
+                {
+                    var healthData = HealthLookup[entity];
+                    if (healthData.CurrHealth != healthData.MaxHealth)
+                        ak=healthData.CurrHealth / healthData.MaxHealth;
+                }
+                if (RoadTypeLookup.HasComponent(entity))
+                {
+                    int l =MapPointLookup[entity].Length;
+                    ak=ak*l;
+                    ck=ck*l;
+                }
                 var ecbInputBuff = ECB.SetBuffer<InputConstructionSlotData>(sortKey,entity);
                 var ecbOutputBuff = ECB.SetBuffer<OutputConstructionSlotData>(sortKey,entity);
                 if (IsBlueprintLookup.IsComponentEnabled(entity))
@@ -449,35 +470,14 @@ public partial struct BuildingConfigManagerSystem : ISystem
                         ecbOutputBuff.Add( new OutputConstructionSlotData
                         {
                             ItemId = itemRequest.itemsRequests[i].ItemId,
-                            Capacity = itemRequest.itemsRequests[i].Amount,
+                            Capacity = itemRequest.itemsRequests[i].Amount*ck,
                             Amount = inputBuff[i].Amount
-                        });
-
-                        ecbInputBuff.Add( new InputConstructionSlotData
-                        {
-                            ItemId = itemRequest.itemsRequests[i].ItemId,
-                            Capacity = itemRequest.itemsRequests[i].Amount,
-                            Amount = 0,
                         });
                     }
                     
                 }
                 else
                 {
-                    float ak=1;
-                    int ck=1;
-                    if (HealthLookup.HasComponent(entity))
-                    {
-                        var healthData = HealthLookup[entity];
-                        if (healthData.CurrHealth != healthData.MaxHealth)
-                            ak=healthData.CurrHealth / healthData.MaxHealth;
-                    }
-                    if (RoadTypeLookup.HasComponent(entity))
-                    {
-                        int l =MapPointLookup[entity].Length;
-                        ak=ak*l;
-                        ck=ck*l;
-                    }
                     for (int i = 0; i <itemRequest.itemsRequests.Length; i++)
                     {
                         float amount=itemRequest.itemsRequests[i].Amount*ak;

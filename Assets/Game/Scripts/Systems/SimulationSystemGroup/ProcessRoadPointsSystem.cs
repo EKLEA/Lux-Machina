@@ -50,7 +50,6 @@ public partial struct ProcessRoadPointsSystem : ISystem
         public BufferLookup<TransitionSlotData> TransitionSlotDataLookUp;
         public EntityCommandBuffer ECB;
         int pointCountInCommand;
-        DynamicBuffer<TransitionSlotData> items;
         
         public void Execute( Entity entity, 
                         in DynamicBuffer<MapPoint> points)
@@ -78,18 +77,25 @@ public partial struct ProcessRoadPointsSystem : ISystem
             var IsBluePrint =IsBluePrintLookUp.HasComponent(entity)&&IsBluePrintLookUp.IsComponentEnabled(entity);
             var IsDemolition =IsDemolitionLookUp.HasComponent(entity)&&IsDemolitionLookUp.IsComponentEnabled(entity);
             var hasTransitSlots =false;
+            NativeArray<(int, TransitionSlotData)> items = default; 
             if (TransitionSlotDataLookUp.HasBuffer(entity))
             {
                 hasTransitSlots=true;
-                items=TransitionSlotDataLookUp[entity];
+                var buff=TransitionSlotDataLookUp[entity];
+                items=new(buff.Length,Allocator.Temp);
+                for(int i=0;i<buff.Length;i++)
+                {
+                    items[i]=(buff[i].amount,buff[i]);
+                }
             }
-            ClusterPoints(filteredPoints, IsBluePrint,IsDemolition,hasTransitSlots);
+            ClusterPoints(filteredPoints, IsBluePrint,IsDemolition,hasTransitSlots,ref items);
             
             filteredPoints.Dispose();
+            items.Dispose();
             ECB.DestroyEntity(entity);
         }
         
-        private void ClusterPoints(NativeList<int2> points, bool IsBluePrint, bool IsDemolition, bool hasTransitSlots)
+        private void ClusterPoints(NativeList<int2> points, bool IsBluePrint, bool IsDemolition, bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items)
         {
             int pointCount = points.Length;
             pointCountInCommand = pointCount;
@@ -144,7 +150,7 @@ public partial struct ProcessRoadPointsSystem : ISystem
             while (enumerator.MoveNext())
             {
                 var clusterList = enumerator.Current.Value;
-                ProcessCluster(clusterList, IsBluePrint, IsDemolition, hasTransitSlots);
+                ProcessCluster(clusterList, IsBluePrint, IsDemolition, hasTransitSlots,ref items);
                 clusterList.Dispose(); // Чистим каждый список
             }
             
@@ -164,7 +170,7 @@ public partial struct ProcessRoadPointsSystem : ISystem
             return root;
         }
         
-        private void ProcessCluster(NativeList<int2> clusterPoints,bool IsBluePrint,bool IsDemolition,bool hasTransitSlots)
+        private void ProcessCluster(NativeList<int2> clusterPoints,bool IsBluePrint,bool IsDemolition,bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items)
         {
             if (clusterPoints.Length == 0) return;
            
@@ -186,9 +192,15 @@ public partial struct ProcessRoadPointsSystem : ISystem
             {
                 var itemBuff=ECB.AddBuffer<TransitionSlotData>(createRoadCommand);
                 float procent=(float)clusterPoints.Length / pointCountInCommand;
-                foreach(var item in items)
+                for(int i=0;i<items.Length;i++)
                 {
-                    itemBuff.Add(new TransitionSlotData{itemID=item.itemID,amount=(int)(item.amount*procent)});
+                    var pair=items[i];
+                    var slot=pair.Item2;
+                    int amount = (int)math.ceil(pair.Item1* procent);
+                    amount = math.min(amount, slot.amount); 
+                    slot.amount= math.max(slot.amount-amount,0);
+                    itemBuff.Add(new TransitionSlotData{itemID=slot.itemID,amount=amount});
+                    items[i]=(pair.Item1,slot);
                 }
             }
            

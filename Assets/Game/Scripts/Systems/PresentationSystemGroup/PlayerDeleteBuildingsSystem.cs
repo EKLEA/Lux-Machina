@@ -147,7 +147,7 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
                 }
                 else
                 {
-                    ecb.SetComponentEnabled<ChangeDemolitionStateTag>(entity,true);
+                    ecb.SetComponentEnabled<ChangeDemolitionStateTag>(entity,!EntityManager.IsComponentEnabled<ChangeDemolitionStateTag>(entity));
                 }
                 if (!isHold)
                 {
@@ -249,7 +249,7 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
              var playerCommand = SystemAPI.GetSingletonEntity<PlayerCommand>();
             if(_pos!=_cachedPos)
             {
-                ecb.SetComponent(playerCommand,new PathfindingRequest{Start=new int2(_firstPos.x,_firstPos.y),End=new int2(_pos.x,_pos.y)});
+                ecb.SetComponent(playerCommand,new PathfindingRequest{Start=new int2(_firstPos.x,_firstPos.y),End=new int2(_pos.x,_pos.y),RoadPerfer=true});
                 ecb.SetComponentEnabled<PathfindingRequest>(playerCommand,true);
                 _cachedPos=_pos;
             }

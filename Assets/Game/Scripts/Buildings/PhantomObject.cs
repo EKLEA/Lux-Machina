@@ -1,147 +1,75 @@
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 public class PhantomObject : MonoBehaviour
 {
-    List<MeshRenderer> meshRenderers = new();
-    List<Material[]> originalMaterials = new();
-    List<Material[]> phantomMaterials = new();
+   private static readonly int IsPhantomID = Shader.PropertyToID("_IsPhantom");
+    private static readonly int MainColorID = Shader.PropertyToID("_PhantomColor");
+    private static readonly int LineColorID = Shader.PropertyToID("_LineColor");
+    private static readonly int ProgressID = Shader.PropertyToID("_PhantomProcent");
 
-    Material _trueMat;
-    Material _falseMat;
-    Material _forceMat;
+    private List<Renderer> _renderers = new();
+    private MaterialPropertyBlock _propBlock;       
+     private IReadOnlyPhantomConfig _config;
 
-    public void SetUp( Material trueMat, Material falseMat, Material forceMat)
+    public void SetUp(IReadOnlyPhantomConfig config)
     {
-        meshRenderers.AddRange(GetComponentsInChildren<MeshRenderer>(true));
-
-        _trueMat = trueMat;
-        _falseMat = falseMat;
-        _forceMat =forceMat;
-
-
-        foreach (MeshRenderer mr in meshRenderers)
-        {
-            if (mr == null)
-                continue;
-
-            Material[] originalMats = mr.sharedMaterials;
-            Material[] phantomMats = new Material[originalMats.Length];
-
-            Material[] originalCopies = new Material[originalMats.Length];
-            for (int i = 0; i < originalMats.Length; i++)
+        _config = config;
+        _renderers.Clear();
+        _renderers.AddRange(GetComponentsInChildren<Renderer>(true));
+        _propBlock = new MaterialPropertyBlock();
+    }
+    public void SetPhantomMode(bool isPhantom, bool isBlueprint)
+    {
+        var activeConfig = isBlueprint ? _config.BluePrintPhantomConfig : _config.DemolitionAndFalsePhantomConfig;
+        
+        UpdateVisuals(block => {
+            block.SetFloat(IsPhantomID, isPhantom ? 1f : 0f);
+            if (isPhantom)
             {
-                if (originalMats[i] != null)
-                    originalCopies[i] = originalMats[i];
+                block.SetColor(MainColorID, activeConfig.MainColor);
+                block.SetColor(LineColorID, activeConfig.LineColor);
             }
-            originalMaterials.Add(originalCopies);
-
-            for (int i = 0; i < originalMats.Length; i++)
-            {
-                if (originalMats[i] != null)
-                    phantomMats[i] = CreatePhantomMaterial(originalMats[i], _trueMat);
-            }
-
-            mr.materials = phantomMats;
-            phantomMaterials.Add(phantomMats);
-
-        }
-
+        });
     }
 
-    Material CreatePhantomMaterial(Material originalMat, Material phantomShaderMat)
+    public void CanBuild(bool canBuild, bool force)
     {
-        if (originalMat == null || phantomShaderMat == null)
-            return null;
+        PhantomConfig targetConfig;
 
-        Material newMat = new Material(phantomShaderMat);
-
-        if (
-            originalMat.HasProperty("_MainTex")
-            && newMat.HasProperty("_MainTex")
-            && originalMat.mainTexture != null
-        )
-        {
-            newMat.SetTexture("_MainTex", originalMat.mainTexture);
-        }
-        else if (originalMat.HasProperty("_BaseMap") && newMat.HasProperty("_BaseMap"))
-        {
-            Texture baseMap = originalMat.GetTexture("_BaseMap");
-            if (baseMap != null)
-                newMat.SetTexture("_BaseMap", baseMap);
-        }
-
-        return newMat;
-    }
-
-    public void CanBuild(bool canBuild,bool force)
-    {
-        Material targetPhantomMat;
         if (force)
+            targetConfig = _config.ForceDestroyPhantomConfig;
+        else
+            targetConfig = canBuild ? _config.BluePrintPhantomConfig : _config.DemolitionAndFalsePhantomConfig;
+
+        UpdateVisuals(block => {
+            block.SetColor(MainColorID, targetConfig.MainColor);
+            block.SetColor(LineColorID, targetConfig.LineColor);
+        });
+    }
+    public void SetProgress(float value)
+    {
+        UpdateVisuals(block => {
+            block.SetFloat(ProgressID, value); 
+        });
+    }
+
+    private void UpdateVisuals(Action<MaterialPropertyBlock> action)
+    {
+        foreach (var r in _renderers)
         {
-            targetPhantomMat=_forceMat;
-        }
-        else 
-            targetPhantomMat = canBuild ? _trueMat : _falseMat;
-        for (int mrIndex = 0; mrIndex < meshRenderers.Count; mrIndex++)
-        {
-            if (meshRenderers[mrIndex] == null)
-                continue;
-
-            Material[] currentPhantomMats = phantomMaterials[mrIndex];
-            Material[] originalMats = originalMaterials[mrIndex];
-            Material[] newMats = new Material[currentPhantomMats.Length];
-
-            for (int i = 0; i < currentPhantomMats.Length; i++)
-            {
-                if (originalMats[i] != null)
-                {
-                    newMats[i] = CreatePhantomMaterial(originalMats[i], targetPhantomMat);
-
-                    if (currentPhantomMats[i] != null)
-                    {
-                        if (Application.isPlaying)
-                            Destroy(currentPhantomMats[i]);
-                        else
-                            DestroyImmediate(currentPhantomMats[i]);
-                    }
-                }
-            }
-
-            phantomMaterials[mrIndex] = newMats;
-            meshRenderers[mrIndex].materials = newMats;
+            if (r == null) continue;
+            r.GetPropertyBlock(_propBlock);
+            action.Invoke(_propBlock);
+            r.SetPropertyBlock(_propBlock);
         }
     }
 
     public void UnPhantom()
     {
-        for (int i = 0; i < meshRenderers.Count; i++)
-        {
-            if (meshRenderers[i] != null)
-            {
-                meshRenderers[i].sharedMaterials = originalMaterials[i];
-            }
-
-            foreach (Material mat in phantomMaterials[i])
-            {
-                if (mat != null)
-                {
-                    if (Application.isPlaying)
-                        Destroy(mat);
-                    else
-                        DestroyImmediate(mat);
-                }
-            }
-        }
-
-        meshRenderers.Clear();
-        originalMaterials.Clear();
-        phantomMaterials.Clear();
-
-        if (Application.isPlaying)
-            Destroy(this);
-        else
-            DestroyImmediate(this);
+        UpdateVisuals(block => block.SetFloat(IsPhantomID, 0f));
+        _renderers.Clear();
+        Destroy(this);
     }
 }

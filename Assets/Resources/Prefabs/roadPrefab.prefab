@@ -89,7 +89,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 2c13f8f798473374dae19379c179173d, type: 2}
+  - {fileID: 2100000, guid: 99d6e782ee528ee40821bd4208833d1a, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -128,7 +128,7 @@ MonoBehaviour:
   clusterIndicator: {fileID: 0}
   outlineScript: {fileID: 5076338796290987020}
   roadHeight: 0.6666667
-  roadMaterial: {fileID: 2100000, guid: 2c13f8f798473374dae19379c179173d, type: 2}
+  roadMaterial: {fileID: 2100000, guid: 99d6e782ee528ee40821bd4208833d1a, type: 2}
 --- !u!114 &5076338796290987020
 MonoBehaviour:
   m_ObjectHideFlags: 0

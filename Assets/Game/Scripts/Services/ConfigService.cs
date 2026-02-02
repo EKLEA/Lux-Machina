@@ -7,12 +7,10 @@ using UnityEngine;
 public class ConfigService
     : IReadOnlyBuildingInfo,
         IReadOnlyItemsInfo,
-        IReadOnlyMaterialInfo,
         IReadOnlyRecipeInfo,
         IReadOnlyTypeBuildingButtonInfo
 {
     public Dictionary<int, ItemConfig> ItemsInfos { get; private set; }
-    public Dictionary<string, Material> MaterialInfos { get; private set; }
     public Dictionary<int, RecipeConfig> RecipeInfos { get; private set; }
     public Dictionary<int, string> TypeBuildingButtonConfig { get; private set; }
      public Dictionary<int, BuildingBaseConfig> BuildingInfos{ get; private set; }
@@ -32,7 +30,6 @@ public class ConfigService
         BuildingStorageInfos = new Dictionary<int, BuildingStorageConfig>();
         BuildingProcessionInfos = new Dictionary<int, BuildingProcessionConfig>();
         BuildingItemRequestsInfos = new Dictionary<int, BuildingItemRequestsConfig>();
-        MaterialInfos = new Dictionary<string, Material>();
         RecipeInfos = new Dictionary<int, RecipeConfig>();
         TypeBuildingButtonConfig=new Dictionary<int, string>();
         ItemClassButtonConfig=new();
@@ -46,24 +43,11 @@ public class ConfigService
         LoadBuildingsProcession();
         LoadBuildingsItemRequests();
 
-        LoadMaterials();
         LoadRecipes();
         LoadTypeBuildingButtons();
-        Debug.Log(
-            $"Configs loaded: {ItemsInfos.Count} items, {BuildingInfos.Count} buildings, {MaterialInfos.Count} materials, {RecipeInfos.Count} recipes"
-        );
         await UniTask.Yield();
     }
     
-    void LoadMaterials()
-    {
-        Material[] allMaterials = Resources.LoadAll<Material>("Materials");
-        foreach (var material in allMaterials)
-        {
-            MaterialInfos[material.name] = material;
-        }
-        Debug.Log($"Loaded {allMaterials.Length} materials from Resources/Materials");
-    }
 
     void LoadTypeBuildingButtons()
     {
@@ -249,15 +233,6 @@ public class ConfigService
         return GetOrLoadSprite($"Images/Recipes/{recipe.recipeSpritePath}");
     }
 
-    public Material GetMaterial(string materialName)
-    {
-        if (MaterialInfos.TryGetValue(materialName, out var material))
-            return material;
-
-        Debug.LogWarning($"Material not found: {materialName}");
-        return null;
-    }
-
     public GameObject GetBuildingPrefab(int buildingId)
     {
         if (
@@ -374,11 +349,6 @@ public interface IReadOnlyBuildingInfo
     Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; }
     GameObject GetBuildingPrefab(int buildingId);
     Sprite GetBuildingSprite(int buildingId);
-}
-
-public interface IReadOnlyMaterialInfo
-{
-    Dictionary<string, Material> MaterialInfos { get; }
 }
 
 public interface IReadOnlyRecipeInfo

@@ -18,6 +18,15 @@ MonoBehaviour:
   selectBuildingColor: {r: 0.23760104, g: 1, b: 0, a: 1}
   makeAsDemolitionBuidlingColor: {r: 1, g: 0.5375431, b: 0, a: 1}
   forceDestoryBuidlingColor: {r: 0, g: 0, b: 0, a: 1}
+  BluePrintPhantomConfig:
+    MainColor: {r: 0.039215688, g: 0.06666667, b: 0.7490196, a: 1}
+    LineColor: {r: 0, g: 0.09019608, b: 1, a: 0.5882353}
+  DemolitionAndFalsePhantomConfig:
+    MainColor: {r: 1, g: 0.42633575, b: 0, a: 1}
+    LineColor: {r: 1, g: 0.3764706, b: 0, a: 0.5882353}
+  ForceDestroyPhantomConfig:
+    MainColor: {r: 1, g: 0, b: 0.70397806, a: 1}
+    LineColor: {r: 1, g: 0, b: 0.6938925, a: 1}
   removeLayer:
     serializedVersion: 2
     m_Bits: 128

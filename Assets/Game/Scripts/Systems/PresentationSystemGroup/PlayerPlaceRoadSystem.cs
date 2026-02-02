@@ -79,13 +79,14 @@ public partial class PlayerPlaceRoadSystem : SystemBase
                 _firstPos=_pos;
                 _road.GenerateRoadMesh(new Vector2Int[]{_firstPos},null);
                 var pos=new int2(_pos.x,_pos.y);
+                
                 _preview.CanBuild(!(mapData.CellMapBuildingsIDs.ContainsKey(pos)&&mapData.CellMapBuildingsIDs[pos]!=buildingConfig.roadID),_placeRoadPlayerData.isForce);
             }
             else
             {
                 if(_pos!=_cachedPos)
                 {
-                    ecb.SetComponent(playerCommand,new PathfindingRequest{Start=new int2(_firstPos.x,_firstPos.y),End=new int2(_pos.x,_pos.y)});
+                    ecb.SetComponent(playerCommand,new PathfindingRequest{Start=new int2(_firstPos.x,_firstPos.y),End=new int2(_pos.x,_pos.y),RoadPerfer=true});
                     ecb.SetComponentEnabled<PathfindingRequest>(playerCommand,true);
                     _cachedPos=_pos;
                 }
@@ -96,6 +97,8 @@ public partial class PlayerPlaceRoadSystem : SystemBase
                 }
               
                 _road.GenerateRoadMesh(_roadPoints.Select(f=>new Vector2Int(f.x,f.y)).ToArray(),null);
+                
+                _preview.CanBuild(true,_placeRoadPlayerData.isForce);
             }
         }
         

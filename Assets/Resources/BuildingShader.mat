@@ -7,13 +7,13 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: False
-  m_Shader: {fileID: -6465566751694194690, guid: 72913eefde9549e46b65884f48aa8b7f, type: 3}
+  m_Name: BuildingShader
+  m_Shader: {fileID: -6465566751694194690, guid: 11a85ca1a30a755488ac775e1373f54e, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
   m_InvalidKeywords: []
-  m_LightmapFlags: 4
+  m_LightmapFlags: 2
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
@@ -25,42 +25,22 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _BumpMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailAlbedoMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailMask:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _DetailNormalMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _EmissionMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 37a95467d25ad8a41b94d5e4ea04e2b7, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _MetallicGlossMap:
+    - _RustTex:
+        m_Texture: {fileID: 2800000, guid: 1f1acaf6e7799ce42be42d75c766782d, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_9771ac9369d144a1922208704c792f64_Texture_1_Texture2D:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _OcclusionMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _ParallaxMap:
+    - _Texture2DAsset_afc43f230fae40eca70beca4a3f82a69_Out_0_Texture2D:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -78,38 +58,37 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BumpScale: 1
-    - _Cutoff: 0.5
-    - _DetailNormalMapScale: 1
-    - _DstBlend: 10
-    - _FresnelStrength: 2
-    - _GlossMapScale: 0
-    - _Glossiness: 0
-    - _GlossyReflections: 0
-    - _LineFrequency: 20
+    - _EdgeThickness: 5
+    - _EdgeWear: 1
+    - _FresnelStrength: 0.75
+    - _IsPhantom: 0
+    - _IsRust: 0
+    - _LineFrequency: 2
     - _LineRotation: 45
     - _LineStrength: 1
-    - _LineThickness: 0.2
-    - _Metallic: 0
-    - _Mode: 3
-    - _OcclusionStrength: 1
-    - _Parallax: 0.005
+    - _LineThickness: 0.6
+    - _LineWidth: 0.2
+    - _PhantomAlpha: 0.5
+    - _PhantomProcent: 0
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _ScrollSpeed: -1
-    - _SmoothnessTextureChannel: 0
-    - _SpecularHighlights: 1
-    - _SrcBlend: 5
-    - _UVSec: 0
-    - _ZWrite: 0
+    - _RustIntensity: 1
+    - _RustScale: 1
+    - _ScrollSpeed: -2
+    - _WearAmount: 0.5
+    - _WearScale: 5
     m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FresnelColor: {r: 10.627344, g: 0.32754433, b: 0, a: 1}
-    - _Tint: {r: 1, g: 0.058823533, b: 0, a: 0.5254902}
+    - _EdgeColor: {r: 0, g: 0, b: 0, a: 1}
+    - _FresnelColor: {r: 0.99215686, g: 0, b: 0.08720933, a: 1}
+    - _LineColor: {r: 0, g: 1, b: 0.08398149, a: 0.5882353}
+    - _PhantomColor: {r: 1, g: 0, b: 0.14656258, a: 1}
+    - _RustColor: {r: 1, g: 0.35315964, b: 0, a: 1}
+    - _ScrollSpeed: {r: 15, g: 15, b: 0, a: 0}
+    - _Tint: {r: 0, g: 0.16078424, b: 1, a: 0.6117647}
+    - _WearColor: {r: 0.44313726, g: 0.24465056, b: 0, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &644301867893610241
+--- !u!114 &4635581065432142699
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}

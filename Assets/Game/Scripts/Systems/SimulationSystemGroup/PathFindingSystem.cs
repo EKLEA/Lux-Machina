@@ -122,11 +122,18 @@ public partial struct PathfindingParallelJob : IJobEntity
                 int2 neighborPos = current.Position + offset;
                 if (closedSet.Contains(neighborPos)) continue;
 
-                if (BuildingMap.TryGetValue(neighborPos, out int bID) && bID != RoadID)
+                bool hasBuilding = BuildingMap.TryGetValue(neighborPos, out int bID);
+                bool isRoad = hasBuilding && bID == RoadID;
+
+                if (hasBuilding && !isRoad)
                     continue;
 
+                float roadPenalty = isRoad&&request.RoadPerfer ? 0f : 2.0f; 
+                
                 float turnPenalty = current.Direction.Equals(offset) ? 0f : 0.6f;
-                float tentativeG = current.GScore + 1.0f + turnPenalty;
+                
+                // Итоговая стоимость: 1 (база) + поворот + штраф за бездорожье
+                float tentativeG = current.GScore + 1.0f + turnPenalty + roadPenalty;
 
                 if (!gScoreMap.TryGetValue(neighborPos, out float oldG) || tentativeG < oldG)
                 {

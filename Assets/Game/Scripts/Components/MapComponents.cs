@@ -131,6 +131,7 @@ public struct PathfindingRequest : IComponentData, IEnableableComponent
 {
     public int2 Start;
     public int2 End;
+    public bool RoadPerfer;
 }
 public struct DisablePathfindingTag : IComponentData, IEnableableComponent { }
 public struct MapUpdateRequest : IBufferElementData

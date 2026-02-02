@@ -31,6 +31,30 @@ public partial class BuildingChangeVisualSystem : SystemBase
             ChangeDemolitionState(reference,entity,ecb);
             ecb.SetComponentEnabled<UpdateClusterSlots>(mapEntity,true);
         }
+        foreach (var (buff,reference) in SystemAPI.Query<DynamicBuffer<InputConstructionSlotData>,BuildingOnSceneReference>().WithAll<IsBlueprint>().WithDisabled<ChangeBluePrintState>())
+        {
+            if(buff.Length<1) continue;
+            int maxItems=0,currItem=0;
+            foreach(var b in buff)
+            {
+                maxItems+=b.Capacity;
+                currItem+=b.Amount;
+            }
+            _visualBuildingFactory.SetProgress(reference.buildingOnScene.gameObject,(float)currItem/maxItems);
+        }
+         foreach (var (buff,reference) in SystemAPI.Query<DynamicBuffer<OutputConstructionSlotData>,BuildingOnSceneReference>().WithAll<IsDemolition>().WithDisabled<ChangeDemolitionStateTag>())
+        {
+            
+            if(buff.Length<1) continue;
+            int maxItems=0,currItem=0;
+            foreach(var b in buff)
+            {
+                maxItems+=b.Capacity;
+                currItem+=b.Amount;
+            }
+            _visualBuildingFactory.SetProgress(reference.buildingOnScene.gameObject,(float)currItem/maxItems);
+        }
+        
 
         ecb.Playback(EntityManager);
         ecb.Dispose();
@@ -79,7 +103,11 @@ public partial class BuildingChangeVisualSystem : SystemBase
                     {
                         for(int y = 0; y< buildingPosData.size.y;y++)
                         {
-                            MapData.IsBluePrintOrDemolitionPoints.Add(buildingPosData.LeftCornerPos+new int2(x,y),true);
+                            var pos =buildingPosData.LeftCornerPos+new int2(x,y);
+                            if(MapData.IsBluePrintOrDemolitionPoints.ContainsKey(pos))
+                                 MapData.IsBluePrintOrDemolitionPoints[pos]=true;
+                            else
+                                 MapData.IsBluePrintOrDemolitionPoints.Add(pos,true);
                         }
                     }
                 }
@@ -88,7 +116,10 @@ public partial class BuildingChangeVisualSystem : SystemBase
                     var points= EntityManager.GetBuffer<MapPoint>(building);
                     foreach(var p in points)
                     {
-                        MapData.IsBluePrintOrDemolitionPoints.Add(p.pos,true);
+                        if(MapData.IsBluePrintOrDemolitionPoints.ContainsKey(p.pos))
+                            MapData.IsBluePrintOrDemolitionPoints[p.pos]=true;
+                        else
+                             MapData.IsBluePrintOrDemolitionPoints.Add(p.pos,true);
                     }
                 }
             }
@@ -102,7 +133,10 @@ public partial class BuildingChangeVisualSystem : SystemBase
         if(_entityManager.HasComponent<CanCraft>(building)) ecb.SetComponentEnabled<CanCraft>(building,false);
         if (EntityManager.IsComponentEnabled<IsDemolition>(building))
         {
-            _visualBuildingFactory.UnDemolitionObject(gameobject.buildingOnScene.gameObject);       
+            if(!EntityManager.IsComponentEnabled<IsBlueprint>(building))
+                _visualBuildingFactory.DemolitionObject(gameobject.buildingOnScene.gameObject,false);
+            else
+                _visualBuildingFactory.PhantomizeObject(gameobject.buildingOnScene.gameObject);  
             ecb.SetComponentEnabled<IsDemolition>(building,false);
             if (MapData.CellEntityMultiMap.ContainsKey(building))
             {
@@ -130,7 +164,7 @@ public partial class BuildingChangeVisualSystem : SystemBase
         }
         else
         {
-            _visualBuildingFactory.DemolitionObject(gameobject.buildingOnScene.gameObject);       
+            _visualBuildingFactory.DemolitionObject(gameobject.buildingOnScene.gameObject,true);       
             ecb.SetComponentEnabled<IsDemolition>(building,true);
             if (MapData.CellEntityMultiMap.ContainsKey(building))
             {
@@ -141,7 +175,15 @@ public partial class BuildingChangeVisualSystem : SystemBase
                     {
                         for(int y = 0; y< buildingPosData.size.y;y++)
                         {
-                            MapData.IsBluePrintOrDemolitionPoints.Add(buildingPosData.LeftCornerPos+new int2(x,y),false);
+                            
+                            var pos =buildingPosData.LeftCornerPos+new int2(x,y);
+                            if(MapData.IsBluePrintOrDemolitionPoints.ContainsKey(pos))
+                                
+                                MapData.IsBluePrintOrDemolitionPoints[pos]=false;
+                            else
+                            {
+                                MapData.IsBluePrintOrDemolitionPoints.Add(pos,false);
+                            }
                         }
                     }
                 }
@@ -150,7 +192,12 @@ public partial class BuildingChangeVisualSystem : SystemBase
                     var points= EntityManager.GetBuffer<MapPoint>(building);
                     foreach(var p in points)
                     {
-                        MapData.IsBluePrintOrDemolitionPoints.Add(p.pos,false);
+                        if(MapData.IsBluePrintOrDemolitionPoints.ContainsKey(p.pos))
+                            MapData.IsBluePrintOrDemolitionPoints[p.pos]=false;
+                        else
+                        {
+                            MapData.IsBluePrintOrDemolitionPoints.Add(p.pos,false);
+                        }
                     }
                 }
             }

@@ -43,6 +43,9 @@ public class BootStrapperBindings : MonoInstaller
                         ls.selectBuildingColor,
                         ls.makeAsDemolitionBuidlingColor,
                         ls.forceDestoryBuidlingColor,
+                        ls.BluePrintPhantomConfig,
+                        ls.DemolitionAndFalsePhantomConfig,
+                        ls.ForceDestroyPhantomConfig,
                         ls.removeLayer
                     ))
                     .First()
@@ -52,6 +55,8 @@ public class BootStrapperBindings : MonoInstaller
         Container.Bind<Button>().FromInstance(button).AsSingle();
         Container.Bind<IReadOnlyLoadingSettings>().To<LoadingSettings>().FromResolve();
         Container.Bind<IReadOnlyGameFieldSettings>().To<GameFieldSettings>().FromResolve();
+        Container.Bind<IReadOnlyPhantomConfig>().To<GameFieldSettings>().FromResolve();
+        Container.Bind<IReadOnlyOutLineConfig>().To<GameFieldSettings>().FromResolve();
         var loadingScreen = Container.InstantiatePrefabForComponent<LoadingScreen>(
             _loadingScreenPrefab
         );
@@ -80,10 +85,6 @@ public class BootStrapperBindings : MonoInstaller
             .FromMethod(ctx => ctx.Container.Resolve<ConfigService>())
             .AsSingle();
 
-        Container
-            .Bind<IReadOnlyMaterialInfo>()
-            .FromMethod(ctx => ctx.Container.Resolve<ConfigService>())
-            .AsSingle();
         Container
             .Bind<IReadOnlyRecipeInfo>()
             .FromMethod(ctx => ctx.Container.Resolve<ConfigService>())
