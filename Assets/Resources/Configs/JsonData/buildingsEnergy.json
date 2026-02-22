@@ -1,0 +1,19 @@
+﻿{
+    "buildingEnegryConfigs": [
+        {
+            "BuildingID": "Core",
+            "radius": 25.0,
+            "maxConnections": 4
+        },
+        {
+            "BuildingID": "Lep",
+            "radius": 1.0,
+            "maxConnections": 4
+        },
+        {
+            "BuildingID": "Concentrator",
+            "radius": 25.0,
+            "maxConnections": 4
+        }
+    ]
+}

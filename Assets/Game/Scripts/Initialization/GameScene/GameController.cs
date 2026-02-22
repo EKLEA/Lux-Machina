@@ -79,7 +79,7 @@ public class GameController : IInitializable
         await configToBlob.LoadConfigs(World.EntityManager);
         var save = saveService.GameState;
 
-        await CreateMap();
+        await CreateMap(save);
         await CreateSystems(World);
         await LoadSavedEntities(save);
         var query = World.EntityManager.CreateEntityQuery(typeof(LoadingMapTag));
@@ -137,14 +137,15 @@ public class GameController : IInitializable
         var RoadSystem= RegisterManagedSystem<PlayerPlaceRoadSystem>(presGroup);
         var deleteSystem= RegisterManagedSystem<PlayerDeleteBuildingsSystem>(presGroup);
         var gridSystem= RegisterManagedSystem<GridUpdateSystem>(presGroup);
+        var connSystem= RegisterManagedSystem<PlayerConnectionEnergySystem>(presGroup);
 
          var player = _container.Resolve<PlayerController>();
-        player.Initialize(BuildSystem, RoadSystem,deleteSystem,gridSystem);
+        player.Initialize(BuildSystem, RoadSystem,deleteSystem,connSystem,gridSystem);
         simGroup.SortSystems();
         presGroup.SortSystems();
         await UniTask.Yield();
     }
-    async UniTask CreateMap()
+    async UniTask CreateMap(GameStateData gameStateData)
     {
         Map=World.EntityManager.CreateEntity();
         World.EntityManager.AddComponentData(Map, new BuildingMap
@@ -154,7 +155,14 @@ public class GameController : IInitializable
             CellEntityMultiMap=new(1000,Allocator.Persistent),
             IsBluePrintOrDemolitionPoints=new(1000,Allocator.Persistent),
         });
-
+        World.EntityManager.AddComponentData(Map, new EnergyMap
+        {
+            CellToEnergyBuildingMap=new(1000,Allocator.Persistent),
+            CellToEnergyEntityBuildingMap=new(1000,Allocator.Persistent),
+            EnergyEntityToCellBuildingMap=new(1000,Allocator.Persistent),
+            EnergyLinks=new(5000,Allocator.Persistent),
+            CoreID=gameStateData.CoreID
+        });
         World.EntityManager.AddComponentData(Map, new EntitiesDictionary
         {
             Entities=new(250,Allocator.Persistent)
@@ -164,9 +172,11 @@ public class GameController : IInitializable
         World.EntityManager.AddComponent<UpdateMapTag>(Map);
         World.EntityManager.AddComponent<UpdateClustersTag>(Map);
         World.EntityManager.AddComponent<UpdateClusterSlots>(Map);
+        World.EntityManager.AddComponent<UpdateConnectionsTag>(Map);
         World.EntityManager.SetComponentEnabled<UpdateMapTag>(Map,false);
         World.EntityManager.SetComponentEnabled<UpdateClustersTag>(Map,false);
         World.EntityManager.SetComponentEnabled<UpdateClusterSlots>(Map,false);
+        World.EntityManager.SetComponentEnabled<UpdateConnectionsTag>(Map,false);
          World.EntityManager.AddComponentData(Map, new TickInfoData
         {
             currTickPerSecond=gameFieldSettings.tickPerSecond,
@@ -183,10 +193,10 @@ public class GameController : IInitializable
     }
     async UniTask LoadSavedEntities(GameStateData gameStateData)
     {
-        var buildingCommand = World.EntityManager.CreateArchetype(typeof(CreateBuildingEventData),typeof(IsBlueprint),typeof(IsDemolition));
+        var buildingCommand = World.EntityManager.CreateArchetype(typeof(CreateBuildingEventData),typeof(IsBlueprint),typeof(IsDemolition),typeof(LinkNetworkEnergyTo));
 
         var roadCommand = World.EntityManager.CreateArchetype(typeof(CreateRoadEventTag),typeof(MapPoint),typeof(IsBlueprint),typeof(IsDemolition));
-        CreateBuildingCommand(buildingCommand,gameStateData.Buildings);
+        CreateBuildingCommand(buildingCommand,gameStateData);
 
         using var entities = new NativeArray<Entity>(gameStateData.RoadsBuildings.Count, Allocator.TempJob);
         World.EntityManager.CreateEntity(roadCommand, entities);
@@ -206,24 +216,32 @@ public class GameController : IInitializable
         }
         await UniTask.Yield();
     }
-    void CreateBuildingCommand<T>(EntityArchetype commandArchetype,Dictionary<int,T> data) where T : BaseBuildingSaveData
+    void CreateBuildingCommand(EntityArchetype commandArchetype,GameStateData gameStateData)
     {
-        using var entities = new NativeArray<Entity>(data.Count, Allocator.TempJob);
+        using var entities = new NativeArray<Entity>(gameStateData.Buildings.Count, Allocator.TempJob);
         World.EntityManager.CreateEntity(commandArchetype, entities);
         int index = 0;
-        foreach (var pair in data)
+        foreach (var pair in gameStateData.Buildings)
         {
             Entity entity = entities[index];
             int id = pair.Key;
-
             World.EntityManager.SetComponentData(entity, new CreateBuildingEventData
             {
                 UniqueBuildingID=id,
                 buildingID=pair.Value.buildingID,
                 buildingPosition=pair.Value.buildingPosition,
                 rotation=pair.Value.rotation,
-                isConnected=pair.Value.isConnected,
             });
+            
+            if (gameStateData.buildingEnergyNetvorkLinkSaveData.ContainsKey(id))
+            {
+                var buff=World.EntityManager.AddBuffer<LinkNetworkEnergyTo>(entity);
+                var links = gameStateData.buildingEnergyNetvorkLinkSaveData[id].entitesLink;
+                foreach(var link in links)
+                {
+                    buff.Add(new LinkNetworkEnergyTo{LinkFromBuilding=link.Item1,LinkToBuilding=link.Item2,});
+                }
+            }
             World.EntityManager.SetComponentEnabled<IsBlueprint>(entity,pair.Value.isBlueprint);
             World.EntityManager.SetComponentEnabled<IsDemolition>(entity,pair.Value.IsDemolition);
             index++;

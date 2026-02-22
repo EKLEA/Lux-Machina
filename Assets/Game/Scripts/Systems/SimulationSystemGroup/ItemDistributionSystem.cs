@@ -297,7 +297,7 @@ public partial struct ItemDistributionSystem : ISystem
                          ProducersWriter.Add(ids[j], slot);
                 }
             }
-            if (IsBlueprintLookup.IsComponentEnabled(entity) || IsDemolitionLookup.IsComponentEnabled(entity))
+            if (IsBlueprintLookup.HasComponent(entity)&&IsBlueprintLookup.IsComponentEnabled(entity) || IsDemolitionLookup.HasComponent(entity)&&IsDemolitionLookup.IsComponentEnabled(entity))
             {
                 byte priority = (byte)ConstructionPriority[entity].ConstructionPriority;
                 if (IsInputConstructionEnabled.IsComponentEnabled(entity))

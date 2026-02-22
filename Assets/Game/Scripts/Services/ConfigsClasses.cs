@@ -40,6 +40,13 @@ public class BuildingItemRequestsConfig
     public string BuildingID;
     public List<RecipeIngredient> itemsRequest =  new List<RecipeIngredient>();
 }
+[Serializable]
+public class BuildingEnegryConfig
+{
+    public string BuildingID;
+    public float radius;
+    public int maxConnections;
+}
 
 [Serializable]
 public class BuildingBaseConfigList:IWrapper
@@ -61,6 +68,11 @@ public class BuildingProcessionConfigList:IWrapper
 public class BuildingItemRequestsConfigList:IWrapper
 {
     public List<BuildingItemRequestsConfig> buildingItemRequestsConfigs;
+}
+[Serializable]
+public class BuildingEnegryConfigList:IWrapper
+{
+    public List<BuildingEnegryConfig> buildingEnegryConfigs;
 }
 #endregion
 #region  Items
@@ -140,6 +152,7 @@ public enum BuildingsTypes
     Logistic = 4,
     Defence = 5,
     DeleteBuilding=99,
+    ConnectBuilding=100
 }
 public enum TypeOfProcession 
 {

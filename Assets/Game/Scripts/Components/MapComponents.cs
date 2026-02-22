@@ -19,6 +19,23 @@ public struct BuildingMap : IComponentData, IDisposable
         IsBluePrintOrDemolitionPoints.Dispose();
     }
 }
+public struct EnergyMap: IComponentData, IDisposable
+{
+    
+    public NativeParallelMultiHashMap<int2,int> CellToEnergyBuildingMap; 
+    public NativeParallelMultiHashMap<int2,Entity> CellToEnergyEntityBuildingMap; 
+    public NativeParallelMultiHashMap<Entity,int2> EnergyEntityToCellBuildingMap; 
+    public NativeParallelHashMap<int2,int2> EnergyLinks; 
+    public int CoreID;
+
+    public void Dispose()
+    {
+       CellToEnergyBuildingMap.Dispose();
+       CellToEnergyEntityBuildingMap.Dispose();
+       EnergyEntityToCellBuildingMap.Dispose();
+       EnergyLinks.Dispose();
+    }
+}
 public struct EntitiesDictionary: IComponentData, IDisposable
 {
     public NativeParallelHashMap<int, Entity> Entities;
@@ -32,7 +49,7 @@ public struct ClusterMap : IComponentData, IDisposable
 {
     public NativeList<int> UniqueClusterIDs;
     public NativeParallelHashMap<int2, int> pointToClusterId;
-    public NativeParallelMultiHashMap<int, int2> roadsPoints;
+    public NativeParallelMultiHashMap<int, int2> logisticPoints;
     public NativeParallelMultiHashMap<int, SlotReference> ClusterToProducers;
     public NativeParallelMultiHashMap<int, SlotReference> ClusterToConsumers;
     public NativeParallelMultiHashMap<Entity, SlotReference> EntityInputSlots;
@@ -54,7 +71,7 @@ public struct ClusterMap : IComponentData, IDisposable
         EntityInputSlots = new NativeParallelMultiHashMap<Entity, SlotReference>(5000, allocator);
         EntityOutputSlots = new NativeParallelMultiHashMap<Entity, SlotReference>(5000, allocator);
         pointToClusterId = new NativeParallelHashMap<int2, int> (5000, allocator);
-        roadsPoints = new NativeParallelMultiHashMap<int, int2> (5000, allocator);
+        logisticPoints = new NativeParallelMultiHashMap<int, int2> (5000, allocator);
         AllProducersList = new NativeList<SlotReference>(10000, allocator);
         SlotToClusters = new NativeParallelHashMap<SlotReference, FixedList32Bytes<int>>(10000, allocator);
     }
@@ -69,7 +86,7 @@ public struct ClusterMap : IComponentData, IDisposable
         if (EntityOutputSlots.IsCreated) EntityOutputSlots.Dispose();
         if (SlotGraph.IsCreated) SlotGraph.Dispose();
         if (ReverseSlotGraph.IsCreated) ReverseSlotGraph.Dispose();
-        if (roadsPoints.IsCreated) roadsPoints.Dispose();
+        if (logisticPoints.IsCreated) logisticPoints.Dispose();
         if (AllProducersList.IsCreated) AllProducersList.Dispose();
         if (SlotToClusters.IsCreated) SlotToClusters.Dispose();
     }
@@ -106,6 +123,7 @@ public struct SlotReference : IEquatable<SlotReference>, IComparable<SlotReferen
 public struct UpdateMapTag : IComponentData, IEnableableComponent { }
 public struct UpdateClustersTag:IComponentData, IEnableableComponent{}
 public struct UpdateClusterSlots:IComponentData, IEnableableComponent{}
+public struct UpdateConnectionsTag:IComponentData, IEnableableComponent{}
 public struct TickInfoData : IComponentData
 {
     public int currTickPerSecond;

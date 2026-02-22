@@ -17,6 +17,8 @@ public class BuildingButtonsHolder : UIScreen
     Dictionary<int, Button> BTs;
     int prevType;
     int currType;
+    Func<string, Sprite> GetSprite;
+    
     public void SetUpByType(int type)
     {
         foreach (var bt in BTs.Values)
@@ -33,6 +35,27 @@ public class BuildingButtonsHolder : UIScreen
             {
                 ids.Add(v.ToString());
             }
+            
+             GetSprite = (string name) => 
+            {
+                DeleteType enumValue = (DeleteType)Enum.Parse(typeof(DeleteType), name);
+                
+                return buildingInfo.GetEnumSprite<DeleteType>((int)enumValue);
+            };
+        }
+        else if((BuildingsTypes)type == BuildingsTypes.ConnectBuilding)
+        {
+            foreach(ConnectType v in Enum.GetValues(typeof(ConnectType)))
+            {
+                ids.Add(v.ToString());
+            }
+            
+           GetSprite = (string name) => 
+            {
+                ConnectType enumValue = (ConnectType)Enum.Parse(typeof(ConnectType), name);
+                
+                return buildingInfo.GetEnumSprite<ConnectType>((int)enumValue);
+            };
         }
         else
         {
@@ -41,6 +64,7 @@ public class BuildingButtonsHolder : UIScreen
             {
                 ids.Add(b.id);
             }
+            GetSprite=(string id)=> buildingInfo.GetBuildingSprite(id.GetStableHashCode());
         }
        
         if (type != currType||!isOpened.Value)
@@ -83,7 +107,7 @@ public class BuildingButtonsHolder : UIScreen
             {
                 var bt = BTs[i];
 
-                bt.image.sprite = buildingInfo.GetBuildingSprite(ids[i].GetStableHashCode());
+                bt.image.sprite =GetSprite(ids[i]);
                 AddButtonListener(ids[i], bt);
                 bt.gameObject.SetActive(true);
                 bt.interactable = true;
@@ -104,6 +128,7 @@ public class BuildingButtonsHolder : UIScreen
     }
     public override void Close()
     {
+        GetSprite=null;
         ids.Clear();
         foreach (var bt in BTs.Values)
         {

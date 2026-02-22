@@ -14,6 +14,7 @@ public struct BuildingPosData : IComponentData
     public int2 LeftCornerPos;
     public int2 size;
     public int Rotation;
+    public float2 center;
 }
 public class BuildingOnSceneReference : IComponentData
 {   

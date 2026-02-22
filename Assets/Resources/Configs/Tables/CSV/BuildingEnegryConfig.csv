@@ -1,0 +1,4 @@
+﻿id ;radius;maxConnections
+Core;25;4
+Lep;1;4
+Concentrator;25;4

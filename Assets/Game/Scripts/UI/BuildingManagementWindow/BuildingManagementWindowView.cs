@@ -12,6 +12,7 @@ public class BuildingManagementWindowView:DragableUIWindow
     
     [Inject] IReadOnlyBuildingInfo buildingInfo;
     [Inject] IReadOnlyRecipeInfo recipeInfo;
+    [Inject] GameController gameController;
     [Header("Simple obj")]
     [SerializeField] Transform Header;
     [SerializeField] Image workIndicatorOrb;
@@ -89,10 +90,11 @@ public class BuildingManagementWindowView:DragableUIWindow
     DistribuitionViewData distribuitionViewData;
     ReactiveProperty<SlotViewData[]> excessItems;
     ReactiveProperty<int> priority;
-    ConstructionViewData constructionViewData;
+    ReactiveProperty<ConstructionViewData> constructionViewData;
     (bool,BuildingCraftViewData) recipeViewData;
      ReactiveProperty<StorageSlotViewData[]> storageSlots;
     bool windowChanged;
+    bool CanDestory;
     public void BindModel(BuildingInfoViewModel model)
     {
         this.model=model;
@@ -100,7 +102,7 @@ public class BuildingManagementWindowView:DragableUIWindow
     }
     public void SetUpData(Entity entity)
     { 
-        model.GetBuildingData(entity,out BuildingViewData buildingViewDataS,out priority,out distribuitionViewData,out excessItems,out constructionViewData,out recipeViewData,out storageSlots);
+        model.GetBuildingData(entity,out BuildingViewData buildingViewDataS,out constructionViewData,out excessItems,out distribuitionViewData,out priority,out recipeViewData,out storageSlots,out CanDestory);
         buildingViewData=buildingViewDataS;
         Open();
     }
@@ -147,17 +149,18 @@ public class BuildingManagementWindowView:DragableUIWindow
         addOne.onClick.RemoveAllListeners();
         removeOne.onClick.RemoveAllListeners();
         model.tempUpdate+=()=>{Close();SetUpData(buildingViewData.buildingEntity);};
-        addOne.onClick.AddListener(()=>model.AddAmount(buildingViewData.buildingEntity,1));
-        removeOne.onClick.AddListener(()=>model.AddAmount(buildingViewData.buildingEntity,-1));
+        addOne.onClick.AddListener(()=>model.AddAmount(1));
+        removeOne.onClick.AddListener(()=>model.AddAmount(-1));
         BuildingSprite.sprite=buildingInfo.GetBuildingSprite(buildingViewData.buildingID);
         BuildingText.text=buildingInfo.BuildingInfos[buildingViewData.buildingID].title;
         BuildingDescriptionText.text=buildingInfo.BuildingInfos[buildingViewData.buildingID].description;
-        DestroyBT.gameObject.SetActive(true);
+        DestroyBT.gameObject.SetActive(CanDestory);
     }
     void ShowCraftArea()
     {
         if (distribuitionViewData != null)
         {
+            Debug.Log("asdsdsd");
             CraftAreaDispose=new();
             CraftArea.gameObject.SetActive(true);
             RecipeHead.gameObject.SetActive(true);
@@ -168,7 +171,7 @@ public class BuildingManagementWindowView:DragableUIWindow
                 if(!recipeViewData.Item1&&RecipesAndItemsHead.isOpened.Value) return;
 
                 if (recipeViewData.Item1&&recipeViewData.Item2.recipeIDHash!=-1)
-                    model.SetRecipe(buildingViewData.buildingEntity, -1);
+                    model.SetRecipe( -1);
                 
                 windowChanged=true;
                 CraftSlotsHead.gameObject.SetActive(false);
@@ -177,12 +180,12 @@ public class BuildingManagementWindowView:DragableUIWindow
             });     
             RecipesAndItemsHead.onItemChoosed += (value) => 
             {
-                model.SetRecipe(buildingViewData.buildingEntity, value);
+                model.SetRecipe( value);
                 windowChanged=true;
                 RecipesAndItemsHead.Close();
             };
             
-            if (distribuitionViewData.IsProcessor&&recipeViewData.Item1)
+            if (recipeViewData.Item1)
             {
                 CraftSlotsHead.gameObject.SetActive(true);
                 if(distribuitionViewData.OutputSlots != null)
@@ -224,7 +227,7 @@ public class BuildingManagementWindowView:DragableUIWindow
             else
             {
                 RecipesAndItemsHead.SetUpWindowAsRecipesByRecipeGroup(
-                    buildingInfo.BuildingProcessionInfos[buildingViewData.buildingID].requiredRecipesGroup.ToHashSet());
+                buildingInfo.BuildingProcessionInfos[buildingViewData.buildingID].requiredRecipesGroup.ToHashSet());
             }
             allDisposables.Add(CraftAreaDispose);
         }
@@ -246,7 +249,7 @@ public class BuildingManagementWindowView:DragableUIWindow
 
             RecipesAndItemsHead.onItemChoosed += (value) => 
             {
-                model.AddStorageSlot(buildingViewData.buildingEntity, value, 5);
+                model.AddStorageSlot( value, 5);
                 windowChanged=true;
                 AddSlotBT.transform.SetAsLastSibling();
                 RecipesAndItemsHead.Close();
@@ -266,47 +269,19 @@ public class BuildingManagementWindowView:DragableUIWindow
     }
     void ShowConstructionArea()
     {
-        if (constructionViewData != null&&(constructionViewData.InputConstructionSlots!=null||constructionViewData.OutputConstructionSlots!=null))
+        if (constructionViewData != null)
         {
             
             ConstructionAreaDispose=new();
-            ConstructionArea.gameObject.SetActive(true);
-            ConstructionSlotsHead.gameObject.SetActive(true);
-            ConstructionHead.gameObject.SetActive(true);
-
-            if(constructionViewData.OutputConstructionSlots != null)
+            constructionViewData.Subscribe(value =>
             {
-                OutputConstructionSlotsHolder.gameObject.SetActive(true);
-                ToggleOutputConstuctionBT.Bind(constructionViewData.IsActiveConstructionOutput);
-                ConstructionAreaDispose.Add(ToggleOutputConstuctionBT);
-                
-                for(int i=0;i<constructionViewData.OutputConstructionSlots.Length;i++)
-                {
-                    OutputConstructionSlots[i].Bind((constructionViewData.OutputConstructionSlots[i].ItemID.Value,
-                                        constructionViewData.OutputConstructionSlots[i].Amount,
-                                        constructionViewData.OutputConstructionSlots[i].Capacity));
-                    ConstructionAreaDispose.Add(OutputConstructionSlots[i]);
-                }
-            }
-            if(constructionViewData.InputConstructionSlots!=null)
-            {
-                InputConstructionSlotsHolder.gameObject.SetActive(true);
-                ToggleInputConstuctionBT.Bind(constructionViewData.IsActiveConstructionInput);
-                ConstructionAreaDispose.Add(ToggleInputBT);
-
-                for(int i=0;i<constructionViewData.InputConstructionSlots.Length;i++)
-                {
-                    InputConstructionSlots[i].Bind((constructionViewData.InputConstructionSlots[i].ItemID.Value,
-                                        constructionViewData.InputConstructionSlots[i].Amount,
-                                        constructionViewData.InputConstructionSlots[i].Capacity));
-                    ConstructionAreaDispose.Add(InputConstructionSlots[i]);
-                }
-            }
-            PriorityConstuctionBT.Bind(constructionViewData.ConstructionPriority);
-            ConstructionAreaDispose.Add(PriorityConstuctionBT);
+                UpdateConstuctionSlots(value);
+            }).AddTo(allDisposables);
+            
+            UpdateConstuctionSlots(constructionViewData.Value);
             allDisposables.Add(ConstructionAreaDispose);
         }
-    }
+    } 
     void ShowExcessArea()
     { 
         if (excessItems == null)
@@ -329,6 +304,78 @@ public class BuildingManagementWindowView:DragableUIWindow
         }
         allDisposables.Add(ExcessAreaDispose);
     }
+    void UpdateConstuctionSlots(ConstructionViewData constructionViewData)
+    {
+    
+        foreach(var s in InputConstructionSlots)
+        {
+            if (s.gameObject.activeInHierarchy)
+            {
+                ConstructionAreaDispose.Remove(s);
+                s.Dispose();
+            }
+        }
+        foreach(var s in OutputConstructionSlots)
+        {
+            if (s.gameObject.activeInHierarchy)
+            {
+                ConstructionAreaDispose.Remove(s);
+                s.Dispose();
+            }
+        }
+        ToggleOutputConstuctionBT.Dispose();
+        ToggleInputConstuctionBT.Dispose();
+        bool shouldShow=false;
+        if(constructionViewData.OutputConstructionSlots != null&&constructionViewData.OutputConstructionSlots.Length>0)
+        {
+            ToggleOutputConstuctionBT.Bind(constructionViewData.IsActiveConstructionOutput);
+            ConstructionAreaDispose.Add(ToggleOutputConstuctionBT);
+            
+            for(int i=0;i<constructionViewData.OutputConstructionSlots.Length;i++)
+            {
+                OutputConstructionSlots[i].Bind((constructionViewData.OutputConstructionSlots[i].ItemID.Value,
+                                    constructionViewData.OutputConstructionSlots[i].Amount,
+                                    constructionViewData.OutputConstructionSlots[i].Capacity));
+                ConstructionAreaDispose.Add(OutputConstructionSlots[i]);
+            }
+            shouldShow=true;
+        }
+        if(constructionViewData.InputConstructionSlots!=null&&constructionViewData.InputConstructionSlots.Length > 0)
+        {
+            ToggleInputConstuctionBT.Bind(constructionViewData.IsActiveConstructionInput);
+            ConstructionAreaDispose.Add(ToggleInputConstuctionBT);
+
+            for(int i=0;i<constructionViewData.InputConstructionSlots.Length;i++)
+            {
+                InputConstructionSlots[i].Bind((constructionViewData.InputConstructionSlots[i].ItemID.Value,
+                                    constructionViewData.InputConstructionSlots[i].Amount,
+                                    constructionViewData.InputConstructionSlots[i].Capacity));
+                ConstructionAreaDispose.Add(InputConstructionSlots[i]);
+            }
+            shouldShow=true;
+        }
+         
+        if (shouldShow)
+        {
+            
+            ConstructionArea.gameObject.SetActive(true);
+            ConstructionSlotsHead.gameObject.SetActive(true);
+            ConstructionHead.gameObject.SetActive(true);
+            
+            InputConstructionSlotsHolder.gameObject.SetActive(true);
+            OutputConstructionSlotsHolder.gameObject.SetActive(true);
+            PriorityConstuctionBT.Bind(constructionViewData.ConstructionPriority);
+            ConstructionAreaDispose.Add(PriorityConstuctionBT);
+        }
+        else
+        {
+            ConstructionArea.gameObject.SetActive(false);
+            ConstructionSlotsHead.gameObject.SetActive(false);
+            ConstructionHead.gameObject.SetActive(false);
+            //ConstructionAreaDispose.Dispose();
+        }
+    }
+   
     void UpdateExcessSlots(SlotViewData[] slots)
     {
         foreach(var s in ExcessItemsSlots)
@@ -399,7 +446,7 @@ public class BuildingManagementWindowView:DragableUIWindow
                 // Теперь подписываемся на ЧИСТОЕ событие. На кнопке будет ровно ОДИН обработчик.
                 slotUI.onSlotDeleted += () =>
                 {
-                    model.RemoveStorageSlot(buildingViewData.buildingEntity, indexForLambda);
+                    model.RemoveStorageSlot(indexForLambda);
                 };
 
                 StorageAreaDispose.Add(slotUI);
@@ -438,8 +485,6 @@ public class BuildingManagementWindowView:DragableUIWindow
         ConstructionAreaDispose=null;
         ConstructionHead.gameObject.SetActive(false);
         ConstructionSlotsHead.gameObject.SetActive(false);
-        InputConstructionSlotsHolder.gameObject.SetActive(false);
-        OutputConstructionSlotsHolder.gameObject.SetActive(false);
         //ForceDestroyBT.onClick.RemoveAllListeners();
         ConstructionArea.gameObject.SetActive(false);
     }  
@@ -453,6 +498,7 @@ public class BuildingManagementWindowView:DragableUIWindow
     }
     void ResetWindow()
     {
+        RecipesAndItemsHead.Close();
         workStateDispose?.Dispose();
         workStateDispose=null;
         allDisposables?.Dispose();
@@ -465,7 +511,6 @@ public class BuildingManagementWindowView:DragableUIWindow
     public override void Close()
     {
         ResetWindow();
-        RecipesAndItemsHead.Close();
         base.Close();
     }
     
@@ -473,6 +518,7 @@ public class BuildingManagementWindowView:DragableUIWindow
    private bool _pendingSetup = false;
     public void UpdateView()
     {
+        
         if(model == null || !isOpened.Value || buildingViewData == null) return;
         
         if (windowChanged)
@@ -491,7 +537,8 @@ public class BuildingManagementWindowView:DragableUIWindow
 
         if (fC % 4 == 0)
         {
-            model.FixedUpdate(buildingViewData);
+            if(gameController.GetEntity(buildingViewData.buildingID,out var en)&&en!=buildingViewData.buildingEntity) Close();
+            model.FixedUpdate();
             fC = 0;
         }
         else fC++;

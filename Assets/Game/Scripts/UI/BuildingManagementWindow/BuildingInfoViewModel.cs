@@ -14,179 +14,204 @@ public class BuildingInfoViewModel
 {
     EntityManager entityManager;
     World world;
-    SlotViewData[] InputSlots;    
-    SlotViewData[] OutputSlots;   
-    ReactiveProperty<bool> IsActiveInput;  
-    ReactiveProperty<bool> IsActiveOutput;  
-    ReactiveProperty<int> Priority;
+    SlotViewData[] _inputSlots;    
+    SlotViewData[] _outputSlots;   
+    ReactiveProperty<bool> _isActiveInput;  
+    ReactiveProperty<bool> _isActiveOutput;  
+    ReactiveProperty<int> _priority;
 
 
     
-    ReactiveProperty<SlotViewData[]>ExcessSlots;   
-    SlotViewData[] InputConstructionSlots;    
-    SlotViewData[] OutputConstructionSlots;  
+    ReactiveProperty<SlotViewData[]> _excessSlotsRP;   
 
-   ReactiveProperty< StorageSlotViewData[]> StorageSlots;  
-    ReactiveProperty<bool> IsActiveConstructionInput;  
-    ReactiveProperty<bool> IsActiveConstructionOutput;  
-    ReactiveProperty<int> ConstructionPriority;
+    ReactiveProperty< StorageSlotViewData[]> _storageSlots;
 
-    ReactiveProperty<int> WorkState;
+    ReactiveProperty<ConstructionViewData> _constructionViewDataRP;
+    SlotViewData[] _inputConstructionSlots; 
+    SlotViewData[] _outputConstructionSlots; 
+    ReactiveProperty<bool> _isActiveConstructionInput;  
+    ReactiveProperty<bool> _isActiveConstructionOutput;  
+    ReactiveProperty<int> _constructionPriority;
 
-    ReactiveProperty<float> TimeToCraft;
-    ReactiveProperty<float> CurrTime;
-    ReactiveProperty<int> CountInPack;
+    ReactiveProperty<int> _workState;
+
+    ReactiveProperty<float> _timeToCraft;
+    ReactiveProperty<float> _currTime;
+    ReactiveProperty<int> _countInPack;
+
     CompositeDisposable disposables;
     CompositeDisposable storageDisposables;
     public Action tempUpdate;
+    BuildingViewData viewData;
     
     public BuildingInfoViewModel(World world)
     {
         entityManager=world.EntityManager;
         this.world=world;
     }
-    public void GetBuildingData(Entity building,
-                out BuildingViewData buildingViewData,
-                out ReactiveProperty<int> priority, 
-                out DistribuitionViewData distribuitionViewData,
-                out ReactiveProperty<SlotViewData[]> excessItems,
-                out ConstructionViewData placeDestroyViewData,
-                out (bool,BuildingCraftViewData) recipeViewData,
-                out ReactiveProperty<StorageSlotViewData[]>StorageSlots)
+    void ClearViewModel()
     {
         tempUpdate=null;
         disposables?.Dispose();
         disposables=new();
-        buildingViewData=null;
-        distribuitionViewData=null;
-        excessItems=null;
-        StorageSlots=null;
-        placeDestroyViewData=null;
-        priority=null;
-        recipeViewData=(false,null);
-        if (entityManager.HasComponent<PropTag>(building) || entityManager.HasComponent<BuildingTag>(building))
+        _inputSlots=null;    
+        _outputSlots=null;   
+        _isActiveInput?.Dispose();
+        _isActiveInput=null; 
+        _isActiveOutput?.Dispose();
+        _isActiveOutput=null;  
+        _priority?.Dispose();
+        _priority=null;
+        _excessSlotsRP?.Dispose();  
+        _excessSlotsRP=null;   
+        _inputConstructionSlots=null;    
+        _outputConstructionSlots=null;  
+        _isActiveConstructionInput?.Dispose();
+        _isActiveConstructionInput=null;  
+        _isActiveConstructionOutput?.Dispose();
+        _isActiveConstructionOutput=null;  
+        _constructionPriority?.Dispose();
+        _constructionPriority=null;
+        _workState=null;
+        _workState?.Dispose();
+        
+        _storageSlots?.Dispose(); 
+        _storageSlots=null;  
+
+        _timeToCraft?.Dispose();
+        _timeToCraft=null;
+        _currTime?.Dispose();
+        _currTime=null;
+        _countInPack?.Dispose();
+        _countInPack=null;
+    }
+    public void GetBuildingData(Entity building,
+                                out BuildingViewData buildingViewData,
+                                out ReactiveProperty<ConstructionViewData> constructionViewDataRP,
+                                out ReactiveProperty<SlotViewData[]> excessItems,
+                                out DistribuitionViewData distribuitionViewData,
+                                out ReactiveProperty<int> priority, 
+                                out (bool,BuildingCraftViewData) recipeViewData,
+                                out ReactiveProperty<StorageSlotViewData[]>StorageSlots,
+                                out bool CanDestory)
+    { 
+        ClearViewModel();
+        _constructionViewDataRP=new();
+        _excessSlotsRP=new();
+        _workState=new();
+        _workState.Value=entityManager.GetComponentData<BuildingStateData>(building).State;
+        viewData=new BuildingViewData{buildingID=entityManager.GetComponentData<BuildingData>(building).BuildingIDHash,buildingEntity=building,WorkState=_workState};
+        buildingViewData=viewData;
+        CanDestory=entityManager.HasComponent<ForceDestroyTag>(building);
+        _inputConstructionSlots=GetSlotsFromBuff<InputConstructionSlotData>(building);
+        _outputConstructionSlots=GetSlotsFromBuff<OutputConstructionSlotData>(building);
+        _isActiveConstructionInput= entityManager.HasComponent<IsInputConstructionEnabled>(building)?new(entityManager.IsComponentEnabled<IsInputConstructionEnabled>(building)):null;
+        _isActiveConstructionOutput= entityManager.HasComponent<IsOutputConstuctionEnabled>(building)?new(entityManager.IsComponentEnabled<IsOutputConstuctionEnabled>(building)):null;
+        _constructionPriority=entityManager.HasComponent<IsOutputConstuctionEnabled>(building)?new(entityManager.GetComponentData<ConstructionPriorityData>(building).ConstructionPriority):null;
+        _constructionPriority?.Subscribe(value =>
         {
-            this.WorkState=new(entityManager.GetComponentData<BuildingStateData>(building).State);
-            buildingViewData=new BuildingViewData{buildingID=entityManager.GetComponentData<BuildingData>(building).BuildingIDHash,buildingEntity=building,WorkState=WorkState};
-            
-            InputSlots=null;    
-            OutputSlots=null;   
-            InputSlots=GetSlotsFromBuff<InputSlotData>(building);
-            OutputSlots=GetSlotsFromBuff<OutputSlotData>(building);
-            
-            if (InputSlots != null || OutputSlots != null)
-            {
-                IsActiveInput=entityManager.HasComponent<IsInputCraftEnabled>(building)? new(entityManager.IsComponentEnabled<IsInputCraftEnabled>(building)) :null;
-                IsActiveOutput=entityManager.HasComponent<IsOutputCraftEnabled>(building)? new(entityManager.IsComponentEnabled<IsOutputCraftEnabled>(building)):null;
-                IsActiveInput?.Subscribe(value=>ChangeBuildingAccess(building,false,true,value)).AddTo(disposables);
-                IsActiveOutput?.Subscribe(value=>ChangeBuildingAccess(building,false,false,value)).AddTo(disposables);
-                distribuitionViewData = new()
-                {
-                    IsProcessor=entityManager.HasComponent<ConsumerTypeBuildingTag>(building)||
-                                entityManager.HasComponent<ProducerTypeBuildingTag>(building)||
-                                entityManager.HasComponent<ProcessorTypeBuildingTag>(building),
-                                InputSlots=InputSlots,
-                    OutputSlots=OutputSlots,
-                    IsActiveInput=IsActiveInput,
-                    IsActiveOutput=IsActiveOutput,
-                };
+            ChangePriority(true,value);
+        });
+        _isActiveConstructionInput?.Subscribe(value=>ChangeBuildingAccess(true,true,value)).AddTo(disposables);
+        _isActiveConstructionOutput?.Subscribe(value=>ChangeBuildingAccess(true,false,value)).AddTo(disposables);
+        ConstructionViewData constViewData = new()
+        {
+            InputConstructionSlots=_inputConstructionSlots,
+            OutputConstructionSlots=_outputConstructionSlots,
+            IsActiveConstructionInput=_isActiveConstructionInput,
+            IsActiveConstructionOutput=_isActiveConstructionOutput,
+            ConstructionPriority= _constructionPriority
+        };
+        _constructionViewDataRP.Value=constViewData;
+        constructionViewDataRP=_constructionViewDataRP;
+        
+        _excessSlotsRP.Value=GetSlotsFromBuff<ExcessSlotData>(building);
+        excessItems=_excessSlotsRP;
 
-            }
-            else distribuitionViewData =null;
-            Priority=entityManager.HasComponent<CraftingPriorityData>(building)? new(entityManager.GetComponentData<CraftingPriorityData>(building).CraftingPriority):null;
-            Priority?.Subscribe(
-                value =>
-                {
-                    ChangePriority(building,false,value);
-                    
-                }).AddTo(disposables);;
-            priority=Priority;
-            if(entityManager.HasComponent<ExcessSlotData>(building)) ExcessSlots=new(GetSlotsFromBuff<ExcessSlotData>(building));
-            else ExcessSlots=null;
-            excessItems=ExcessSlots;
+        _inputSlots=GetSlotsFromBuff<InputSlotData>(building);
+        _outputSlots=GetSlotsFromBuff<OutputSlotData>(building);
+        
+        if (_inputSlots!=null|| _outputSlots!=null)
+        {
+            _isActiveInput=entityManager.HasComponent<IsInputCraftEnabled>(building)? new(entityManager.IsComponentEnabled<IsInputCraftEnabled>(building)) :null;
+            _isActiveOutput=entityManager.HasComponent<IsOutputCraftEnabled>(building)? new(entityManager.IsComponentEnabled<IsOutputCraftEnabled>(building)):null;
+            _isActiveInput?.Subscribe(value=>ChangeBuildingAccess(false,true,value)).AddTo(disposables);
+            _isActiveOutput?.Subscribe(value=>ChangeBuildingAccess(false,false,value)).AddTo(disposables);
+            distribuitionViewData = new()
+            {
+                InputSlots=_inputSlots,
+                OutputSlots=_outputSlots,
+                IsActiveInput=_isActiveInput,
+                IsActiveOutput=_isActiveOutput,
+            };
            
-
-            if (entityManager.IsComponentEnabled<IsBlueprint>(building)||entityManager.IsComponentEnabled<IsDemolition>(building))
-            {
-                InputConstructionSlots=null;    
-                OutputConstructionSlots=null;   
-                InputConstructionSlots=GetSlotsFromBuff<InputConstructionSlotData>(building);
-                OutputConstructionSlots=GetSlotsFromBuff<OutputConstructionSlotData>(building);
-                IsActiveConstructionInput=entityManager.HasComponent<IsInputConstructionEnabled>(building)? new(entityManager.IsComponentEnabled<IsInputConstructionEnabled>(building)) :null;
-                IsActiveConstructionOutput=entityManager.HasComponent<IsOutputConstuctionEnabled>(building)? new(entityManager.IsComponentEnabled<IsOutputConstuctionEnabled>(building)):null;
-                ConstructionPriority=entityManager.HasComponent<ConstructionPriorityData>(building)? new(entityManager.GetComponentData<ConstructionPriorityData>(building).ConstructionPriority):null;
-                ConstructionPriority?.Subscribe(value =>
-                {
-                    ChangePriority(building,true,value);
-                    
-                    
-                });
-                IsActiveConstructionInput?.Subscribe(value=>ChangeBuildingAccess(building,true,true,value)).AddTo(disposables);
-                IsActiveConstructionOutput?.Subscribe(value=>ChangeBuildingAccess(building,true,false,value)).AddTo(disposables);
-                placeDestroyViewData = new()
-                {
-                    InputConstructionSlots=InputConstructionSlots,
-                    OutputConstructionSlots=OutputConstructionSlots,
-                    IsActiveConstructionInput=IsActiveConstructionInput,
-                    IsActiveConstructionOutput=IsActiveConstructionOutput,
-                    ConstructionPriority= ConstructionPriority
-                };
-            }
-            else placeDestroyViewData=null;
-            recipeViewData=(false,null);
-            if (entityManager.HasComponent<IsRecipeAssigned>(building) && entityManager.IsComponentEnabled<IsRecipeAssigned>(building))
-            {
-                recipeViewData.Item1=true;
-                var recipeData=entityManager.GetComponentData<RecipeBuildingData>(building);
-                TimeToCraft=new(recipeData.TimeToCraft);
-                CurrTime=new(recipeData.CurrTime);
-                CountInPack=new(entityManager.GetComponentData<CountOfPackInBuildingData>(building).CountOfPack);
-                CountInPack.Subscribe(value =>
-                {
-                    ChangeCountOfPack(building,value);
-                }).AddTo(disposables);;
-                recipeViewData.Item2 = new()
-                {
-                    recipeIDHash=recipeData.RecipeIDHash,
-                    CountInPack=CountInPack,
-                    TimeToCraft=TimeToCraft,
-                    CurrTime=CurrTime
-                };
-            }
-            if (entityManager.HasComponent<StorageTypeBuildingTag>(building))
-            {
-                if (entityManager.HasBuffer<StorageSlotData>(building))
-                {
-                    var buff = entityManager.GetBuffer<StorageSlotData>(building);
-                    var slots = new StorageSlotViewData[buff.Length];
-                    storageDisposables?.Dispose();
-                    storageDisposables=new();
-                    for(int i = 0; i < buff.Length;i++)
-                    {
-                        
-                         int indexForLambda = i; 
-                         
-                        ReactiveProperty<int>  ItemID=new(buff[i].ItemId);
-                        ReactiveProperty<int> Amount=new(buff[i].Amount);
-                        ReactiveProperty<int> Capacity=new(buff[i].Capacity);
-                        Capacity.Subscribe(value=> ChangeStorageSlotCapacity(building,indexForLambda,value)).AddTo(storageDisposables);
-                        ReactiveProperty<bool> IsActiveSlotInput=new(buff[i].IsInputEnabled);
-                        ReactiveProperty<bool>  IsActiveSlotOutput=new(buff[i].IsOutputEnabled);
-
-                        IsActiveSlotInput.Subscribe(value=>ChangeStorageSlotAccess(building,indexForLambda,true,value)).AddTo(storageDisposables);
-                        IsActiveSlotOutput.Subscribe(value=>ChangeStorageSlotAccess(building,indexForLambda,false,value)).AddTo(storageDisposables);
-                        slots[i]=new StorageSlotViewData{
-                            ItemID=ItemID,
-                            Amount=Amount,
-                            Capacity=Capacity,
-                            IsActiveInput=IsActiveSlotInput,
-                            IsActiveOutput=IsActiveSlotOutput};
-                    }
-                    this.StorageSlots=new(slots);
-                    StorageSlots=this.StorageSlots;
-                }
-            }
         }
+        else distribuitionViewData=null;
+        _priority=entityManager.HasComponent<CraftingPriorityData>(building)? new(entityManager.GetComponentData<CraftingPriorityData>(building).CraftingPriority):null;
+        _priority?.Subscribe(
+            value =>
+            {
+                ChangePriority(false,value);
+                
+            }).AddTo(disposables);;
+        priority=_priority;
+        recipeViewData=(false,null);
+        if (entityManager.HasComponent<IsRecipeAssigned>(building) && entityManager.IsComponentEnabled<IsRecipeAssigned>(building))
+        {
+            recipeViewData.Item1=true;
+            var recipeData=entityManager.GetComponentData<RecipeBuildingData>(building);
+            _timeToCraft=new(recipeData.TimeToCraft);
+            _currTime=new(recipeData.CurrTime);
+            _countInPack=new(entityManager.GetComponentData<CountOfPackInBuildingData>(building).CountOfPack);
+            _countInPack.Subscribe(value =>
+            {
+                ChangeCountOfPack(value);
+            }).AddTo(disposables);;
+            recipeViewData.Item2 = new()
+            {
+                recipeIDHash=recipeData.RecipeIDHash,
+                CountInPack=_countInPack,
+                TimeToCraft=_timeToCraft,
+                CurrTime=_currTime
+            };
+        }
+        if (entityManager.HasComponent<StorageTypeBuildingTag>(building))
+        {
+            if (entityManager.HasBuffer<StorageSlotData>(building))
+            {
+                var buff = entityManager.GetBuffer<StorageSlotData>(building);
+                var slots = new StorageSlotViewData[buff.Length];
+                storageDisposables?.Dispose();
+                storageDisposables=new();
+                for(int i = 0; i < buff.Length;i++)
+                {
+                    
+                        int indexForLambda = i; 
+                        
+                    ReactiveProperty<int>  ItemID=new(buff[i].ItemId);
+                    ReactiveProperty<int> Amount=new(buff[i].Amount);
+                    ReactiveProperty<int> Capacity=new(buff[i].Capacity);
+                    Capacity.Subscribe(value=> ChangeStorageSlotCapacity(indexForLambda,value)).AddTo(storageDisposables);
+                    ReactiveProperty<bool> IsActiveSlotInput=new(buff[i].IsInputEnabled);
+                    ReactiveProperty<bool>  IsActiveSlotOutput=new(buff[i].IsOutputEnabled);
+
+                    IsActiveSlotInput.Subscribe(value=>ChangeStorageSlotAccess(indexForLambda,true,value)).AddTo(storageDisposables);
+                    IsActiveSlotOutput.Subscribe(value=>ChangeStorageSlotAccess(indexForLambda,false,value)).AddTo(storageDisposables);
+                    slots[i]=new StorageSlotViewData{
+                        ItemID=ItemID,
+                        Amount=Amount,
+                        Capacity=Capacity,
+                        IsActiveInput=IsActiveSlotInput,
+                        IsActiveOutput=IsActiveSlotOutput};
+                }
+                _storageSlots=new(slots);
+                StorageSlots=_storageSlots;
+                storageDisposables.AddTo(disposables);
+            }
+            else StorageSlots=null;
+        }
+        else StorageSlots=null;
+
     }
     
     SlotViewData[] GetSlotsFromBuff<T>(Entity building) where T:unmanaged,ISlot,IBufferElementData
@@ -218,50 +243,72 @@ public class BuildingInfoViewModel
         }
     }
     
-    public void FixedUpdate(BuildingViewData viewDataData)
+    public void FixedUpdate()
     {
-        if (InputSlots != null)
-            UpdateBuff<InputSlotData>(viewDataData.buildingEntity, InputSlots);
-    
-        if (OutputSlots != null)
-            UpdateBuff<OutputSlotData>(viewDataData.buildingEntity, OutputSlots);
-        
-        
-        if (InputConstructionSlots != null)
-            UpdateBuff<InputConstructionSlotData>(viewDataData.buildingEntity, InputConstructionSlots);
-        
-        if (OutputConstructionSlots != null)
-            UpdateBuff<OutputConstructionSlotData>(viewDataData.buildingEntity, OutputConstructionSlots);
-        if (entityManager.HasComponent<PropTag>(viewDataData.buildingEntity) || entityManager.HasComponent<BuildingTag>(viewDataData.buildingEntity))
+         if (!entityManager.Exists(viewData.buildingEntity)) 
         {
-            
-            WorkState.Value=entityManager.GetComponentData<BuildingStateData>(viewDataData.buildingEntity).State;
-            if (entityManager.HasComponent<IsRecipeAssigned>(viewDataData.buildingEntity)&&entityManager.IsComponentEnabled<IsRecipeAssigned>(viewDataData.buildingEntity))
-            {
-                var data=entityManager.GetComponentData<RecipeBuildingData>(viewDataData.buildingEntity);
-                
-               
-                TimeToCraft.Value=data.TimeToCraft;
-                CurrTime.Value=data.CurrTime;
-            }
-
-
-            UpdateStorageSlots(viewDataData);
-
-           UpdateExcessSlots(viewDataData);
+            return; 
         }
+        if (_inputSlots != null)
+            UpdateBuff<InputSlotData>(viewData.buildingEntity, _inputSlots);
+    
+        if (_outputSlots != null)
+            UpdateBuff<OutputSlotData>(viewData.buildingEntity, _outputSlots);
+        _workState.Value=entityManager.GetComponentData<BuildingStateData>(viewData.buildingEntity).State;
+        if (entityManager.HasComponent<IsRecipeAssigned>(viewData.buildingEntity)&&entityManager.IsComponentEnabled<IsRecipeAssigned>(viewData.buildingEntity))
+        {
+            var data=entityManager.GetComponentData<RecipeBuildingData>(viewData.buildingEntity);
+            
+            
+            _timeToCraft.Value=data.TimeToCraft;
+            _currTime.Value=data.CurrTime;
+        }
+
+
+        UpdateStorageSlots();
+
+        UpdateExcessSlots();
+        UpdateConstructionSlots();
     }
-    private void UpdateStorageSlots(BuildingViewData viewDataData)
+    void UpdateConstructionSlots()
     {
-        var entity = viewDataData.buildingEntity;
+        var entity = viewData.buildingEntity;
+        var val=_constructionViewDataRP.Value;
+        
+        if(!entityManager.HasComponent<ConstructionPriorityData>(entity)) return;
+        var inbuff = entityManager.GetBuffer<InputConstructionSlotData>(entity);
+        
+        if (val.InputConstructionSlots.Length != inbuff.Length)
+        {
+            _inputConstructionSlots=GetSlotsFromBuff<InputConstructionSlotData>(entity);
+            val.InputConstructionSlots=_inputConstructionSlots;
+            _constructionViewDataRP.SetValueAndForceNotify(val);
+        }
+        else
+            UpdateBuff<InputConstructionSlotData>(viewData.buildingEntity, _inputConstructionSlots);
+        var outbuff = entityManager.GetBuffer<OutputConstructionSlotData>(entity);
+        
+        if (val.OutputConstructionSlots.Length != outbuff.Length)
+        {
+            _outputConstructionSlots=GetSlotsFromBuff<OutputConstructionSlotData>(entity);
+            val.OutputConstructionSlots=_outputConstructionSlots;
+            _constructionViewDataRP.SetValueAndForceNotify(val);
+        }
+        else 
+            UpdateBuff<OutputConstructionSlotData>(viewData.buildingEntity, _outputConstructionSlots);
+
+
+    }
+    void UpdateStorageSlots()
+    {
+        var entity = viewData.buildingEntity;
 
         if (!entityManager.HasComponent<StorageTypeBuildingTag>(entity) || 
             !entityManager.HasBuffer<StorageSlotData>(entity)) return;
 
         var buff = entityManager.GetBuffer<StorageSlotData>(entity);
         
-        // 1. Если размер изменился — создаем НОВЫЙ массив, заполняем и ОДИН раз присваиваем
-        if (StorageSlots.Value == null || StorageSlots.Value.Length != buff.Length)
+        if (_storageSlots.Value == null || _storageSlots.Value.Length != buff.Length)
         {
             var newSlots = new StorageSlotViewData[buff.Length];
             storageDisposables?.Dispose();
@@ -273,12 +320,12 @@ public class BuildingInfoViewModel
                 ReactiveProperty<int>  ItemID=new(buff[i].ItemId);
                 ReactiveProperty<int> Amount=new(buff[i].Amount);
                 ReactiveProperty<int> Capacity=new(buff[i].Capacity);
-                Capacity.Subscribe(value=> ChangeStorageSlotCapacity(entity,indexForLambda,value)).AddTo(storageDisposables);
+                Capacity.Subscribe(value=> ChangeStorageSlotCapacity(indexForLambda,value)).AddTo(storageDisposables);
                 ReactiveProperty<bool> IsActiveSlotInput=new(buff[i].IsInputEnabled);
                 ReactiveProperty<bool>  IsActiveSlotOutput=new(buff[i].IsOutputEnabled);
 
-                IsActiveSlotInput.Subscribe(value=>ChangeStorageSlotAccess(entity,indexForLambda,true,value)).AddTo(storageDisposables);
-                IsActiveSlotOutput.Subscribe(value=>ChangeStorageSlotAccess(entity,indexForLambda,false,value)).AddTo(storageDisposables);
+                IsActiveSlotInput.Subscribe(value=>ChangeStorageSlotAccess(indexForLambda,true,value)).AddTo(storageDisposables);
+                IsActiveSlotOutput.Subscribe(value=>ChangeStorageSlotAccess(indexForLambda,false,value)).AddTo(storageDisposables);
                 newSlots[i] = new StorageSlotViewData {
                     ItemID=ItemID,
                             Amount=Amount,
@@ -286,39 +333,36 @@ public class BuildingInfoViewModel
                             IsActiveInput=IsActiveSlotInput,
                             IsActiveOutput=IsActiveSlotOutput};
             }
-            // Только это действие триггерит обновление списка в UI (создание новых плашек)
-            StorageSlots.Value = newSlots; 
+            _storageSlots.Value = newSlots; 
+            
+            storageDisposables.AddTo(disposables);
         }
         else
         {
-            // 2. Если размер ТОТ ЖЕ — просто обновляем значения внутри существующих объектов
-            // Свойство StorageSlots.Value МЫ НЕ ТРОГАЕМ. 
-            // UI-список не перерисовывается, обновляются только цифры в текстовых полях.
-            var currentSlots = StorageSlots.Value;
+            var currentSlots = _storageSlots.Value;
             for (int i = 0; i < buff.Length; i++)
             {
                 var data = buff[i];
                 var slot = currentSlots[i];
 
-                // Обновляем только примитивы внутри реактивных свойств
                 slot.ItemID.Value = data.ItemId;
                 slot.Amount.Value = data.Amount;
             }
         }
     }
-    private void UpdateExcessSlots(BuildingViewData viewDataData)
+    void UpdateExcessSlots()
     {
-        var entity = viewDataData.buildingEntity;
+        var entity = viewData.buildingEntity;
 
         if (!entityManager.HasBuffer<ExcessSlotData>(entity)) return;
 
         var exbuff = entityManager.GetBuffer<ExcessSlotData>(entity);
         
-        bool isSizeChanged = ExcessSlots.Value == null || ExcessSlots.Value.Length != exbuff.Length;
+        bool isSizeChanged = _excessSlotsRP.Value == null || _excessSlotsRP.Value.Length != exbuff.Length;
 
         SlotViewData[] currentSlots = isSizeChanged 
             ? new SlotViewData[exbuff.Length] 
-            : ExcessSlots.Value;
+            : _excessSlotsRP.Value;
 
         for (int i = 0; i < exbuff.Length; i++)
         {
@@ -343,19 +387,20 @@ public class BuildingInfoViewModel
 
         if (isSizeChanged)
         {
-            ExcessSlots.Value = currentSlots;
+            _excessSlotsRP.Value = currentSlots;
         }
         else
         {
-            ExcessSlots.SetValueAndForceNotify(currentSlots);
+            _excessSlotsRP.SetValueAndForceNotify(currentSlots);
         }
     }
-    public void AddAmount(Entity entity,int amount)
+    
+    public void AddAmount(int amount)
     {
         
-        if (entityManager.HasComponent<IsDemolition>(entity)&&entityManager.IsComponentEnabled<IsDemolition>(entity))
+        if (entityManager.HasComponent<IsDemolition>(viewData.buildingEntity)&&entityManager.IsComponentEnabled<IsDemolition>(viewData.buildingEntity))
         {
-            var buff = entityManager.GetBuffer<OutputConstructionSlotData>(entity);
+            var buff = entityManager.GetBuffer<OutputConstructionSlotData>(viewData.buildingEntity);
             if(buff.Length<1) return;
             for(int i =0; i < buff.Length; i++)
             {
@@ -365,9 +410,9 @@ public class BuildingInfoViewModel
                 if(b.Amount==b.Capacity) tempUpdate?.Invoke();
             }
         }
-        if (entityManager.HasComponent<IsBlueprint>(entity)&&entityManager.IsComponentEnabled<IsBlueprint>(entity))
+        if (entityManager.HasComponent<IsBlueprint>(viewData.buildingEntity)&&entityManager.IsComponentEnabled<IsBlueprint>(viewData.buildingEntity))
         {
-            var buff = entityManager.GetBuffer<InputConstructionSlotData>(entity);
+            var buff = entityManager.GetBuffer<InputConstructionSlotData>(viewData.buildingEntity);
             if(buff.Length<1) return;
             for(int i =0; i < buff.Length; i++)
             {
@@ -378,103 +423,106 @@ public class BuildingInfoViewModel
             }
         }
     }
-    public void SetRecipe(Entity entity, int RecipeID)
+    public void SetRecipe(int RecipeID)
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
                .CreateCommandBuffer();
         Entity Command=ecb.CreateEntity();
-        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
+        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=viewData.buildingEntity});
         ecb.AddComponent(Command,new SetRecipeData{RecipeID=RecipeID});
         
     }
 
-    public void MarkAsDemolition(Entity entity,bool IsDemolition)
+    public void MarkAsDemolition(bool IsDemolition)
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
                .CreateCommandBuffer();
-        ecb.SetComponentEnabled<ChangeDemolitionStateTag>(entity,IsDemolition);
+        ecb.SetComponentEnabled<ChangeDemolitionStateTag>(viewData.buildingEntity,IsDemolition);
     }
-    public void MarkAsForceDestory(Entity entity)
+    public void MarkAsForceDestory()
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
                .CreateCommandBuffer();
-        if(!entityManager.HasComponent<IsDemolition>(entity)) return;
+        if(!entityManager.HasComponent<IsDemolition>(viewData.buildingEntity)) return;
         Entity Command=ecb.CreateEntity();
-        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
+        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=viewData.buildingEntity});
         ecb.AddComponent(Command,new MarkAsForceDestoroyData());
     }
-    public void AddStorageSlot(Entity entity,int ItemID, int Capacity)
+    public void AddStorageSlot(int ItemID, int Capacity)
     {
-        if (entityManager.HasBuffer<StorageSlotData>(entity))
+        
+            Debug.Log("ыфввыфвыфвыфвыффвыфвыыфв");
+        if (entityManager.HasBuffer<StorageSlotData>(viewData.buildingEntity))
         {
+            Debug.Log("ssdds");
             var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
                 .CreateCommandBuffer();
-            var buff=entityManager.GetBuffer<StorageSlotData>(entity);
+            var buff=entityManager.GetBuffer<StorageSlotData>(viewData.buildingEntity);
             if(buff.Length==buff.Capacity) return;
             
             Entity Command=ecb.CreateEntity();
-            ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
+            ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=viewData.buildingEntity});
             ecb.AddComponent(Command,new AddStorageSlotData{ItemID=ItemID,Capacity=Capacity});
         }
     }
-    public void RemoveStorageSlot(Entity entity,int slotIND)
+    public void RemoveStorageSlot(int slotIND)
     {
-        if (entityManager.HasBuffer<StorageSlotData>(entity))
+        if (entityManager.HasBuffer<StorageSlotData>(viewData.buildingEntity))
         {     var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
                 .CreateCommandBuffer();
-            var buff=entityManager.GetBuffer<StorageSlotData>(entity);
+            var buff=entityManager.GetBuffer<StorageSlotData>(viewData.buildingEntity);
             if(buff.Length<=slotIND) return;
             
             Entity Command=ecb.CreateEntity();
-            ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
+            ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=viewData.buildingEntity});
             ecb.AddComponent(Command,new RemoveStorageSlotData{slotIND=slotIND});
         }
     }   
-    void ChangePriority(Entity entity,bool isConstrucionPriority,int priorityValue)
+    void ChangePriority(bool isConstrucionPriority,int priorityValue)
     {
        
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
             .CreateCommandBuffer();
         Entity Command=ecb.CreateEntity();
-        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
+        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=viewData.buildingEntity});
         if (isConstrucionPriority)
             ecb.AddComponent(Command,new ChangeConstructionPriotiyData{newPriority=priorityValue});
         else
             ecb.AddComponent(Command,new ChangeCraftPriotiyData{newPriority=priorityValue});
     }
-    void ChangeBuildingAccess(Entity entity,bool isConstrucionAccess,bool IsInput,bool value)
+    void ChangeBuildingAccess(bool isConstrucionAccess,bool IsInput,bool value)
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
             .CreateCommandBuffer();
         Entity Command=ecb.CreateEntity();
-        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
+        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=viewData.buildingEntity});
         if (isConstrucionAccess)
             ecb.AddComponent(Command,new ChangeConstructionBuildingAccessData{IsInput=IsInput,IsEnabled=value});
         else
             ecb.AddComponent(Command,new ChangeProcessorBuildingAccessData{IsInput=IsInput,IsEnabled=value});
     }
-    void ChangeStorageSlotAccess(Entity entity,int SlotIND,bool IsInput,bool value)
+    void ChangeStorageSlotAccess(int SlotIND,bool IsInput,bool value)
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
             .CreateCommandBuffer();
         Entity Command=ecb.CreateEntity();
-        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
+        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=viewData.buildingEntity});
         ecb.AddComponent(Command,new ChangeStorageSlotAccessData{SlotIND=SlotIND,IsInput=IsInput,IsEnabled=value});
     }
-    void ChangeStorageSlotCapacity(Entity entity,int SlotIND,int newCapacity)
+    void ChangeStorageSlotCapacity(int SlotIND,int newCapacity)
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
             .CreateCommandBuffer();
          Entity Command=ecb.CreateEntity();
-        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
+        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=viewData.buildingEntity});
         ecb.AddComponent(Command,new ChangeStorageSlotCapacityData{SlotIND=SlotIND,newCapacity=newCapacity});
     }
-    void ChangeCountOfPack(Entity entity,int newCapacity)
+    void ChangeCountOfPack(int newCapacity)
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
             .CreateCommandBuffer();
         Entity Command=ecb.CreateEntity();
-        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=entity});
+        ecb.AddComponent(Command,new ChangeBuildingData{targetEntity=viewData.buildingEntity});
         ecb.AddComponent(Command,new ChangeCountOfPackData{newCapacity=newCapacity});
     }
 }
@@ -539,7 +587,6 @@ public class BuildingViewData
 }
 public class DistribuitionViewData
 {
-    public bool IsProcessor;
     public SlotViewData[] InputSlots;    
     public SlotViewData[] OutputSlots;   
     public ReactiveProperty<bool> IsActiveInput;

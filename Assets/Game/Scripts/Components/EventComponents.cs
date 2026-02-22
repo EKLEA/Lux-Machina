@@ -1,3 +1,4 @@
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -7,7 +8,16 @@ public struct CreateBuildingEventData : IComponentData
     public int buildingID;
     public int2 buildingPosition;
     public int rotation;
-    public bool isConnected;
+}
+public struct LinkNetworkEnergyTo : IBufferElementData
+{
+    public int2 LinkToBuilding; //x=node , y entity
+    public int2 LinkFromBuilding;
+}
+public struct UnLinkNetworkEnergyTo : IBufferElementData
+{
+    public int2 UnLinkToBuilding; //x=node , y entity
+    public int2 UnLinkFromBuilding;
 }
 public struct ProcessRoadPointsEventTag: IComponentData
 {
@@ -19,11 +29,4 @@ public struct CreateRoadEventTag: IComponentData
 {
     public int UniqueBuildingID;
 }
-public struct ConnectEntities: IComponentData
-{
-    
-}
-public struct EntityToConnect : IBufferElementData
-{
-    public Entity entity;
-}
+

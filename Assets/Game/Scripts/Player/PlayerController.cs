@@ -7,9 +7,10 @@ using Unity.Entities;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
 using Zenject;
 
-public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerData
+public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
 
 {
 
@@ -19,6 +20,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     [SerializeField] int distanceToBuildingWithOpenWindow;
     [SerializeField] LayerMask BuildingMask;
     [SerializeField] LayerMask GroundMask;
+    [SerializeField] LayerMask EnergyNodeMask;
     [SerializeField] GridVisualizer gridVisualizer;
 
     [SerializeField] CameraController cameraController;
@@ -27,6 +29,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     [Inject] PlayerPlaceBuildingSystem playerPlaceBuildingSystem;
     [Inject] PlayerPlaceRoadSystem playerPlaceRoadSystem; 
     [Inject] PlayerDeleteBuildingsSystem playerDeleteBuildingsSystem; 
+    [Inject] PlayerConnectionEnergySystem playerConnectionEnergySystem; 
     [Inject] GridUpdateSystem gridUpdateSystem; 
     InputActionMap GamePlay;
     InputActionMap UI;
@@ -49,9 +52,13 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     public Vector2Int pos {get;private set;}
     public bool isForce {get;private set;}
 
+    public EnergyNode energyNode {get;private set;}
+
+    public Vector3 posV3  {get;private set;}
 
     Action<bool,bool> PlaceDelegate;
     Action BackDelegate;
+    Action<bool> RotateDelegate;
 
     bool isLoaded;
     Entity PlaceCommand;
@@ -61,12 +68,12 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     Color selectColor;
     BuildingOnScene cachedBuilding;
     PlayerState playerState;
-
-    public void Initialize(PlayerPlaceBuildingSystem buildSystem, PlayerPlaceRoadSystem roadSystem,PlayerDeleteBuildingsSystem deleteBuildingsSystem,GridUpdateSystem gridSystem)
+    public void Initialize(PlayerPlaceBuildingSystem buildSystem, PlayerPlaceRoadSystem roadSystem,PlayerDeleteBuildingsSystem deleteBuildingsSystem,PlayerConnectionEnergySystem connSystem,GridUpdateSystem gridSystem)
     {
         playerPlaceBuildingSystem = buildSystem;
         playerPlaceRoadSystem = roadSystem;
         playerDeleteBuildingsSystem=deleteBuildingsSystem;
+        playerConnectionEnergySystem=connSystem;
         gridUpdateSystem=gridSystem;
     }
     void Start()
@@ -82,12 +89,14 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
         entityManager.AddComponent<PlayerPlacingRoad>(PlaceCommand);
         entityManager.AddComponent<PlayerDeletePoints>(PlaceCommand);
         entityManager.AddComponent<PathfindingRequest>(PlaceCommand);
+        entityManager.AddComponent<PlayerConnectBuildings>(PlaceCommand);
         
 
         entityManager.SetComponentEnabled<PathfindingRequest>(PlaceCommand,false);
         entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
         entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,false);
         entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,false);
+        entityManager.SetComponentEnabled<PlayerConnectBuildings>(PlaceCommand,false);
         
         entityManager.AddBuffer<MapPoint>(PlaceCommand); 
         gridVisualizer.Init();
@@ -130,12 +139,14 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     {
         if (!isLoaded) return;
         if (cachedBuilding == null) cachedBuilding = null; 
+        if (energyNode == null) energyNode = null; 
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
         // 1. Логика координат (земля)
         if (Physics.Raycast(ray, out hit, Mathf.Infinity,GroundMask))
         {
             pos = gameController.GetMapPos(hit.point);
+            posV3=hit.point;
             isForce = ForceBuilding.IsPressed();
             if(playerState == PlayerState.Destroy&&playerDeleteBuildingsSystem.DeleteType==DeleteType.DeleteBuilding)
             {
@@ -143,23 +154,57 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
                 cachedBuilding?.SetOutLine(selectColor); 
             }
         }
-        
-        // 2. Логика выделения зданий
-        if (Physics.Raycast(ray, out hit, Mathf.Infinity, BuildingMask))
+        if (Physics.Raycast(ray, out hit, Mathf.Infinity, EnergyNodeMask)&&playerState==PlayerState.Energy)
         {
-            if(playerState==PlayerState.Building||playerState == PlayerState.Destroy&&playerDeleteBuildingsSystem.DeleteType!=DeleteType.DeleteBuilding) return;
-            var building = hit.collider.GetComponent<BuildingOnScene>();
-            
-            if (building != null)
+            if(!(playerState==PlayerState.Building||playerState == PlayerState.Destroy&&playerDeleteBuildingsSystem.DeleteType!=DeleteType.DeleteBuilding))
             {
-                
-                if (cachedBuilding != building)
+                var node = hit.collider.GetComponent<EnergyNode>();
+                if (node != null)
                 {
-                    cachedBuilding?.SetOutLine(null);
-                    cachedBuilding = building;
-                    cachedBuilding.SetOutLine(selectColor); 
+                    
+                    if (energyNode != node)
+                    {
+                        energyNode?.SetOutLine(null);
+                        energyNode = node;
+                        energyNode.SetOutLine(selectColor); 
+                    }
                 }
             }
+        }
+        else
+        {
+            if (energyNode != null)
+            {
+                energyNode.SetOutLine(null);
+                energyNode = null;
+            }
+        }
+        if (Physics.Raycast(ray, out hit, Mathf.Infinity, BuildingMask))
+        {
+            if(!(playerState==PlayerState.Building||playerState == PlayerState.Destroy && playerDeleteBuildingsSystem.DeleteType != DeleteType.DeleteBuilding))
+            {
+                var building = hit.collider.GetComponent<BuildingOnScene>();
+                posV3=hit.point;
+                if (building != null)
+                {
+                    
+                    if (cachedBuilding != building)
+                    {
+                        cachedBuilding?.SetOutLine(null);
+                        cachedBuilding = building;
+                        cachedBuilding.SetOutLine(selectColor); 
+                    }
+                }
+            }
+            else
+            {
+                if (cachedBuilding != null)
+                {
+                    cachedBuilding.SetOutLine(null);
+                    cachedBuilding = null;
+                }
+            }
+            
         }
         else
         {
@@ -169,6 +214,8 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
                 cachedBuilding = null;
             }
         }
+        
+        
     }
 
    
@@ -191,13 +238,23 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
             }
             else
             {
-                 playerDeleteBuildingsSystem.SetUpDelete(info==DeleteType.DeleteManyPoints.ToString()?
-                    DeleteType.DeleteManyPoints:DeleteType.DeleteBuilding,this,PlaceCommand);
+                playerDeleteBuildingsSystem.SetUpDelete(info==DeleteType.DeleteManyPoints.ToString()?
+                DeleteType.DeleteManyPoints:DeleteType.DeleteBuilding,this,PlaceCommand);
             }
             
             entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
             entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,false);
             entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,true);
+        }
+        else if (info.Contains("Energy"))
+        {
+            playerState=PlayerState.Energy;
+            playerConnectionEnergySystem.onActionDone -= SwitchToUIMode;
+            playerConnectionEnergySystem.onActionDone += SwitchToUIMode;
+            PlaceDelegate=playerConnectionEnergySystem.ConnectBuildings;
+            BackDelegate=playerConnectionEnergySystem.Back;
+            RotateDelegate=playerConnectionEnergySystem.Rotate;
+             playerConnectionEnergySystem.SetUpBuilding(( ConnectType)Enum.Parse(typeof(ConnectType), info),this,PlaceCommand);
         }
         else
         {
@@ -222,7 +279,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
                 PlaceDelegate=playerPlaceBuildingSystem.PlaceBuilding;
                 BackDelegate=playerPlaceBuildingSystem.Back;
                 //неучитываыет коннектед
-                playerPlaceBuildingSystem.SetUpBuilding(info.GetStableHashCode(),true,this,PlaceCommand);
+                playerPlaceBuildingSystem.SetUpBuilding(info.GetStableHashCode(),this,PlaceCommand);
                 entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
                 entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,true);
                 entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,false);
@@ -329,8 +386,15 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     {
         if (context.performed)
         {
-            rotation++;
-            rotation%=4;
+            if (Hold.IsPressed())
+            { 
+                RotateDelegate?.Invoke(true);
+            }
+            else
+            {
+                rotation++;
+                rotation%=8;
+            }
         }
     }
 
@@ -364,12 +428,17 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlaceBuildingPlayerD
     {
         UiMode,
         Building,
+        Energy,
         Destroy
     }
    
 }
 
-
+public interface IPlayerConnectData:IPlaceBuildingPlayerData
+{
+    EnergyNode energyNode{get;}
+    Vector3 posV3{get;}
+}
 public interface IPlaceBuildingPlayerData:IPlayerData
 {
     int rotation{get;}

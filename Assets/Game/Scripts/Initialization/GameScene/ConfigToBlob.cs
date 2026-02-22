@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
+using Unity.Cecil.Awesome.CFG;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -12,6 +13,7 @@ public class ConfigToBlob : IInitializable
     EntityManager _entityManager;
     [Inject] IReadOnlyBuildingInfo _buildingInfo;
     [Inject] IReadOnlyRecipeInfo _recipeInfoInfo;
+    [Inject] GameFieldSettings _gameFieldSetting;
     Entity configEntity;
     public async UniTask LoadConfigs(EntityManager entityManager)
     {
@@ -28,6 +30,7 @@ public class ConfigToBlob : IInitializable
         List<BuildingStorageStructConfig> buildingStorageStructConfig=new();
         List<BuildingProcessionStructConfig> buildingProcessionStructConfig=new();
         List<BuildingItemRequestsStructConfig> buildingItemRequestsStructConfig=new();
+        List<BuildingEnergyStructConfig> buildingEnergyStructConfig=new();
 
 
         foreach(var cfg in info.BuildingInfos)
@@ -89,12 +92,25 @@ public class ConfigToBlob : IInitializable
             };
             buildingItemRequestsStructConfig.Add(sturctCFG);
         }
+        foreach(var cfg in info.BuildingEnegryConfigs)
+        {
+             var sturctCFG=new BuildingEnergyStructConfig
+            {
+                id=cfg.Key,
+                radius=cfg.Value.radius,
+                maxConnections=cfg.Value.maxConnections
+            };
+            buildingEnergyStructConfig.Add(sturctCFG);
+        }
         _entityManager.AddComponentData(configEntity,new BuildingConfigReference{ 
             BuildingsBaseConfigs=CreateConfigReference(buildingBaseConfigs.ToArray()),
             BuildingStorageStructConfigs=CreateConfigReference(buildingStorageStructConfig.ToArray()),
             BuildingProcessionStructConfigs=CreateConfigReference(buildingProcessionStructConfig.ToArray()),
             BuildingItemRequestsStructConfigs=CreateConfigReference(buildingItemRequestsStructConfig.ToArray()),
-            roadID="Road".GetStableHashCode()});
+            BuildingEnergyStructConfig=CreateConfigReference(buildingEnergyStructConfig.ToArray()),
+            roadID="Road".GetStableHashCode(),
+            CoreID="Core".GetStableHashCode(),
+            range=_gameFieldSetting.range});
     }
     void CreateRecipeConfig(Entity configEntity,IReadOnlyRecipeInfo info)
     {

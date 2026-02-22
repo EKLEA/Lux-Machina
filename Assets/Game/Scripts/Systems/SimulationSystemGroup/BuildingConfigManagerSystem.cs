@@ -145,9 +145,14 @@ public partial struct BuildingConfigManagerSystem : ISystem
         if(!_markAsForceDestoryQuery.IsEmpty)
             state.Dependency= new MarkAsForceDestoryJob{ECB=ecbParallel}.Schedule(state.Dependency);
 
-        if(!_addStorageSlotQuery.IsEmpty)
+        if (!_addStorageSlotQuery.IsEmpty)
+        {
+            
+         var count = _addStorageSlotQuery.CalculateEntityCount();
+    Debug.Log($"Джоб запускается! Найдено сущностей-команд: {count}");
             state.Dependency= new AddStorageSlotJob{ECB=ecbParallel,StorageSlotDataLookup= StorageSlotDataLookup,mapEntity=mapEntity,
                                                     ExcessSlotDataLookup=ExceessBufferLookup}.Schedule(state.Dependency);
+        }
 
         if(!_removeStorageSlotQuery.IsEmpty)
             state.Dependency= new RemoveStorageSlotJob{ECB=ecbParallel,StorageSlotDataLookup= StorageSlotDataLookup,mapEntity=mapEntity,
@@ -441,6 +446,8 @@ public partial struct BuildingConfigManagerSystem : ISystem
                 {
                     ECB.SetComponentEnabled<ChangeBluePrintState>(sortKey,entity,true);
                 }
+                else 
+                    ecbInputBuff.Clear();
             }
             else
             {

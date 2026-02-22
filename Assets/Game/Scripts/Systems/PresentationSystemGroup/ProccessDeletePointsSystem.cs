@@ -24,13 +24,11 @@ public partial class ProccessDeletePointsSystem : SystemBase
     }
     void ProcessDeleteRoadPoints(Entity command, BuildingMap mapData, DynamicBuffer<MapPoint> points, bool isForce, EntityCommandBuffer ecb)
     {
-        // 1. Группируем точки сноса по сущностям дорог
         NativeParallelMultiHashMap<Entity, MapPoint> entitiesToPoints = new(points.Length, Allocator.Temp);
         foreach (var p in points)
         {
             if (mapData.CellMapEntites.TryGetValue(p.pos, out Entity roadEntity))
             {
-                // Проверка: принудительно ИЛИ точка не защищена от сноса
                 if (isForce || !mapData.IsBluePrintOrDemolitionPoints.TryGetValue(p.pos, out var isProtected) || isProtected)
                     entitiesToPoints.Add(roadEntity, p);
             }

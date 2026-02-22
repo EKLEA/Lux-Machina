@@ -14,13 +14,16 @@ public partial class BuildingChangeVisualSystem : SystemBase
 {
     [Inject] VisualBuildingFactory _visualBuildingFactory;
     [Inject] IReadOnlyBuildingInfo _buildingInfo;
+    
     [Inject] EntityManager _entityManager;
+    [Inject] ConnectEnergyFactory _energyFactory;
     
     protected override void OnUpdate()
     {
         
         var ecb = new EntityCommandBuffer(Allocator.Temp);
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
+        EntitiesDictionary entitiesDictionary = SystemAPI.GetSingleton<EntitiesDictionary>();
         foreach (var (reference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ChangeBluePrintState>().WithEntityAccess())
         {
             ChangeBluePrintState(reference,entity,ecb);
@@ -53,6 +56,22 @@ public partial class BuildingChangeVisualSystem : SystemBase
                 currItem+=b.Amount;
             }
             _visualBuildingFactory.SetProgress(reference.buildingOnScene.gameObject,(float)currItem/maxItems);
+        }
+        foreach(var (energyData,reference,entity)in SystemAPI.Query<EnergyBuildingData, BuildingOnSceneReference>().WithAll<UpdateConnectStatus>().WithDisabled<MarkOnMap>().WithEntityAccess())
+        {
+            var en=reference.buildingOnScene as EnergyBuildingOnScene;
+            bool isConnected=EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity);
+            foreach(var c in energyData.connections)
+            {
+                var nodefrom=en.nodes[c.Item1];
+                if(c.Item2.y!=-1)
+                {
+                    var tobuilding = EntityManager.GetComponentData<BuildingOnSceneReference>(entitiesDictionary.Entities[c.Item2.y]).buildingOnScene as EnergyBuildingOnScene;
+                    var nodeto = tobuilding.nodes[c.Item2.x];
+                    _energyFactory.UpdateConnect(nodefrom,nodeto,isConnected);
+                }
+            }
+            ecb.SetComponentEnabled<UpdateConnectStatus>(entity,false);
         }
         
 

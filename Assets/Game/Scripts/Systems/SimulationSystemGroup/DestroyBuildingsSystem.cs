@@ -66,7 +66,6 @@ public partial struct DestroyBuildingsSystem : ISystem
     public partial struct DestroyBuildingJob : IJobEntity
     {
         public BuildingMap MapData; 
-        
         public EntitiesDictionary EntityDictionary; 
         public Entity Map;
         public EntityCommandBuffer ECB;

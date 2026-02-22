@@ -1,9 +1,10 @@
     using System;
     using Unity.Collections;
     using Unity.Entities;
+using Unity.Mathematics;
 
-    #region классификация построек
-    public struct BuildingTag : IComponentData{}
+#region классификация построек
+public struct BuildingTag : IComponentData{}
     
     public struct RoadTypeBuildingTag : IComponentData{}
     public struct ProcessorTypeBuildingTag:IComponentData{}
@@ -11,7 +12,9 @@
     public struct ConsumerTypeBuildingTag:IComponentData{}
     public struct DefenceTypeBuildingTag: IComponentData{}
     public struct StorageTypeBuildingTag: IComponentData{}
+    public struct EnergyTypeBuildingTag: IComponentData{}
     public struct PropTag : IComponentData{}
+    public struct LogisticTag : IComponentData{}
     #endregion
 
     #region визуал
@@ -33,15 +36,16 @@
     public struct MarkOnMap: IComponentData, IEnableableComponent{}
     public struct UpdateRoad: IComponentData, IEnableableComponent{}
     
+   
+
+    #endregion
+
+    #region распределение ресурсов
     public struct TransitionSlotData : IBufferElementData
     {
         public int itemID;
         public int amount;
     }
-
-    #endregion
-
-    #region распределение ресурсов
 
     [Serializable]
     public struct CraftingPriorityData : IComponentData
@@ -146,10 +150,21 @@
     #endregion
     
     #region электричество
-    public struct IsConnectedToEnegy:IComponentData, IEnableableComponent
+    public struct IsConnectedToEnergy:IComponentData, IEnableableComponent
     {
         //ссылка на башню   
     }
+    public struct ConnectToEnegyEntities:IComponentData
+    {
+        public FixedList128Bytes<int> ConnectToEntites; 
+    }
+    public struct EnergyBuildingData : IComponentData
+    {
+        public float radius;
+        public FixedList128Bytes<(int,int2)> connections; //x-node y -entity
+        public int maxConnections;
+    }
+    public struct UpdateConnectStatus:IComponentData, IEnableableComponent{}
     #endregion
     #region кластеризация
     public struct ClusterLink : IComponentData

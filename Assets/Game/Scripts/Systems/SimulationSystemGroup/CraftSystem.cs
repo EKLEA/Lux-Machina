@@ -85,7 +85,7 @@ public partial struct CraftSystem : ISystem
 
 
     [BurstCompile]
-    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnegy),typeof(IsLogicEnabled),typeof(ProducerTypeBuildingTag))]
+    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnergy),typeof(IsLogicEnabled),typeof(ProducerTypeBuildingTag))]
     [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
     public partial struct PingProducerCraftBuildingJob : IJobEntity
     {
@@ -108,7 +108,7 @@ public partial struct CraftSystem : ISystem
     }
     [BurstCompile]
     
-    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnegy),typeof(IsLogicEnabled),typeof(ConsumerTypeBuildingTag))]
+    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnergy),typeof(IsLogicEnabled),typeof(ConsumerTypeBuildingTag))]
     [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
     public partial struct PingConsumerCraftBuildingJob : IJobEntity
     {
@@ -130,7 +130,7 @@ public partial struct CraftSystem : ISystem
             return true;
         }
     }
-    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnegy),typeof(IsLogicEnabled),typeof(ProcessorTypeBuildingTag))]
+    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnergy),typeof(IsLogicEnabled),typeof(ProcessorTypeBuildingTag))]
     [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
     public partial struct PingProcessorCraftBuildingJob : IJobEntity
     {
@@ -169,7 +169,7 @@ public partial struct CraftSystem : ISystem
     }
 
     [BurstCompile]
-    [WithAll(typeof(IsConnectedToEnegy),typeof(IsRecipeAssigned),typeof(IsLogicEnabled),typeof(ProducerTypeBuildingTag))]
+    [WithAll(typeof(IsConnectedToEnergy),typeof(IsRecipeAssigned),typeof(IsLogicEnabled),typeof(ProducerTypeBuildingTag))]
     [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
     public partial struct ProducerCraftJob : IJobEntity
     {
@@ -208,7 +208,7 @@ public partial struct CraftSystem : ISystem
     }
     
     [BurstCompile]
-    [WithAll(typeof(IsConnectedToEnegy),typeof(IsRecipeAssigned),typeof(IsLogicEnabled),typeof(ConsumerTypeBuildingTag))]
+    [WithAll(typeof(IsConnectedToEnergy),typeof(IsRecipeAssigned),typeof(IsLogicEnabled),typeof(ConsumerTypeBuildingTag))]
     [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
     public partial struct ConsumerCraftJob : IJobEntity
     {
@@ -236,7 +236,7 @@ public partial struct CraftSystem : ISystem
     }
 
       [BurstCompile]
-    [WithAll(typeof(IsConnectedToEnegy),typeof(IsRecipeAssigned),typeof(IsLogicEnabled),typeof(ProcessorTypeBuildingTag))]
+    [WithAll(typeof(IsConnectedToEnergy),typeof(IsRecipeAssigned),typeof(IsLogicEnabled),typeof(ProcessorTypeBuildingTag))]
     [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
     [WithNone(typeof(ProducerTypeBuildingTag))]
     public partial struct ProcessorCraftJob: IJobEntity

@@ -107,6 +107,42 @@
             "maxHealth": 100.0,
             "timeToStartRestore": 5.0,
             "restoreHealthPerSecond": 20.0
+        },
+        {
+            "id": "Lep",
+            "title": "Линия электро предач",
+            "description": "saddsa",
+            "iconPath": "lep",
+            "prefabPath": "lepPrefab",
+            "buildingType": 3,
+            "actionType": 0,
+            "size": {
+                "x": 1,
+                "y": 10,
+                "z": 1
+            },
+            "typeOfLogic": 0,
+            "maxHealth": 50.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 20.0
+        },
+        {
+            "id": "Concentrator",
+            "title": "Распределитель",
+            "description": "sadsadsda",
+            "iconPath": "concentrator",
+            "prefabPath": "concentratorPrefab",
+            "buildingType": 3,
+            "actionType": 0,
+            "size": {
+                "x": 2,
+                "y": 10,
+                "z": 2
+            },
+            "typeOfLogic": 0,
+            "maxHealth": 50.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 20.0
         }
     ]
 }

@@ -82,6 +82,7 @@ public class SaveService : IGameStateSaver,IReadOnlySave
         save.excessSlotsSaveData=new();
         save.recipeBuildingSaveData=new();
         save.storageSlotsSaveData=new();
+        save.buildingEnergyNetvorkLinkSaveData=new();
 
         // save.buildingDatas = new();
         // save.roadPoints = new();
@@ -100,14 +101,14 @@ public class SaveService : IGameStateSaver,IReadOnlySave
             CamPosition = new Vector3(0, 25, -25),
         };
         var hash = "Core".GetStableHashCode();
+        save.CoreID=hash;
         save.Buildings.Add(
-            123,
+            hash,
             new BaseBuildingSaveData
             {
                 buildingID=hash,
                 buildingPosition= new int2(-1, -1),
                 rotation = 1,
-                isConnected=false,
                 isBlueprint=false,
             }
         );

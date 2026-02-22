@@ -62,6 +62,7 @@ public class GameSceneBindings : MonoInstaller
         SignalBusInstaller.Install(Container);
         Container.Bind<VisualBuildingFactory>().AsSingle().NonLazy();
         Container.Bind<BuildingObjectFactory>().AsSingle().NonLazy();
+        Container.Bind<ConnectEnergyFactory>().AsSingle().NonLazy();
     }
 
     void BindGameScene()
@@ -90,6 +91,9 @@ public class GameSceneBindings : MonoInstaller
         ).AsSingle();
          Container.Bind<GridUpdateSystem>().FromMethod(ctx => 
             ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<GridUpdateSystem>()
+        ).AsSingle();
+         Container.Bind<PlayerConnectionEnergySystem>().FromMethod(ctx => 
+            ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerConnectionEnergySystem>()
         ).AsSingle();
         Container.Bind<PlayerController>().FromInstance(playerController).AsSingle();
         Container.Bind<GridVisualizer>().FromInstance(gridVisualizer).AsSingle();

@@ -8,7 +8,6 @@ public class VisualBuildingFactory
 
     public PhantomObject PhantomizeObject(GameObject gameObject)
     {
-        Debug.Log(_PhantomConfig);
         var get = gameObject.GetComponent<PhantomObject>();
         if (get == null)
         {

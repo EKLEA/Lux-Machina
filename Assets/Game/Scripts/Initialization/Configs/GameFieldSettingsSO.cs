@@ -10,6 +10,7 @@ public class GameFieldSettingsSO : ScriptableObject
     [Range(10, 30)]
     [SerializeField]
     public int tickPerSecond;
+    public int range;
     public DistributionPriority defaultDistributionPriority;
     public Color selectBuildingColor;
     public Color makeAsDemolitionBuidlingColor;
@@ -18,4 +19,13 @@ public class GameFieldSettingsSO : ScriptableObject
     public PhantomConfig DemolitionAndFalsePhantomConfig;
     public PhantomConfig ForceDestroyPhantomConfig;
     public LayerMask removeLayer;
+    [ColorUsage(true, true)] 
+    public Color ConnectionColor;
+    [ColorUsage(true, true)] 
+    public Color ConnectionPulseColor;
+    [ColorUsage(true, true)] 
+    public Color DisconnectColor;
+    [ColorUsage(true, true)] 
+    public Color DisconnectPulseColor;
+    public EnergyLine EnergyLine;
 }

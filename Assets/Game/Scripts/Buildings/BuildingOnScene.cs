@@ -1,4 +1,5 @@
 using System;
+using Unity.Mathematics;
 using UnityEngine;
 [RequireComponent(typeof(Outline))]
 public class BuildingOnScene : MonoBehaviour,IDisposable
@@ -20,6 +21,7 @@ public class BuildingOnScene : MonoBehaviour,IDisposable
         else 
             outlineScript.enabled=false;
     }
+   
     public void CreateClusterIndicator(float height = 2f)
     {
         var indicatorObject = GameObject.CreatePrimitive(PrimitiveType.Cube);

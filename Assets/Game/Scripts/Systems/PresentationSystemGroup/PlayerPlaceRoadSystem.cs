@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using NUnit.Framework;
 using UniRx;
 using Unity.Burst;
@@ -22,9 +23,10 @@ public partial class PlayerPlaceRoadSystem : SystemBase
     bool isSecondPoint;
     Vector2Int _pos;
     Vector2Int _cachedPos;
+    int _cachedRot;
     Vector2Int _firstPos;
     EntityQuery _buildReadyQuery;
-    IPlayerData _placeRoadPlayerData;
+    IPlaceBuildingPlayerData _placeRoadPlayerData;
     RoadOnScene _road;
     PhantomObject _preview;
     List<int2> _roadPoints;
@@ -33,7 +35,7 @@ public partial class PlayerPlaceRoadSystem : SystemBase
     bool _isProcessing = false;
     public  Action onBuildingDone;
     public bool canBuild{get;private set;}
-    public void SetUpBuilding(int buildingID,IPlayerData placeRoadPlayerData, Entity playerState)
+    public void SetUpBuilding(int buildingID,IPlaceBuildingPlayerData placeRoadPlayerData, Entity playerState)
     {
         if(_isProcessing || _road != null || EntityManager.IsComponentEnabled<PlayerPlacingRoad>(playerState)||EntityManager.IsComponentEnabled<PlayerDeletePoints>(playerState)) return;
         _isProcessing = true; 
@@ -84,9 +86,11 @@ public partial class PlayerPlaceRoadSystem : SystemBase
             }
             else
             {
-                if(_pos!=_cachedPos)
+                
+                if(_pos!=_cachedPos||_cachedRot!=_placeRoadPlayerData.rotation)
                 {
-                    ecb.SetComponent(playerCommand,new PathfindingRequest{Start=new int2(_firstPos.x,_firstPos.y),End=new int2(_pos.x,_pos.y),RoadPerfer=true});
+                    _cachedRot=_placeRoadPlayerData.rotation;
+                    ecb.SetComponent(playerCommand,new PathfindingRequest{Start=new int2(_firstPos.x,_firstPos.y),End=new int2(_pos.x,_pos.y),RoadPerfer= _cachedRot%2==0});
                     ecb.SetComponentEnabled<PathfindingRequest>(playerCommand,true);
                     _cachedPos=_pos;
                 }

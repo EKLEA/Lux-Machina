@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Entities;
 using Unity.Mathematics;
 
 
@@ -17,9 +18,13 @@ public class BaseBuildingSaveData
     public int buildingID;
     public int2 buildingPosition;
     public int rotation;
-    public bool isConnected;
     public bool isBlueprint;
     public bool IsDemolition;
+}
+[Serializable] 
+public class BuildingEnergyNetvorkLinkSaveData
+{
+    public List<(int2,int2)> entitesLink;//x-node y -entity
 }
 [Serializable]
 public class ConstructionSlotsSaveData

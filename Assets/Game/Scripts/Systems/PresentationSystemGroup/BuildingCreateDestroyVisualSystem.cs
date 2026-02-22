@@ -50,7 +50,9 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
         var buildingOnScene=_factorty.CreateBuilding(buildingData.BuildingIDHash,
                                                     new Vector2Int(posData.LeftCornerPos.x,posData.LeftCornerPos.y),
                                                     posData.Rotation);
-        buildingOnScene.id=buildingData.BuildingUniqueID;                                      
+        buildingOnScene.id=buildingData.BuildingUniqueID;
+        
+        if(buildingOnScene is EnergyBuildingOnScene)  (buildingOnScene as EnergyBuildingOnScene).SetUpNodes();
         ecb.SetComponent(building,new BuildingOnSceneReference{buildingOnScene=buildingOnScene});
         ecb.SetComponentEnabled<CreateVisualTag>(building,false);
     }

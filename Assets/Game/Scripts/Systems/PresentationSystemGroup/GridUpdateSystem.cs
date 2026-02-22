@@ -35,5 +35,6 @@ public partial class GridUpdateSystem : SystemBase
                 map
             );
         }
+        else _visualizer?.Clear();
     }
 }

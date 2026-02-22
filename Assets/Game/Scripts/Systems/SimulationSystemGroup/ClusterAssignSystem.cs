@@ -27,6 +27,7 @@ public partial struct ClusterAssignSystem : ISystem
             .Build(ref state);
         _buildingsToAssignInCluster= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<NeedsClusterAssign>()
+            .WithNone<LogisticTag>()
             .Build(ref state);
 
         
@@ -55,17 +56,17 @@ public partial struct ClusterAssignSystem : ISystem
             var updateTagLookup = SystemAPI.GetComponentLookup<UpdateClustersTag>(false);
             var needsAssignLookup = SystemAPI.GetComponentLookup<NeedsClusterAssign>(false);
             var clusterLinkLookup = SystemAPI.GetComponentLookup<ClusterLink>(false);
-            var roadJob = new RoadClusteringJob
+            var roadJob = new LogisticClusteringJob
             {
-                CellMapBuildingsIDs = map.ValueRO.CellMapBuildingsIDs,
+                CellMapEntities = map.ValueRO.CellMapEntites,
                 CellEntityMultiMap=map.ValueRO.CellEntityMultiMap,
-                ClusterRoadsPoints = clusterMapRW.ValueRW.roadsPoints,
+                ClusterLogisticPoints= clusterMapRW.ValueRW.logisticPoints,
                 clusterIDs = clusterMapRW.ValueRW.UniqueClusterIDs,
-                RoadTypeId = _buildingConfigs.roadID,
                 MapEntity = mapEntity,
                 pointToClusterLink = clusterMapRW.ValueRW.pointToClusterId,
                 UpdateClusterTagLookup = updateTagLookup,
-                ClusterLinkLookup=SystemAPI.GetComponentLookup<ClusterLink>(false),
+                ClusterLinkLookup=clusterLinkLookup,
+                LogisticTagLookup=SystemAPI.GetComponentLookup<LogisticTag>(false),
             };
             state.Dependency = roadJob.Schedule(state.Dependency);
             state.Dependency = new PingBuildingClusterID
@@ -84,7 +85,7 @@ public partial struct ClusterAssignSystem : ISystem
                 IsDemolitionLookup = SystemAPI.GetComponentLookup<IsDemolition>(false),
                 NeedsClusterAssignLookup = SystemAPI.GetComponentLookup<NeedsClusterAssign>(false),
                 IsLogicEnabledLookup = SystemAPI.GetComponentLookup<IsLogicEnabled>(false),
-                RoadLookup = SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(false),
+                RoadLookup = SystemAPI.GetComponentLookup<LogisticTag>(false),
             };
 
             state.Dependency  = assignJob.Schedule(state.Dependency );
@@ -105,37 +106,37 @@ public partial struct ClusterAssignSystem : ISystem
     }
 
     [BurstCompile]
-    public struct RoadClusteringJob : IJob
+    public struct LogisticClusteringJob : IJob
     {
-        [ReadOnly] public NativeParallelHashMap<int2, int> CellMapBuildingsIDs;
+        [ReadOnly] public NativeParallelHashMap<int2, Entity> CellMapEntities;
         [ReadOnly] public NativeParallelMultiHashMap<Entity, int2> CellEntityMultiMap; 
-        public NativeParallelMultiHashMap<int, int2> ClusterRoadsPoints;
+        public NativeParallelMultiHashMap<int, int2> ClusterLogisticPoints;
         
         public Entity MapEntity;
         public ComponentLookup<UpdateClustersTag> UpdateClusterTagLookup;
+        public ComponentLookup<LogisticTag> LogisticTagLookup;
         public ComponentLookup<ClusterLink> ClusterLinkLookup;
         public NativeList<int> clusterIDs;
         public NativeParallelHashMap<int2, int> pointToClusterLink;
 
-        public int RoadTypeId;
 
         public void Execute()
         {
             clusterIDs.Clear();
-            ClusterRoadsPoints.Clear();
+            ClusterLogisticPoints.Clear();
             pointToClusterLink.Clear(); 
 
-            var roadPoints = new NativeParallelHashSet<int2>(CellMapBuildingsIDs.Count(), Allocator.Temp);
+            NativeParallelHashSet<int2> logisticPoints = new NativeParallelHashSet<int2>(CellMapEntities.Count(), Allocator.Temp);
             
-            foreach (var pair in CellMapBuildingsIDs)
+            foreach (var pair in CellMapEntities)
             {
-                if (pair.Value == RoadTypeId)
+                if (LogisticTagLookup.HasComponent(pair.Value))
                 {
-                    roadPoints.Add(pair.Key);
+                    logisticPoints.Add(pair.Key);
                 }
             }
             
-            if (roadPoints.IsEmpty) return;
+            if (logisticPoints.IsEmpty) return;
 
             var currentClusterLink = 0;
             var directions = new NativeArray<int2>(4, Allocator.Temp) 
@@ -144,30 +145,30 @@ public partial struct ClusterAssignSystem : ISystem
                 [2] = new int2(0,1), [3] = new int2(0,-1) 
             };
 
-            while (!roadPoints.IsEmpty)
+            while (!logisticPoints.IsEmpty)
             {
                 clusterIDs.Add(currentClusterLink); 
 
-                var enumerator = roadPoints.GetEnumerator();
+                var enumerator = logisticPoints.GetEnumerator();
                 enumerator.MoveNext();
                 var start = enumerator.Current;
                 var queue = new NativeQueue<int2>(Allocator.Temp);
 
                 queue.Enqueue(start);
-                roadPoints.Remove(start);
+                logisticPoints.Remove(start);
 
                 while(queue.TryDequeue(out int2 pos))
                 {
-                    ClusterRoadsPoints.Add(currentClusterLink, pos);
+                    ClusterLogisticPoints.Add(currentClusterLink, pos);
                     pointToClusterLink[pos] = currentClusterLink;
 
                     for (int i = 0; i < 4; i++)
                     {
                         var neighbor = pos + directions[i];
-                        if (roadPoints.Contains(neighbor))
+                        if (logisticPoints.Contains(neighbor))
                         {
                             queue.Enqueue(neighbor);
-                            roadPoints.Remove(neighbor);
+                            logisticPoints.Remove(neighbor);
                         }
                     }
                 }
@@ -214,6 +215,7 @@ public partial struct ClusterAssignSystem : ISystem
 
     [BurstCompile]
     [WithAll(typeof(NeedsClusterAssign))]
+    [WithNone(typeof(LogisticTag))]
     public partial struct AssignClusterJob : IJobEntity
     {
         [ReadOnly] public NativeParallelHashMap<int2, Entity> CellMapEntities;
@@ -225,7 +227,7 @@ public partial struct ClusterAssignSystem : ISystem
 
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBlueprintLookup;
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
-        [ReadOnly] public ComponentLookup<RoadTypeBuildingTag> RoadLookup;
+        [ReadOnly] public ComponentLookup<LogisticTag> RoadLookup;
         void Execute(
             Entity entity, 
             in BuildingPosData buildingPosData,ref ClusterLink clusterLink)
@@ -262,8 +264,8 @@ public partial struct ClusterAssignSystem : ISystem
                 {
                     if (roadEntity == Entity.Null) return;
 
-                    bool isDemolition = IsDemolitionLookup.IsComponentEnabled(roadEntity);
-                    bool isBlueprint = IsBlueprintLookup.IsComponentEnabled(roadEntity);
+                    bool isDemolition = IsDemolitionLookup.HasComponent(roadEntity) && IsDemolitionLookup.IsComponentEnabled(roadEntity);
+                    bool isBlueprint = IsBlueprintLookup.HasComponent(roadEntity) && IsBlueprintLookup.IsComponentEnabled(roadEntity);
                     
                     if (!isDemolition && !isBlueprint && RoadLookup.HasComponent(roadEntity))
                     {

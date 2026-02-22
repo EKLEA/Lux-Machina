@@ -11,6 +11,7 @@ public class CsvTableParserEditor : EditorWindow
     TextAsset buildingsStorageCsv;
     TextAsset buildingsProcessionCsv;
     TextAsset buildingsItemRequestsCsv;
+    TextAsset buildingsEnergyCsv;
     TextAsset recipesCsv;
     TextAsset itemsCsv;
 
@@ -28,6 +29,7 @@ public class CsvTableParserEditor : EditorWindow
         buildingsBaseCsv =
             EditorGUILayout.ObjectField("Buildings Base CSV", buildingsBaseCsv, typeof(TextAsset), false)
             as TextAsset;
+       
         buildingsStorageCsv =
             EditorGUILayout.ObjectField("Buildings Storage CSV", buildingsStorageCsv, typeof(TextAsset), false)
             as TextAsset;
@@ -36,6 +38,10 @@ public class CsvTableParserEditor : EditorWindow
             as TextAsset;
         buildingsItemRequestsCsv =
             EditorGUILayout.ObjectField("Buildings Item Requests CSV", buildingsItemRequestsCsv, typeof(TextAsset), false)
+            as TextAsset;
+
+         buildingsEnergyCsv =
+            EditorGUILayout.ObjectField("Buildings Enegty CSV", buildingsEnergyCsv, typeof(TextAsset), false)
             as TextAsset;
 
         recipesCsv =
@@ -91,7 +97,15 @@ public class CsvTableParserEditor : EditorWindow
                 );
                 ParseBuildingsItemRequestsConfig(csvText);
             }
-
+            if (buildingsEnergyCsv != null)
+            {
+                Debug.Log($"Parsing Building Energy Configs CSV: {buildingsEnergyCsv.name}");
+                string csvText = File.ReadAllText(
+                    AssetDatabase.GetAssetPath(buildingsEnergyCsv),
+                    System.Text.Encoding.UTF8
+                );
+                ParseBuildingsEnergyConfig(csvText);
+            }
             if (recipesCsv != null)
             {
                 Debug.Log($"Parsing Recipes CSV: {recipesCsv.name}");
@@ -297,6 +311,47 @@ public class CsvTableParserEditor : EditorWindow
 
         SaveToJson(new BuildingItemRequestsConfigList {  buildingItemRequestsConfigs= buildingItemRequests }, "buildingItemRequests");
         Debug.Log($"Parsed {buildingItemRequests.Count} buildingItemRequests");
+    }
+     void ParseBuildingsEnergyConfig(string csvText)
+    {
+        var rows = ParseCsv(csvText);
+        if (rows.Count < 2)
+            return;
+
+        var buildingEnegry = new List<BuildingEnegryConfig>();
+
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Length < 3)
+            {
+                Debug.LogWarning(
+                    $"Skipping row {i} in Buildings Energy CSV: not enough columns ({row.Length})"
+                );
+                continue;
+            }
+
+            try
+            {
+                buildingEnegry.Add(
+                    new BuildingEnegryConfig
+                    {
+                        BuildingID = row[0],
+                        radius = float.Parse(row[1]),
+                        maxConnections = int.Parse(row[2]),
+                    }
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error parsing building at row {i}: {ex.Message}");
+                Debug.LogError($"Row data: {string.Join(" | ", row)}");
+                throw;
+            }
+        }
+
+        SaveToJson(new BuildingEnegryConfigList { buildingEnegryConfigs = buildingEnegry }, "buildingsEnergy");
+        Debug.Log($"Parsed {buildingEnegry.Count} buildings energy");
     }
 #endregion
 #region itemes

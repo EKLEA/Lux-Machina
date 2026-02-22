@@ -66,6 +66,14 @@ public struct BuildingItemRequestsStructConfig:IConfigBase
     
     public FixedList64Bytes<RecipeIngredientStruct> itemsRequests;
 }
+public struct BuildingEnergyStructConfig:IConfigBase
+{
+    
+    public int id {get;set;}
+    
+    public float radius;
+    public int maxConnections;
+}
 public struct RecipeStructConfig:IConfigBase
 {
     public FixedList64Bytes<RecipeIngredientStruct> InputItems;
@@ -88,7 +96,10 @@ public struct BuildingConfigReference : IComponentData,IDisposable
     public BlobAssetReference<BlobLibrary<BuildingStorageStructConfig>> BuildingStorageStructConfigs;
     public BlobAssetReference<BlobLibrary<BuildingProcessionStructConfig>> BuildingProcessionStructConfigs;
     public BlobAssetReference<BlobLibrary<BuildingItemRequestsStructConfig>> BuildingItemRequestsStructConfigs;
+    public BlobAssetReference<BlobLibrary<BuildingEnergyStructConfig>> BuildingEnergyStructConfig;
     public int roadID;
+    public int CoreID;
+    public int range;
 
     public void Dispose()
     {
@@ -96,6 +107,7 @@ public struct BuildingConfigReference : IComponentData,IDisposable
         BuildingStorageStructConfigs.Dispose();
         BuildingProcessionStructConfigs.Dispose();
         BuildingItemRequestsStructConfigs.Dispose();
+        BuildingEnergyStructConfig.Dispose();
     }
 }
 public struct RecipeConfigRefernce : IComponentData

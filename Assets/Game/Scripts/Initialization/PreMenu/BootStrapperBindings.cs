@@ -39,6 +39,7 @@ public class BootStrapperBindings : MonoInstaller
                     .Select(ls => new GameFieldSettings(
                         ls.cellSize,
                         ls.tickPerSecond,
+                        ls.range,
                         ls.defaultDistributionPriority,
                         ls.selectBuildingColor,
                         ls.makeAsDemolitionBuidlingColor,
@@ -46,7 +47,12 @@ public class BootStrapperBindings : MonoInstaller
                         ls.BluePrintPhantomConfig,
                         ls.DemolitionAndFalsePhantomConfig,
                         ls.ForceDestroyPhantomConfig,
-                        ls.removeLayer
+                        ls.removeLayer,
+                        ls.ConnectionColor,
+                        ls.ConnectionPulseColor,
+                        ls.DisconnectColor,
+                        ls.DisconnectPulseColor,
+                        ls.EnergyLine
                     ))
                     .First()
             )
@@ -57,6 +63,7 @@ public class BootStrapperBindings : MonoInstaller
         Container.Bind<IReadOnlyGameFieldSettings>().To<GameFieldSettings>().FromResolve();
         Container.Bind<IReadOnlyPhantomConfig>().To<GameFieldSettings>().FromResolve();
         Container.Bind<IReadOnlyOutLineConfig>().To<GameFieldSettings>().FromResolve();
+        Container.Bind<IReadOnlyEnergyLineConfig>().To<GameFieldSettings>().FromResolve();
         var loadingScreen = Container.InstantiatePrefabForComponent<LoadingScreen>(
             _loadingScreenPrefab
         );

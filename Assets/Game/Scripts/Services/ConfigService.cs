@@ -17,8 +17,10 @@ public class ConfigService
     public Dictionary<int, BuildingStorageConfig> BuildingStorageInfos{ get; private set; }
     public Dictionary<int, BuildingProcessionConfig> BuildingProcessionInfos { get; private set; }
     public Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; private set; }
+    public Dictionary<int, BuildingEnegryConfig> BuildingEnegryConfigs  { get; private set; }
 
     public Dictionary<int, string> ItemClassButtonConfig  { get; private set; }
+
 
     Dictionary<int, Sprite> _spriteCache = new Dictionary<int, Sprite>();
     Dictionary<int, GameObject> _prefabCache = new Dictionary<int, GameObject>();
@@ -30,6 +32,7 @@ public class ConfigService
         BuildingStorageInfos = new Dictionary<int, BuildingStorageConfig>();
         BuildingProcessionInfos = new Dictionary<int, BuildingProcessionConfig>();
         BuildingItemRequestsInfos = new Dictionary<int, BuildingItemRequestsConfig>();
+        BuildingEnegryConfigs = new Dictionary<int, BuildingEnegryConfig>();
         RecipeInfos = new Dictionary<int, RecipeConfig>();
         TypeBuildingButtonConfig=new Dictionary<int, string>();
         ItemClassButtonConfig=new();
@@ -42,7 +45,7 @@ public class ConfigService
         LoadBuildingsStorages();
         LoadBuildingsProcession();
         LoadBuildingsItemRequests();
-
+        LoadBuildingsEnergy();
         LoadRecipes();
         LoadTypeBuildingButtons();
         await UniTask.Yield();
@@ -142,6 +145,22 @@ public class ConfigService
         }
     }
 
+    void LoadBuildingsEnergy()
+    {
+        var wrapper = LoadJson<BuildingEnegryConfigList>("Configs/JsonData/buildingsEnergy");
+        if (wrapper?.buildingEnegryConfigs != null)
+        {
+            foreach (var building in wrapper.buildingEnegryConfigs)
+            {
+                BuildingEnegryConfigs[building.BuildingID.GetStableHashCode()] = building;
+            }
+            Debug.Log($"Loaded {wrapper.buildingEnegryConfigs.Count} buildings energy");
+        }
+        else
+        {
+            Debug.LogError("Failed to load buildings energy - wrapper or buildings requests list is null");
+        }
+    }
     void LoadRecipes()
     {
         var wrapper = LoadJson<RecipeConfigList>("Configs/JsonData/recipes");
@@ -221,7 +240,18 @@ public class ConfigService
 
         return GetOrLoadSprite($"Images/Buildings/{building.iconPath}");
     }
+    public Sprite GetEnumSprite<T>(int id) where T : struct, Enum
+    {
+        if (Enum.IsDefined(typeof(T), id))
+        {
+            string enumTypeName = typeof(T).Name; 
+            
+            string valueName = Enum.GetName(typeof(T), id);
 
+            return GetOrLoadSprite($"Images/{enumTypeName}/{valueName}");
+        }
+        return null;
+    }
     public Sprite GetRecipeSprite(int recipeId)
     {
         if (
@@ -330,7 +360,6 @@ public class ConfigService
             }
         }
     }
-
 }
 
 public interface IReadOnlyItemsInfo
@@ -347,8 +376,10 @@ public interface IReadOnlyBuildingInfo
     Dictionary<int, BuildingStorageConfig> BuildingStorageInfos { get; }
     Dictionary<int, BuildingProcessionConfig> BuildingProcessionInfos { get; }
     Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; }
+    Dictionary<int, BuildingEnegryConfig> BuildingEnegryConfigs { get; }
     GameObject GetBuildingPrefab(int buildingId);
     Sprite GetBuildingSprite(int buildingId);
+    Sprite GetEnumSprite<T>(int id)where T : struct, Enum;
 }
 
 public interface IReadOnlyRecipeInfo

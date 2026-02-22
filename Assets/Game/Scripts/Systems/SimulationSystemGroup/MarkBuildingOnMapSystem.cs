@@ -35,13 +35,15 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         bool runRoad = !_markRoad.IsEmpty;
         bool runUpdate = !_mapUpdate.IsEmpty;
 
-        // Если делать нечего - выходим сразу
         if (!runBuilding && !runRoad && !runUpdate) return;
 
-        // 2. Получаем данные
         var updateMapLookup = SystemAPI.GetComponentLookup<UpdateMapTag>(false);
         var updateClusterLookup = SystemAPI.GetComponentLookup<UpdateClustersTag>(false);
+        var energyBuildingDataLookup = SystemAPI.GetComponentLookup<EnergyBuildingData>(false);
+        var connectToEnegyEntitiesLookup = SystemAPI.GetComponentLookup<ConnectToEnegyEntities>(false);
+        var updateConnectStatusLookup = SystemAPI.GetComponentLookup<UpdateConnectStatus>(false);
         var buildingMapRW = SystemAPI.GetSingletonRW<BuildingMap>();
+        var energyMapRW = SystemAPI.GetSingletonRW<EnergyMap>();
         var entitiesRW = SystemAPI.GetSingletonRW<EntitiesDictionary>();
         var mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
         if (runBuilding)
@@ -49,10 +51,14 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             state.Dependency = new MarkBuildingJob
             {
                 MapData = buildingMapRW.ValueRW,
+                EnergyMap=energyMapRW.ValueRW,
                 EntityDictionary = entitiesRW.ValueRW,
                 MapEntity = mapEntity,
                 UpdateMapTagLookup = updateMapLookup,
                 UpdateClusterTagLookup = updateClusterLookup,
+                EnergyBuildingDataLookup=energyBuildingDataLookup,
+                UpdateConnectStatusLookup=updateConnectStatusLookup,
+                ConnectToEnegyEntitiesLookup=connectToEnegyEntitiesLookup
             }.Schedule(state.Dependency);
         }
         if (runRoad)
@@ -98,7 +104,11 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         if(clusterMap.UniqueClusterIDs.IsCreated)clusterMap.Dispose();
         var productionTable=state.EntityManager.GetComponentData<ProductionTable>(mapEntity);
         if(productionTable.produced.IsCreated)productionTable.Dispose();
+        var energyMap=state.EntityManager.GetComponentData<EnergyMap>(mapEntity);
+        if(energyMap.EnergyLinks.IsCreated)energyMap.Dispose();
+        
         state.EntityManager.DestroyEntity(mapEntity);
+    
     
         Entity configEntity = SystemAPI.GetSingletonEntity<BuildingConfigReference>();
         if (state.EntityManager.Exists(configEntity))
@@ -117,13 +127,18 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
     public partial struct MarkBuildingJob : IJobEntity
     {
         public BuildingMap MapData; 
+        public EnergyMap EnergyMap; 
         public EntitiesDictionary EntityDictionary; 
         public Entity MapEntity;
         public ComponentLookup<UpdateMapTag> UpdateMapTagLookup;
         public ComponentLookup<UpdateClustersTag> UpdateClusterTagLookup;
+        public ComponentLookup<EnergyBuildingData> EnergyBuildingDataLookup;
+        public ComponentLookup<UpdateConnectStatus> UpdateConnectStatusLookup;
+        public ComponentLookup<ConnectToEnegyEntities> ConnectToEnegyEntitiesLookup;
 
         public void Execute(Entity entity,in BuildingData buildingData, in BuildingPosData buildingPosData,EnabledRefRW<MarkOnMap> markOnMap)
         {
+            
             for (int x = buildingPosData.LeftCornerPos.x; x < buildingPosData.LeftCornerPos.x + buildingPosData.size.x; x++)
             {
                  for (int y = buildingPosData.LeftCornerPos.y; y < buildingPosData.LeftCornerPos.y + buildingPosData.size.y; y++)
@@ -134,10 +149,66 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                     MapData.CellEntityMultiMap.Add(entity, cell);
                 }
             }
+
+            if(ConnectToEnegyEntitiesLookup.HasComponent(entity))
+            {   
+                NativeHashSet<int> entitiesHasSet=new(buildingPosData.size.x*buildingPosData.size.y,Allocator.Temp);
+               
+                for (int x = buildingPosData.LeftCornerPos.x; x < buildingPosData.LeftCornerPos.x + buildingPosData.size.x; x++)
+                {
+                    for (int y = buildingPosData.LeftCornerPos.y; y < buildingPosData.LeftCornerPos.y + buildingPosData.size.y; y++)
+                    {
+                        var cell = new int2(x, y);
+                        
+                        if (EnergyMap.CellToEnergyBuildingMap.ContainsKey(cell))
+                        {
+                            var values=EnergyMap.CellToEnergyBuildingMap.GetValuesForKey(cell);
+                            foreach(var v in values) entitiesHasSet.Add(v);
+                        }
+                    }
+                }
+                FixedList128Bytes<int> ConnectToEntites=new();
+                foreach(var i in entitiesHasSet)
+                {
+                    ConnectToEntites.Add(i);
+                }
+                UpdateConnectStatusLookup.SetComponentEnabled(entity,true);
+                ConnectToEnegyEntitiesLookup[entity]=new ConnectToEnegyEntities{ConnectToEntites=ConnectToEntites};
+            }
+
             EntityDictionary.Entities.TryAdd(buildingData.BuildingUniqueID,entity);
             markOnMap.ValueRW=false;
             UpdateMapTagLookup.SetComponentEnabled(MapEntity, true);
             UpdateClusterTagLookup.SetComponentEnabled(MapEntity, true);
+            if (EnergyBuildingDataLookup.HasComponent(entity))
+            {
+                var enData = EnergyBuildingDataLookup[entity];
+                int2 center = (int2)buildingPosData.center;
+                float radius = enData.radius;
+                int radiusSq = (int)(radius * radius);
+                NativeHashSet<Entity> entitiesToPing=new(radiusSq,Allocator.Temp);
+                for (int x = (int)(center.x - radius); x <= center.x + radius; x++)
+                {
+                    for (int y = (int)(center.y - radius); y <= center.y + radius; y++)
+                    {
+                        int dx = x - center.x;
+                        int dy = y - center.y;
+                        var pos=new int2(x, y);
+                        if (dx * dx + dy * dy <= radiusSq)
+                        {
+                            EnergyMap.CellToEnergyBuildingMap.Add(pos, buildingData.BuildingUniqueID);
+                            EnergyMap.CellToEnergyEntityBuildingMap.Add(pos, entity);
+                            EnergyMap.EnergyEntityToCellBuildingMap.Add(entity,pos );
+                            if(MapData.CellMapEntites.ContainsKey(pos)) entitiesToPing.Add(MapData.CellMapEntites[pos]);
+                        }
+                    }
+                }
+                foreach(var en in entitiesToPing)
+                {
+                    if(UpdateConnectStatusLookup.HasComponent(en)) UpdateConnectStatusLookup.SetComponentEnabled(en,true);
+                }
+                entitiesToPing.Dispose();
+            }
         }
     }
     [BurstCompile]
@@ -155,7 +226,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             {
                 MapData.CellMapBuildingsIDs.TryAdd(p.pos, buildingData.BuildingIDHash);
                 MapData.CellMapEntites.TryAdd(p.pos, entity); 
-                 MapData.CellEntityMultiMap.Add(entity, p.pos);
+                MapData.CellEntityMultiMap.Add(entity, p.pos);
             }
             
             markOnMap.ValueRW=false;

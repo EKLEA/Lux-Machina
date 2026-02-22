@@ -9564,7 +9564,7 @@ Camera:
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 351
+    m_Bits: 863
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -23653,6 +23653,9 @@ MonoBehaviour:
   GroundMask:
     serializedVersion: 2
     m_Bits: 256
+  EnergyNodeMask:
+    serializedVersion: 2
+    m_Bits: 512
   gridVisualizer: {fileID: 437345685}
   cameraController: {fileID: 381572471}
 --- !u!1 &905414894
