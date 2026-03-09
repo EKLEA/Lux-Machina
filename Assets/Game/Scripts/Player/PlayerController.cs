@@ -22,6 +22,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     [SerializeField] LayerMask GroundMask;
     [SerializeField] LayerMask EnergyNodeMask;
     [SerializeField] GridVisualizer gridVisualizer;
+    [SerializeField] FlowFieldVisualizer FlowFieldVisualizer;
 
     [SerializeField] CameraController cameraController;
     [Inject] GameController gameController;
@@ -44,6 +45,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     InputAction RotateBuilding;
     InputAction ForceBuilding;
     InputAction Hold;
+    InputAction spawn;
     
     RaycastHit hit;
 
@@ -100,6 +102,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         
         entityManager.AddBuffer<MapPoint>(PlaceCommand); 
         gridVisualizer.Init();
+        FlowFieldVisualizer.Init();
     }
     void BindMaps()
     {
@@ -120,6 +123,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         RotateBuilding = Building.FindAction("Rotate");
         ForceBuilding = Building.FindAction("ForceBuilding");
         Hold = GamePlay.FindAction("Hold");
+        spawn = GamePlay.FindAction("Spawn");
     }
 
     void SetUp()
@@ -133,6 +137,16 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         SwitchToUIMode();
 
         handler.onBuildingSelected += SetUpAction;
+        spawn.performed+=Spawn;
+        
+        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);
+    }
+    void Spawn(InputAction.CallbackContext context)
+    {
+        if (context.performed)
+        {
+           gameController.SpawnMobs();
+        }
     }
 
     void Update()
@@ -222,7 +236,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     public void SetUpAction(string info)
     {
         
-        gridUpdateSystem.SetUpGrid(gridVisualizer,this);
+        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);
         ClearAction();
         if(info.Contains("Delete"))
         {

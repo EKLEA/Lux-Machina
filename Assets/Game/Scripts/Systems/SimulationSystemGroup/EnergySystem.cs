@@ -74,9 +74,11 @@ public partial struct EnergySystem : ISystem
         {
             state.Dependency = new AnalyzeEnergyNetworkJob {
                 CoreID = energyMap.ValueRO.CoreID,
+                mapEntity=mapEntity,
                 EnergyLinks = energyMap.ValueRO.EnergyLinks,
                 AllEntities = entitiesDictionary.Entities,
                 IsConnectedToEnegyLookup = state.GetComponentLookup<IsConnectedToEnergy>(false),
+                SwitchIsOffLookup = state.GetComponentLookup<SwitchIsOff>(true),
                 ECB = ecb
             }.Schedule(state.Dependency);
         }
@@ -89,8 +91,9 @@ public partial struct EnergySystem : ISystem
                 buildingMap = buildingMap.ValueRO,
                 EntitiesDictionary = entitiesDictionary,
                 UpdateConnectStatusLookup = state.GetComponentLookup<UpdateConnectStatus>(true),
-                IsConnectedToEnergyLookup = state.GetComponentLookup<IsConnectedToEnergy>(true)
-            }.ScheduleParallel(state.Dependency); // Для ParallelWriter всегда ScheduleParallel
+                IsConnectedToEnergyLookup = state.GetComponentLookup<IsConnectedToEnergy>(true),
+                SwitchIsOffLookup = state.GetComponentLookup<SwitchIsOff>(true)
+            }.ScheduleParallel(state.Dependency); 
         }
 
         if (!_updateBuildings.IsEmpty)
@@ -280,80 +283,80 @@ public partial struct EnergySystem : ISystem
         [ReadOnly] public NativeParallelHashMap<int, Entity> AllEntities;
         [ReadOnly] public ComponentLookup<IsConnectedToEnergy> IsConnectedToEnegyLookup;
         
+        [ReadOnly] public ComponentLookup<SwitchIsOff> SwitchIsOffLookup;
+        
+         [ReadOnly] public Entity mapEntity;
+        
         public EntityCommandBuffer ECB; 
         
         
 
+       
         public void Execute()
         {
-            NativeHashSet<int> ConnectedSet=new(1000,Allocator.Temp);
-            NativeHashSet<int> DisconnectedSet=new(1000,Allocator.Temp);
-
+            NativeHashSet<int> ConnectedSet = new(1000, Allocator.Temp);
+            
             if (!AllEntities.ContainsKey(CoreID)) return;
 
-            var tempGraph = new NativeParallelMultiHashMap<int, int>(EnergyLinks.Count() * 2, Allocator.Temp);
-            
-            foreach (var pair in EnergyLinks)
+            Entity coreEntity = AllEntities[CoreID];
+            bool isCoreOff = SwitchIsOffLookup.HasComponent(coreEntity) && 
+                            SwitchIsOffLookup.IsComponentEnabled(coreEntity);
+
+            if (!isCoreOff)
             {
-                int2 from = pair.Key;
-                int2 to = pair.Value;
+                var queue = new NativeQueue<int>(Allocator.Temp);
+                queue.Enqueue(CoreID);
+                ConnectedSet.Add(CoreID);
 
-                if (from.y != -1 && to.y != -1)
+                var tempGraph = new NativeParallelMultiHashMap<int, int>(EnergyLinks.Count() * 2, Allocator.Temp);
+                foreach (var pair in EnergyLinks)
                 {
-                    tempGraph.Add(from.y, to.y);
-                    tempGraph.Add(to.y, from.y);
-                }
-            }
-
-            var queue = new NativeQueue<int>(Allocator.Temp);
-            
-            queue.Enqueue(CoreID);
-            ConnectedSet.Add(CoreID);
-
-            while (queue.TryDequeue(out int currentID))
-            {
-                if (tempGraph.TryGetFirstValue(currentID, out int neighborID, out var it))
-                {
-                    do
+                    int2 from = pair.Key;
+                    int2 to = pair.Value;
+                    if (from.y != -1 && to.y != -1)
                     {
-                        if (ConnectedSet.Add(neighborID)) 
-                        {
-                            queue.Enqueue(neighborID);
-                        }
-                    } while (tempGraph.TryGetNextValue(out neighborID, ref it));
+                        tempGraph.Add(from.y, to.y);
+                        tempGraph.Add(to.y, from.y);
+                    }
                 }
-            }
 
+                while (queue.TryDequeue(out int currentID))
+                {
+                    if (currentID != CoreID && AllEntities.TryGetValue(currentID, out Entity currentEntity))
+                    {
+                        if (SwitchIsOffLookup.HasComponent(currentEntity) && 
+                            SwitchIsOffLookup.IsComponentEnabled(currentEntity))
+                        {
+                            continue; 
+                        }
+                    }
+
+                    if (tempGraph.TryGetFirstValue(currentID, out int neighborID, out var it))
+                    {
+                        do
+                        {
+                            if (ConnectedSet.Add(neighborID))
+                            {
+                                queue.Enqueue(neighborID);
+                            }
+                        } while (tempGraph.TryGetNextValue(out neighborID, ref it));
+                    }
+                }
+                tempGraph.Dispose();
+                queue.Dispose();
+            }
             foreach (var entityPair in AllEntities)
             {
                 int id = entityPair.Key;
-                if (!ConnectedSet.Contains(id))
-                {
-                    DisconnectedSet.Add(id);
-                }
-            }
-            foreach(var c in ConnectedSet)
-            {
-                var en=AllEntities[c];
-                if (IsConnectedToEnegyLookup.HasComponent(en) && !IsConnectedToEnegyLookup.IsComponentEnabled(en))
-                {
-                     ECB.SetComponentEnabled<IsConnectedToEnergy>(en,true);
-                     ECB.SetComponentEnabled<UpdateConnectStatus>(en,true);
-                }
-            }
-            foreach(var d in DisconnectedSet)
-            {
-                var en=AllEntities[d];
-                if (IsConnectedToEnegyLookup.HasComponent(en) && IsConnectedToEnegyLookup.IsComponentEnabled(en))
-                {
-                    ECB.SetComponentEnabled<IsConnectedToEnergy>(en,false);
-                    ECB.SetComponentEnabled<UpdateConnectStatus>(en,true);
-                }
-            }
+                Entity entity = entityPair.Value;
+                bool isActuallyConnected = ConnectedSet.Contains(id);
+
+                ECB.SetComponentEnabled<IsConnectedToEnergy>(entity, isActuallyConnected);
+                ECB.SetComponentEnabled<UpdateConnectStatus>(entity, true);
+            }   
+            
+            ECB.SetComponentEnabled<UpdateConnectionsTag>(mapEntity, false);
             ConnectedSet.Dispose();
-            DisconnectedSet.Dispose();
-            tempGraph.Dispose();
-            queue.Dispose();
         }
     }
     
@@ -365,8 +368,8 @@ public partial struct EnergySystem : ISystem
         [ReadOnly] public EntitiesDictionary EntitiesDictionary;
         public EntityCommandBuffer.ParallelWriter ECB;
         [ReadOnly] public ComponentLookup<UpdateConnectStatus> UpdateConnectStatusLookup;
-        
         [ReadOnly] public ComponentLookup<IsConnectedToEnergy> IsConnectedToEnergyLookup;
+        [ReadOnly] public ComponentLookup<SwitchIsOff> SwitchIsOffLookup;
 
         public void Execute(Entity entity,in BuildingData buildingData, [ChunkIndexInQuery]int index, in EnergyBuildingData data)
         {
@@ -378,7 +381,7 @@ public partial struct EnergySystem : ISystem
                     int enID=con.Item2.y;
                     if (enID != -1)
                     {
-                        if(IsConnectedToEnergyLookup.IsComponentEnabled(EntitiesDictionary.Entities[enID])) isConnected=true;
+                        if(IsConnectedToEnergyLookup.IsComponentEnabled(EntitiesDictionary.Entities[enID]) && !SwitchIsOffLookup.IsComponentEnabled(EntitiesDictionary.Entities[enID])) isConnected=true;
                     }
                 }
                 ECB.SetComponentEnabled<IsConnectedToEnergy>(index,entity,isConnected);

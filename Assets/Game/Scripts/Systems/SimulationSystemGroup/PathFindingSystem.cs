@@ -50,11 +50,10 @@ public partial struct PathfindingParallelJob : IJobEntity
 
     public void Execute(
         Entity entity, 
-        RefRW<PathfindingRequest> requestRef, // Используем RefRW вместо комбинации in и EnabledRefRW
+        RefRW<PathfindingRequest> requestRef, 
         EnabledRefRW<PathfindingRequest> requestEnabled, 
         DynamicBuffer<MapPoint> pathBuffer)
     {
-        // Получаем доступ к данным через .ValueRO (Read Only)
         var request = requestRef.ValueRO; 
         
         pathBuffer.Clear();
@@ -66,7 +65,6 @@ public partial struct PathfindingParallelJob : IJobEntity
             return;
         }
 
-        // Используем Allocator.TempJob для параллельных вычислений
         var openSet = new NativeList<Node>(Allocator.TempJob);
         var closedSet = new NativeParallelHashSet<int2>(64, Allocator.TempJob);
         var cameFrom = new NativeParallelHashMap<int2, int2>(64, Allocator.TempJob);
@@ -132,7 +130,6 @@ public partial struct PathfindingParallelJob : IJobEntity
                 
                 float turnPenalty = current.Direction.Equals(offset) ? 0f : 0.6f;
                 
-                // Итоговая стоимость: 1 (база) + поворот + штраф за бездорожье
                 float tentativeG = current.GScore + 1.0f + turnPenalty + roadPenalty;
 
                 if (!gScoreMap.TryGetValue(neighborPos, out float oldG) || tentativeG < oldG)
@@ -156,10 +153,8 @@ public partial struct PathfindingParallelJob : IJobEntity
             backtrackPos = prev;
         }
 
-        // Выключаем компонент
         requestEnabled.ValueRW = false; 
 
-        // Очистка памяти
         openSet.Dispose();
         closedSet.Dispose();
         cameFrom.Dispose();

@@ -507,7 +507,6 @@ public partial struct BuildingConfigManagerSystem : ISystem
         public void Execute(Entity entity, [EntityIndexInQuery] int sortKey, in ChangeBuildingData changeBuildingData, in MarkAsForceDestoroyData markAsForceDestoroyData)
         {
             ECB.SetComponentEnabled<ForceDestroyTag>(sortKey,changeBuildingData.targetEntity,true);
-            ECB.SetComponentEnabled<DestroyVisualTag>(sortKey,changeBuildingData.targetEntity,true);
             
             ECB.DestroyEntity(sortKey, entity);
         }

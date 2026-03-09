@@ -100,5 +100,9 @@ public class BootStrapperBindings : MonoInstaller
             .Bind<IReadOnlyTypeBuildingButtonInfo>()
             .FromMethod(ctx => ctx.Container.Resolve<ConfigService>())
             .AsSingle();
+        Container
+            .Bind<IReadOnlyEnemyBaseConfig>()
+            .FromMethod(ctx => ctx.Container.Resolve<ConfigService>())
+            .AsSingle();
     }
 }

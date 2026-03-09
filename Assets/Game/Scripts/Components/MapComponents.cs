@@ -10,6 +10,9 @@ public struct BuildingMap : IComponentData, IDisposable
     public NativeParallelHashMap<int2, Entity> CellMapEntites;
     public NativeParallelMultiHashMap<Entity, int2> CellEntityMultiMap;
     public NativeParallelHashMap<int2, bool> IsBluePrintOrDemolitionPoints; //true blueprint false demolition
+    public NativeParallelHashMap<int2, float> CellWeights;    
+    public NativeParallelHashMap<int2, float2> CellDirections;
+    public int2 CorePos;
 
     public void Dispose()
     {
@@ -17,6 +20,8 @@ public struct BuildingMap : IComponentData, IDisposable
         CellMapEntites.Dispose();
         CellEntityMultiMap.Dispose();
         IsBluePrintOrDemolitionPoints.Dispose();
+        CellWeights.Dispose();
+        CellDirections.Dispose();
     }
 }
 public struct EnergyMap: IComponentData, IDisposable
@@ -26,6 +31,7 @@ public struct EnergyMap: IComponentData, IDisposable
     public NativeParallelMultiHashMap<int2,Entity> CellToEnergyEntityBuildingMap; 
     public NativeParallelMultiHashMap<Entity,int2> EnergyEntityToCellBuildingMap; 
     public NativeParallelHashMap<int2,int2> EnergyLinks; 
+    
     public int CoreID;
 
     public void Dispose()
@@ -34,6 +40,15 @@ public struct EnergyMap: IComponentData, IDisposable
        CellToEnergyEntityBuildingMap.Dispose();
        EnergyEntityToCellBuildingMap.Dispose();
        EnergyLinks.Dispose();
+    }
+}
+public struct ResourceMap : IComponentData, IDisposable
+{
+    
+    public NativeParallelHashMap<int2,int2> ResouecesMap; //x- айди предмета, y количество
+    public void Dispose()
+    {
+        ResouecesMap.Dispose();
     }
 }
 public struct EntitiesDictionary: IComponentData, IDisposable
@@ -127,6 +142,10 @@ public struct UpdateConnectionsTag:IComponentData, IEnableableComponent{}
 public struct TickInfoData : IComponentData
 {
     public int currTickPerSecond;
+}
+public struct SpawnMobs : IComponentData, IEnableableComponent
+{
+   public int points;
 }
 public struct LoadingMapTag : IComponentData, IEnableableComponent { }
 public struct SavingMapTag : IComponentData, IEnableableComponent { }

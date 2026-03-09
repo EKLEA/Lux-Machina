@@ -8,12 +8,13 @@ public class ConfigService
     : IReadOnlyBuildingInfo,
         IReadOnlyItemsInfo,
         IReadOnlyRecipeInfo,
-        IReadOnlyTypeBuildingButtonInfo
+        IReadOnlyTypeBuildingButtonInfo,
+        IReadOnlyEnemyBaseConfig
 {
     public Dictionary<int, ItemConfig> ItemsInfos { get; private set; }
     public Dictionary<int, RecipeConfig> RecipeInfos { get; private set; }
     public Dictionary<int, string> TypeBuildingButtonConfig { get; private set; }
-     public Dictionary<int, BuildingBaseConfig> BuildingInfos{ get; private set; }
+    public Dictionary<int, BuildingBaseConfig> BuildingInfos{ get; private set; }
     public Dictionary<int, BuildingStorageConfig> BuildingStorageInfos{ get; private set; }
     public Dictionary<int, BuildingProcessionConfig> BuildingProcessionInfos { get; private set; }
     public Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; private set; }
@@ -21,6 +22,7 @@ public class ConfigService
 
     public Dictionary<int, string> ItemClassButtonConfig  { get; private set; }
 
+    public Dictionary<int, EnemyBaseConfig> EnemyBaseConfigs { get; private set; }
 
     Dictionary<int, Sprite> _spriteCache = new Dictionary<int, Sprite>();
     Dictionary<int, GameObject> _prefabCache = new Dictionary<int, GameObject>();
@@ -35,6 +37,7 @@ public class ConfigService
         BuildingEnegryConfigs = new Dictionary<int, BuildingEnegryConfig>();
         RecipeInfos = new Dictionary<int, RecipeConfig>();
         TypeBuildingButtonConfig=new Dictionary<int, string>();
+        EnemyBaseConfigs=new Dictionary<int, EnemyBaseConfig>();
         ItemClassButtonConfig=new();
     }
 
@@ -48,9 +51,26 @@ public class ConfigService
         LoadBuildingsEnergy();
         LoadRecipes();
         LoadTypeBuildingButtons();
+        LoadEnemyBaseConfigs();
         await UniTask.Yield();
     }
-    
+
+    private void LoadEnemyBaseConfigs()
+    {
+        var wrapper = LoadJson<EnemyBaseConfigList>("Configs/JsonData/enemyBase");
+        if (wrapper?.enemyBaseConfigs != null)
+        {
+            foreach (var enemy in wrapper.enemyBaseConfigs)
+            {
+                EnemyBaseConfigs[enemy.id.GetStableHashCode()] = enemy;
+            }
+            Debug.Log($"Loaded {wrapper.enemyBaseConfigs.Count} enemyBase");
+        }
+        else
+        {
+            Debug.LogError("Failed to load enemyBase - wrapper or enemyBase list is null");
+        }
+    }
 
     void LoadTypeBuildingButtons()
     {
@@ -360,6 +380,49 @@ public class ConfigService
             }
         }
     }
+
+    public GameObject GetEnemyPrefab(int enemyID)
+    {
+        if (
+            !EnemyBaseConfigs.TryGetValue(enemyID, out var enemy)
+            || string.IsNullOrEmpty(enemy.prefabPath)
+        )
+        {
+            Debug.LogError(
+                $"Enemy config not found or prefabPath is empty for ID: {enemy}"
+            );
+            return null;
+        }
+
+        var prefab = GetOrLoadPrefab($"Prefabs/{enemy.prefabPath}");
+        if (prefab == null)
+        {
+            Debug.LogError(
+                $"Prefab not found at path: Prefabs/{enemy.prefabPath} for enemy ID: {enemy}"
+            );
+
+            // Покажем все доступные префабы для отладки
+            var allPrefabs = Resources.LoadAll<GameObject>("Prefabs");
+            Debug.Log($"Available prefabs: {allPrefabs.Length}");
+            foreach (var p in allPrefabs)
+            {
+                Debug.Log($"Prefab: {p.name}");
+            }
+        }
+
+        return prefab;
+    }
+
+    public Sprite GetEnemySprite(int enemyID)
+    {
+         if (
+            !EnemyBaseConfigs.TryGetValue(enemyID, out var enemy)
+            || string.IsNullOrEmpty(enemy.iconPath)
+        )
+            return null;
+
+        return GetOrLoadSprite($"Images/Enemies/{enemy.iconPath}");
+    }
 }
 
 public interface IReadOnlyItemsInfo
@@ -392,6 +455,13 @@ public interface IReadOnlyTypeBuildingButtonInfo
 
     public Dictionary<int, string> TypeBuildingButtonConfig { get; }
     Sprite GetBuildingTypeBTSprite(int type);
+}
+public interface IReadOnlyEnemyBaseConfig
+{
+    public Dictionary<int, EnemyBaseConfig> EnemyBaseConfigs { get; }
+    GameObject GetEnemyPrefab(int enemyID);
+       
+    Sprite GetEnemySprite(int enemyID);
 }
 
 

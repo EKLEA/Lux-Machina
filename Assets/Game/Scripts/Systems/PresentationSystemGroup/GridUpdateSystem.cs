@@ -1,17 +1,22 @@
+
 using Unity.Collections;
 using Unity.Entities;
-
+using Unity.Mathematics;
+using UnityEngine;
+[DisableAutoCreation]
 [UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial class GridUpdateSystem : SystemBase
 {
      GridVisualizer _visualizer;
+     FlowFieldVisualizer flowFieldVisualizer;
      IPlayerData _playerData;
      
     EntityQuery _buildQuery;
-    public void SetUpGrid(GridVisualizer visualizer,IPlayerData playerData)
+    public void SetUpGrid(GridVisualizer visualizer,IPlayerData playerData,FlowFieldVisualizer flowFieldVisualizer)
     {
         _visualizer=visualizer;
         _playerData =playerData;
+        this.flowFieldVisualizer=flowFieldVisualizer;
 
     }
      protected override void OnCreate()
@@ -21,12 +26,16 @@ public partial class GridUpdateSystem : SystemBase
         .WithAny<PlayerPlacingBuilding,PlayerDeletePoints,PlayerPlacingRoad>()
         
         .Build(this);
-        RequireForUpdate(_buildQuery);
+        //RequireForUpdate(_buildQuery);
     }
     protected override void OnUpdate()
     {
         if (!SystemAPI.TryGetSingleton<BuildingMap>(out var map)) return;
-
+        flowFieldVisualizer.DrawFlowField(
+              new Vector2Int(0,0), 
+                100, 
+                map
+        );
         if (!_buildQuery.IsEmpty)
         {
              _visualizer.DrawGrid(

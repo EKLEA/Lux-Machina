@@ -3,6 +3,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
+using Unity.Mathematics;
 using UnityEngine;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
@@ -32,11 +33,7 @@ public partial struct CraftSystem : ISystem
             var productionTable = SystemAPI.GetSingletonRW<ProductionTable>();
             var canCraftLookup=SystemAPI.GetComponentLookup<CanCraft>(false);
             var recipesRef = recipeCache.RecipesConfig; 
-
-            // ВАЖНО: Каждое следующее задание должно принимать handle предыдущего!
-            
-            // 1. Пинги (Читают RecipeBuildingData)
-           
+            var ResourceMap = SystemAPI.GetSingletonRW<ResourceMap>();
 
             var handle = new PingConsumerCraftBuildingJob 
             { 
@@ -46,7 +43,8 @@ public partial struct CraftSystem : ISystem
              handle = new PingProducerCraftBuildingJob 
             { 
                 RecipesConfig = recipesRef,
-                CanCraftLookup=canCraftLookup
+                CanCraftLookup=canCraftLookup,
+                ResouecesMap=ResourceMap.ValueRO.ResouecesMap
             }.Schedule(handle);
 
              handle = new PingProcessorCraftBuildingJob 
@@ -55,12 +53,11 @@ public partial struct CraftSystem : ISystem
                 CanCraftLookup=canCraftLookup
             }.Schedule(handle);
 
-            // 2. Крафт (Пишут в RecipeBuildingData)
-            // Теперь эти задания гарантированно ждут завершения Пингов
             handle = new ProducerCraftJob {
                 RecipesConfig = recipesRef,
                 produced = productionTable.ValueRW.produced.AsParallelWriter(),
-                timeStep = _accumulatedTime
+                timeStep = _accumulatedTime,
+                ResouecesMap=ResourceMap.ValueRW.ResouecesMap
             }.ScheduleParallel(handle);
 
             handle = new ConsumerCraftJob {
@@ -76,7 +73,6 @@ public partial struct CraftSystem : ISystem
                 timeStep = _accumulatedTime
             }.ScheduleParallel(handle);
 
-            // 3. ОБЯЗАТЕЛЬНО возвращаем финальный handle в систему
             state.Dependency = handle;
             
             _accumulatedTime = 0; 
@@ -90,15 +86,27 @@ public partial struct CraftSystem : ISystem
     public partial struct PingProducerCraftBuildingJob : IJobEntity
     {
         [ReadOnly] public  BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
+        [ReadOnly] public  NativeParallelHashMap<int2,int2> ResouecesMap;
         public ComponentLookup<CanCraft> CanCraftLookup;
-        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<OutputSlotData> outputs)
+        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<OutputSlotData> outputs, in ResourcesLink resourcesLink)
         {
             RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var res);
-            CanCraftLookup.SetComponentEnabled(entity,CanCraft(outputs,res));
+            CanCraftLookup.SetComponentEnabled(entity,CanCraft(outputs,res,resourcesLink));
         }
         
-        bool CanCraft(in DynamicBuffer<OutputSlotData> slots,RecipeStructConfig recipe)
+        bool CanCraft(in DynamicBuffer<OutputSlotData> slots,RecipeStructConfig recipe,ResourcesLink resourcesLink)
         {
+            bool hasResources=false;
+            for(int i = 0; i < resourcesLink.ResourcesCells.Length; i++)
+            {
+                int2 pos= resourcesLink.ResourcesCells[i];
+                if (ResouecesMap.ContainsKey(pos) && ResouecesMap[pos].y > 0)
+                {
+                    hasResources= true; 
+                    break;
+                }
+            }
+            if(!hasResources) return false;
             for(int i=0;i<slots.Length;i++)
             {
                 if (slots[i].Capacity - slots[i].Amount < recipe.OutputItems[i].Amount) return false;
@@ -143,7 +151,7 @@ public partial struct CraftSystem : ISystem
              CanCraftLookup.SetComponentEnabled(entity,CanCraft(inputs,outputs,res));
         }
         
-         bool CanCraft(in DynamicBuffer<InputSlotData> inSlots,in DynamicBuffer<OutputSlotData> outSlots,RecipeStructConfig recipe)
+     bool CanCraft(in DynamicBuffer<InputSlotData> inSlots,in DynamicBuffer<OutputSlotData> outSlots,RecipeStructConfig recipe)
         {
             bool input=true;
 
@@ -170,18 +178,24 @@ public partial struct CraftSystem : ISystem
 
     [BurstCompile]
     [WithAll(typeof(IsConnectedToEnergy),typeof(IsRecipeAssigned),typeof(IsLogicEnabled),typeof(ProducerTypeBuildingTag))]
-    [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
+    [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition),typeof(MarkOnMap))]
     public partial struct ProducerCraftJob : IJobEntity
     {
         [ReadOnly] public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
         public NativeParallelMultiHashMap<int, RecipeIngredientStruct>.ParallelWriter produced; 
+        [NativeDisableParallelForRestriction] public NativeParallelHashMap<int2,int2> ResouecesMap;
         public float timeStep;
-        public void Execute(ref RecipeBuildingData recipeData, ref DynamicBuffer<OutputSlotData> slots,EnabledRefRW<CanCraft> canCraft)
+        public void Execute(ref RecipeBuildingData recipeData, ref DynamicBuffer<OutputSlotData> slots,EnabledRefRW<CanCraft> canCraft,ref ResourcesLink resourcesLink)
         {
             if(recipeData.CurrTime>=recipeData.TimeToCraft)
             {
                 if ( RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var recipe))
                 {
+                    var resCell=ResouecesMap[resourcesLink.ResourcesCells[resourcesLink.indexCell]];
+                    resCell.y-=1;
+                    
+                    ResouecesMap[resourcesLink.ResourcesCells[resourcesLink.indexCell]]=resCell;
+                    resourcesLink.indexCell=( resourcesLink.indexCell+1)%resourcesLink.ResourcesCells.Length;;
                     for(int i = 0; i < slots.Length; i++)
                     {
                         var data=slots[i];
@@ -189,16 +203,28 @@ public partial struct CraftSystem : ISystem
                         produced.Add(recipe.OutputItems[i].ItemId,recipe.OutputItems[i]);
                         slots[i]=data;
                     }
+                    
                     recipeData.CurrTime=0;
-                    canCraft.ValueRW=CanCraft(slots,recipe);
+                    canCraft.ValueRW=CanCraft(slots,recipe,resourcesLink);
                 }
                 
             }
             else recipeData.CurrTime+=timeStep;
             
         }
-        bool CanCraft(in DynamicBuffer<OutputSlotData> slots,RecipeStructConfig recipe)
+        bool CanCraft(in DynamicBuffer<OutputSlotData> slots,RecipeStructConfig recipe,ResourcesLink resourcesLink)
         {
+            bool hasResources=false;
+            for(int i = 0; i < resourcesLink.ResourcesCells.Length; i++)
+            {
+                int2 pos= resourcesLink.ResourcesCells[i];
+                if (ResouecesMap.ContainsKey(pos) && ResouecesMap[pos].y > 0)
+                {
+                    hasResources= true; 
+                    break;
+                }
+            }
+            if(!hasResources) return false;
             for(int i=0;i<slots.Length;i++)
             {
                 if (slots[i].Capacity - slots[i].Amount < recipe.OutputItems[i].Amount) return false;

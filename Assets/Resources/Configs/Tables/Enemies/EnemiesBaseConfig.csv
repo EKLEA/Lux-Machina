@@ -1,0 +1,2 @@
+﻿id;title;description;iconPath;prefabPath;speed;attackDamage;attakInterval;maxHealth;timeToStartRestore;restoreHealthPerSecond;pointAmount
+baseEnemy;базовый;ыввыфвыф;enemyBase;enemyBasePrefab;5;5;5;5;5;5;1

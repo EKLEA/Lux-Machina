@@ -13,6 +13,8 @@ public class ConfigToBlob : IInitializable
     EntityManager _entityManager;
     [Inject] IReadOnlyBuildingInfo _buildingInfo;
     [Inject] IReadOnlyRecipeInfo _recipeInfoInfo;
+    [Inject] IReadOnlyItemsInfo _itemsInfo;
+    [Inject] IReadOnlyEnemyBaseConfig _enemyBaseConfig;
     [Inject] GameFieldSettings _gameFieldSetting;
     Entity configEntity;
     public async UniTask LoadConfigs(EntityManager entityManager)
@@ -21,8 +23,30 @@ public class ConfigToBlob : IInitializable
         configEntity = entityManager.CreateEntity();
         CreateBuildingConfig(configEntity,_buildingInfo);
         CreateRecipeConfig(configEntity,_recipeInfoInfo);
+        CreateItemsConfig(configEntity,_itemsInfo);
+        CreateEnemyBaseConfig(configEntity,_enemyBaseConfig);
         await UniTask.Yield();
     }
+
+    private void CreateEnemyBaseConfig(Entity configEntity, IReadOnlyEnemyBaseConfig enemyBaseConfig)
+    { 
+        List<EnemyBaseStructConfig> enemyBaseStructConfigs=new();
+        foreach(var cfg in enemyBaseConfig.EnemyBaseConfigs)
+        {
+            var str = new EnemyBaseStructConfig
+            {
+                id=cfg.Key,
+                costInPoints=cfg.Value.pointAmount,
+            };
+            enemyBaseStructConfigs.Add(str);
+        }
+        enemyBaseStructConfigs.Sort((a, b) => a.costInPoints.CompareTo(b.costInPoints));
+        _entityManager.AddComponentData(configEntity,new EnemyBaseConfigRefence
+        {
+            EnemyBaseConfigs=CreateConfigReference(enemyBaseStructConfigs.ToArray()),
+        });
+    }
+
     void CreateBuildingConfig(Entity configEntity,IReadOnlyBuildingInfo info)
     {
         
@@ -43,6 +67,9 @@ public class ConfigToBlob : IInitializable
                 actionType=cfg.Value.actionType,
                 size=new int3(cfg.Value.size.x,cfg.Value.size.y,cfg.Value.size.z),
                 typeOfLogic=cfg.Value.typeOfLogic,
+                MaxHealth=cfg.Value.maxHealth,
+                TimeToRestore=cfg.Value.timeToStartRestore,
+                RestoreHpPerTick=cfg.Value.restoreHealthPerSecond
             };
             buildingBaseConfigs.Add(sturctCFG);
         }
@@ -111,6 +138,24 @@ public class ConfigToBlob : IInitializable
             roadID="Road".GetStableHashCode(),
             CoreID="Core".GetStableHashCode(),
             range=_gameFieldSetting.range});
+    }
+    void CreateItemsConfig(Entity configEntity,IReadOnlyItemsInfo info)
+    {
+        List<ItemsStructConfig> itemsStructConfig=new();
+        foreach(var cfg in info.ItemsInfos)
+        {
+            var str = new ItemsStructConfig
+            {
+                id=cfg.Key,
+                ItemClass=(int) cfg.Value.ItemClass,
+                ItemType=(int) cfg.Value.ItemType
+            };
+            itemsStructConfig.Add(str);
+        }
+        _entityManager.AddComponentData(configEntity,new ItemsConfigReference
+        {
+            ItemsConfigs=CreateConfigReference(itemsStructConfig.ToArray()),
+        });
     }
     void CreateRecipeConfig(Entity configEntity,IReadOnlyRecipeInfo info)
     {

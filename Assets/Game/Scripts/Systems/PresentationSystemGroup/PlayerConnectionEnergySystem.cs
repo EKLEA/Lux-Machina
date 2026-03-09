@@ -50,7 +50,6 @@ public partial class PlayerConnectionEnergySystem : SystemBase
         if (connectType == ConnectType.EnergyDisconnect)
         {
             
-            Debug.Log("type");
             Type=-1;
         }
         else
@@ -91,7 +90,6 @@ public partial class PlayerConnectionEnergySystem : SystemBase
             else
             {
                 _connectTo=_buildingSystem.energyNode;
-                Debug.Log(_connectTo);
             }
             if (_connectFrom == null)
             {
@@ -121,12 +119,10 @@ public partial class PlayerConnectionEnergySystem : SystemBase
             
             if (Type== 0)
             {
-                Debug.Log("dssadsdadsadsasadsad");
                 placeAction=ConnectNodes;
                 backAction=BackForLine;
                 _connectTo=null;
                 _connectToData=new int2(-1,-1);
-                //визуал до поз в плеере
             }
             else
             {
@@ -151,15 +147,14 @@ public partial class PlayerConnectionEnergySystem : SystemBase
     }
     void DisConnectNodes(bool isHold,bool IsBlueprint)
     {
-        var ecb = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>().CreateCommandBuffer();
-        Debug.Log(_connectFromData.y);
-        Debug.Log(_connectToData.y);
         if (_connectFromData.y!=-1&&_connectToData.y!=-1)
         {
-            Debug.Log("sdsdsd1123132132");
+            var ecb = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>().CreateCommandBuffer();
             var command=ecb.CreateEntity();
             var buff = ecb.AddBuffer<UnLinkNetworkEnergyTo>(command);
             buff.Add(new UnLinkNetworkEnergyTo{UnLinkFromBuilding=_connectFromData,UnLinkToBuilding=_connectToData});
+            _connectFactory.Disconnect(_connectFrom);
+            _connectFactory.Disconnect(_connectTo);
             _connectFactory.ResetLine(_connectFrom);
             _connectFactory.ResetLine(_connectTo);
             _connectFactory.ResetLine(energyLine,Vector3.zero);

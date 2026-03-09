@@ -13,7 +13,6 @@ using Zenject;
 public partial class BuildingChangeVisualSystem : SystemBase
 {
     [Inject] VisualBuildingFactory _visualBuildingFactory;
-    [Inject] IReadOnlyBuildingInfo _buildingInfo;
     
     [Inject] EntityManager _entityManager;
     [Inject] ConnectEnergyFactory _energyFactory;
@@ -45,7 +44,7 @@ public partial class BuildingChangeVisualSystem : SystemBase
             }
             _visualBuildingFactory.SetProgress(reference.buildingOnScene.gameObject,(float)currItem/maxItems);
         }
-         foreach (var (buff,reference) in SystemAPI.Query<DynamicBuffer<OutputConstructionSlotData>,BuildingOnSceneReference>().WithAll<IsDemolition>().WithDisabled<ChangeDemolitionStateTag>())
+        foreach (var (buff,reference) in SystemAPI.Query<DynamicBuffer<OutputConstructionSlotData>,BuildingOnSceneReference>().WithAll<IsDemolition>().WithDisabled<ChangeDemolitionStateTag>())
         {
             
             if(buff.Length<1) continue;
@@ -57,8 +56,9 @@ public partial class BuildingChangeVisualSystem : SystemBase
             }
             _visualBuildingFactory.SetProgress(reference.buildingOnScene.gameObject,(float)currItem/maxItems);
         }
-        foreach(var (energyData,reference,entity)in SystemAPI.Query<EnergyBuildingData, BuildingOnSceneReference>().WithAll<UpdateConnectStatus>().WithDisabled<MarkOnMap>().WithEntityAccess())
+        foreach(var (energyData,reference,connect,entity)in SystemAPI.Query<EnergyBuildingData, BuildingOnSceneReference,EnabledRefRW<UpdateConnectStatus>>().WithDisabled<MarkOnMap>().WithEntityAccess())
         {
+            if (!connect.ValueRO) continue;
             var en=reference.buildingOnScene as EnergyBuildingOnScene;
             bool isConnected=EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity);
             foreach(var c in energyData.connections)
@@ -71,7 +71,8 @@ public partial class BuildingChangeVisualSystem : SystemBase
                     _energyFactory.UpdateConnect(nodefrom,nodeto,isConnected);
                 }
             }
-            ecb.SetComponentEnabled<UpdateConnectStatus>(entity,false);
+            connect.ValueRW=false;
+
         }
         
 

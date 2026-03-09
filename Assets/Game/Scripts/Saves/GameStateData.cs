@@ -7,6 +7,7 @@ public class GameStateData
 {
     public int CoreID;
     public PlayerCamData camData;
+    public int2 CorePos;
     public Dictionary<int,BaseBuildingSaveData> Buildings;
     public Dictionary<int,RoadSaveData> RoadsBuildings;
     public Dictionary<int,ConstructionSlotsSaveData> constructionSlotsSaveData;
@@ -14,4 +15,5 @@ public class GameStateData
     public Dictionary<int,RecipeAndCraftBuildingSaveData> recipeBuildingSaveData;
     public Dictionary<int,StorageSlotsSaveData> storageSlotsSaveData;
     public Dictionary<int,BuildingEnergyNetvorkLinkSaveData> buildingEnergyNetvorkLinkSaveData;
+    public Dictionary<int2,int2> ResourcesCells;
 }

@@ -22,26 +22,31 @@ public partial class ProccessDeletePointsSystem : SystemBase
         ecb.Playback(EntityManager);
         ecb.Dispose();
     }
-    void ProcessDeleteRoadPoints(Entity command, BuildingMap mapData, DynamicBuffer<MapPoint> points, bool isForce, EntityCommandBuffer ecb)
+    void ProcessDeleteRoadPoints(Entity command, BuildingMap mapData, DynamicBuffer<MapPoint> points, bool isForce,EntityCommandBuffer ecb)
     {
         NativeParallelMultiHashMap<Entity, MapPoint> entitiesToPoints = new(points.Length, Allocator.Temp);
         foreach (var p in points)
         {
+            Debug.Log(p.pos);
             if (mapData.CellMapEntites.TryGetValue(p.pos, out Entity roadEntity))
             {
-                if (isForce || !mapData.IsBluePrintOrDemolitionPoints.TryGetValue(p.pos, out var isProtected) || isProtected)
-                    entitiesToPoints.Add(roadEntity, p);
+                
+                entitiesToPoints.Add(roadEntity, p);
             }
         }
-
+       
         var allEntities = entitiesToPoints.GetKeyArray(Allocator.Temp);
         var uniqueEntities = new NativeParallelHashSet<Entity>(allEntities.Length, Allocator.Temp);
         for (int i = 0; i < allEntities.Length; i++) uniqueEntities.Add(allEntities[i]);
-
+        
+        
         foreach (Entity road in uniqueEntities)
         {
+            
+            Debug.Log(road);
             if (!EntityManager.HasBuffer<MapPoint>(road)) continue;
-
+            
+                    
             var roadPoints = EntityManager.GetBuffer<MapPoint>(road);
             
             var demolitionSet = new NativeParallelHashSet<int2>(16, Allocator.Temp);
@@ -79,6 +84,30 @@ public partial class ProccessDeletePointsSystem : SystemBase
                 foreach (var p in restPoints) buff.Add(p);
             }
 
+            if (EntityManager.HasBuffer<RoadPointHealthData>(road)) 
+            {
+                var oldData=EntityManager.GetBuffer<RoadPointHealthData>(road);
+                // Подготавливаем буферы для новых сущностей
+                DynamicBuffer<RoadPointHealthData> restExtraBuff = default;
+                if (createRestRoadsCommand != Entity.Null) 
+                    restExtraBuff = ecb.AddBuffer<RoadPointHealthData>(createRestRoadsCommand);
+
+                DynamicBuffer<RoadPointHealthData> demoExtraBuff = default;
+                if (createDemolitonRoadCommand != Entity.Null) 
+                    demoExtraBuff = ecb.AddBuffer<RoadPointHealthData>(createDemolitonRoadCommand);
+
+                foreach (var data in oldData)
+                {
+                    if (demolitionSet.Contains(data.pos))
+                    {
+                        if (demoExtraBuff.IsCreated) demoExtraBuff.Add(data);
+                    }
+                    else
+                    {
+                        if (restExtraBuff.IsCreated) restExtraBuff.Add(data);
+                    }
+                }
+            }
             if (EntityManager.HasComponent<IsBlueprint>(road) && EntityManager.IsComponentEnabled<IsBlueprint>(road))
             {
                 var items = EntityManager.GetBuffer<InputConstructionSlotData>(road);
@@ -115,7 +144,6 @@ public partial class ProccessDeletePointsSystem : SystemBase
 
             // Финализация
             ecb.SetComponentEnabled<ForceDestroyTag>(road, true);
-            ecb.SetComponentEnabled<DestroyVisualTag>(road, true);
 
             demolitionSet.Dispose();
             demolitionList.Dispose();

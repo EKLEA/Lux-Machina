@@ -14,6 +14,7 @@ public class CsvTableParserEditor : EditorWindow
     TextAsset buildingsEnergyCsv;
     TextAsset recipesCsv;
     TextAsset itemsCsv;
+    TextAsset enemyBaseCsv;
 
     [MenuItem("Tools/Parse CSV Tables")]
     public static void ShowWindow()
@@ -49,6 +50,9 @@ public class CsvTableParserEditor : EditorWindow
             as TextAsset;
         itemsCsv =
             EditorGUILayout.ObjectField("Items CSV", itemsCsv, typeof(TextAsset), false)
+            as TextAsset;
+        enemyBaseCsv =
+            EditorGUILayout.ObjectField("EnemyBase CSV", enemyBaseCsv, typeof(TextAsset), false)
             as TextAsset;
         if (GUILayout.Button("Parse All Tables"))
         {
@@ -125,6 +129,15 @@ public class CsvTableParserEditor : EditorWindow
                 );
                 ParseItems(csvText);
             }
+             if (enemyBaseCsv != null)
+            {
+                Debug.Log($"Parsing Enemy Base Csv CSV: {enemyBaseCsv.name}");
+                string csvText = File.ReadAllText(
+                    AssetDatabase.GetAssetPath(enemyBaseCsv),
+                    System.Text.Encoding.UTF8
+                );
+                ParseEnemyBase(csvText);
+            }
             EditorUtility.DisplayDialog("Success", "All tables parsed successfully!", "OK");
             AssetDatabase.Refresh();
         }
@@ -135,7 +148,58 @@ public class CsvTableParserEditor : EditorWindow
         }
     }
 
-#region buildings
+    private void ParseEnemyBase(string csvText)
+    {
+         var rows = ParseCsv(csvText);
+        if (rows.Count < 2)
+            return;
+
+        var ememiesBase = new List<EnemyBaseConfig>();
+
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Length < 12)
+            {
+                Debug.LogWarning(
+                    $"Skipping row {i} in EnemyBase CSV: not enough columns ({row.Length})"
+                );
+                continue;
+            }
+
+            try
+            {
+                ememiesBase.Add(
+                    new EnemyBaseConfig
+                    {
+                        id = row[0],
+                        title = row[1],
+                        description = row[2],
+                        iconPath = row[3],
+                        prefabPath = row[4],
+                        speed=float.Parse(row[5]),
+                        attackDamage=float.Parse(row[6]),
+                        attackInterval=float.Parse(row[7]),
+                        maxHealth=float.Parse(row[8]),
+                        timeToStartRestore=float.Parse(row[9]),
+                        restoreHealthPerSecond=float.Parse(row[10]),
+                        pointAmount =int.Parse(row[11])
+                    }
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error parsing enemyBase at row {i}: {ex.Message}");
+                Debug.LogError($"Row data: {string.Join(" | ", row)}");
+                throw;
+            }
+        }
+
+        SaveToJson(new EnemyBaseConfigList { enemyBaseConfigs = ememiesBase }, "enemyBase");
+        Debug.Log($"Parsed {ememiesBase.Count} enemiesBase");
+    }
+
+    #region buildings
     void ParseBuildingsBaseConfig(string csvText)
     {
         var rows = ParseCsv(csvText);
@@ -354,7 +418,7 @@ public class CsvTableParserEditor : EditorWindow
         Debug.Log($"Parsed {buildingEnegry.Count} buildings energy");
     }
 #endregion
-#region itemes
+#region items
     void ParseItems(string csvText)
     {
         var rows = ParseCsv(csvText);

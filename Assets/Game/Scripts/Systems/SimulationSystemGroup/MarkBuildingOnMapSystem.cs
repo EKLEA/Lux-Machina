@@ -42,10 +42,13 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         var energyBuildingDataLookup = SystemAPI.GetComponentLookup<EnergyBuildingData>(false);
         var connectToEnegyEntitiesLookup = SystemAPI.GetComponentLookup<ConnectToEnegyEntities>(false);
         var updateConnectStatusLookup = SystemAPI.GetComponentLookup<UpdateConnectStatus>(false);
+        var resourcesLinkLookup = SystemAPI.GetComponentLookup<ResourcesLink>(false);
         var buildingMapRW = SystemAPI.GetSingletonRW<BuildingMap>();
         var energyMapRW = SystemAPI.GetSingletonRW<EnergyMap>();
         var entitiesRW = SystemAPI.GetSingletonRW<EntitiesDictionary>();
+        var resourceMapRW = SystemAPI.GetSingletonRW<ResourceMap>();
         var mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
+        var config = SystemAPI.GetSingleton<BuildingConfigReference>();
         if (runBuilding)
         {
             state.Dependency = new MarkBuildingJob
@@ -54,6 +57,8 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 EnergyMap=energyMapRW.ValueRW,
                 EntityDictionary = entitiesRW.ValueRW,
                 MapEntity = mapEntity,
+                ResourceMap=resourceMapRW.ValueRO,
+                ResourcesLinkLookup=resourcesLinkLookup,
                 UpdateMapTagLookup = updateMapLookup,
                 UpdateClusterTagLookup = updateClusterLookup,
                 EnergyBuildingDataLookup=energyBuildingDataLookup,
@@ -78,16 +83,43 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         if (runUpdate)
         {
             updateMapLookup = SystemAPI.GetComponentLookup<UpdateMapTag>(false);
+            var HealthDataLookup = SystemAPI.GetComponentLookup<HealthData>(false);
+             
+            var weightJob = new CalculateDestructionWeightsJob {
+                Buildings = buildingMapRW.ValueRO.CellMapBuildingsIDs,
+                //BuildingsEntities = buildingMapRW.ValueRO.CellMapEntites,
+                //HealthDataLookup=HealthDataLookup,
+                buildingConfigReference=config,
+                //TargetPos=buildingMapRW.ValueRO.CorePos,
+                Weights = buildingMapRW.ValueRW.CellWeights
+            };
+            state.Dependency = weightJob.Schedule(state.Dependency);
+
+
+            var flowJob = new GenerateFlowDirectionsJob
+            {
+                Weights = buildingMapRW.ValueRO.CellWeights,
+                BuildingIDs = buildingMapRW.ValueRO.CellMapBuildingsIDs,
+                Directions = buildingMapRW.ValueRW.CellDirections
+            };
+
+            state.Dependency = flowJob.Schedule(state.Dependency);
+
 
             state.Dependency = new ResizeMapJob
             {
                 CellMapEntites = buildingMapRW.ValueRW.CellMapEntites,
                 CellMapBuildingsIDs = buildingMapRW.ValueRW.CellMapBuildingsIDs,
                 CellEntityMultiMap = buildingMapRW.ValueRW.CellEntityMultiMap,
+                IsBluePrintOrDemolitionPoints = buildingMapRW.ValueRW.IsBluePrintOrDemolitionPoints,
+                CellWeights = buildingMapRW.ValueRW.CellWeights,
+                CellDirections = buildingMapRW.ValueRW.CellDirections,
                 Entities = entitiesRW.ValueRW.Entities,
                 MapEntity = mapEntity,
                 UpdateMapTagLookup = updateMapLookup,
             }.Schedule(state.Dependency);
+          
+
         }
     }
     void OnDestroy(ref SystemState state)
@@ -106,6 +138,8 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         if(productionTable.produced.IsCreated)productionTable.Dispose();
         var energyMap=state.EntityManager.GetComponentData<EnergyMap>(mapEntity);
         if(energyMap.EnergyLinks.IsCreated)energyMap.Dispose();
+        var resourceMap=state.EntityManager.GetComponentData<ResourceMap>(mapEntity);
+        if(resourceMap.ResouecesMap.IsCreated)resourceMap.Dispose();
         
         state.EntityManager.DestroyEntity(mapEntity);
     
@@ -115,10 +149,16 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         {
             var buildingConfigs = state.EntityManager.GetComponentData<BuildingConfigReference>(configEntity);
             var recipeConfigs = state.EntityManager.GetComponentData<RecipeConfigRefernce>(configEntity);
+            var itemsConfigs = state.EntityManager.GetComponentData<ItemsConfigReference>(configEntity);
+            var enemyBaseConfig = state.EntityManager.GetComponentData<EnemyBaseConfigRefence>(configEntity);
 
             buildingConfigs.Dispose();
             if (recipeConfigs.RecipesConfig.IsCreated) 
                 recipeConfigs.RecipesConfig.Dispose();
+            if(itemsConfigs.ItemsConfigs.IsCreated)
+                itemsConfigs.ItemsConfigs.Dispose();
+            if(enemyBaseConfig.EnemyBaseConfigs.IsCreated)
+                enemyBaseConfig.EnemyBaseConfigs.Dispose();
 
             state.EntityManager.DestroyEntity(configEntity);
         }
@@ -128,6 +168,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
     {
         public BuildingMap MapData; 
         public EnergyMap EnergyMap; 
+        public ResourceMap ResourceMap; 
         public EntitiesDictionary EntityDictionary; 
         public Entity MapEntity;
         public ComponentLookup<UpdateMapTag> UpdateMapTagLookup;
@@ -135,6 +176,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         public ComponentLookup<EnergyBuildingData> EnergyBuildingDataLookup;
         public ComponentLookup<UpdateConnectStatus> UpdateConnectStatusLookup;
         public ComponentLookup<ConnectToEnegyEntities> ConnectToEnegyEntitiesLookup;
+        public ComponentLookup<ResourcesLink> ResourcesLinkLookup;
 
         public void Execute(Entity entity,in BuildingData buildingData, in BuildingPosData buildingPosData,EnabledRefRW<MarkOnMap> markOnMap)
         {
@@ -178,6 +220,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
 
             EntityDictionary.Entities.TryAdd(buildingData.BuildingUniqueID,entity);
             markOnMap.ValueRW=false;
+
             UpdateMapTagLookup.SetComponentEnabled(MapEntity, true);
             UpdateClusterTagLookup.SetComponentEnabled(MapEntity, true);
             if (EnergyBuildingDataLookup.HasComponent(entity))
@@ -208,6 +251,24 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                     if(UpdateConnectStatusLookup.HasComponent(en)) UpdateConnectStatusLookup.SetComponentEnabled(en,true);
                 }
                 entitiesToPing.Dispose();
+            }
+            if (ResourcesLinkLookup.HasComponent(entity))
+            {
+                ResourcesLink resourcesLink=new();
+                resourcesLink.ResourcesCells=new();
+                resourcesLink.indexCell=0;
+                for (int x = buildingPosData.LeftCornerPos.x; x < buildingPosData.LeftCornerPos.x + buildingPosData.size.x; x++)
+                {
+                    for (int y = buildingPosData.LeftCornerPos.y; y < buildingPosData.LeftCornerPos.y + buildingPosData.size.y; y++)
+                    {
+                        int2 point=new(x,y);
+                        if (ResourceMap.ResouecesMap.ContainsKey(point))
+                        {
+                            resourcesLink.ResourcesCells.Add(point);
+                        }
+                    }
+                }
+                ResourcesLinkLookup[entity]=resourcesLink;
             }
         }
     }
@@ -244,6 +305,9 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         public NativeParallelHashMap<int2, Entity> CellMapEntites;
         public NativeParallelMultiHashMap<Entity, int2> CellEntityMultiMap;
         public NativeParallelHashMap<int, Entity> Entities;
+        public NativeParallelHashMap<int2, bool> IsBluePrintOrDemolitionPoints; 
+        public NativeParallelHashMap<int2, float> CellWeights;    
+        public NativeParallelHashMap<int2, float2> CellDirections;
         public Entity MapEntity;
         public ComponentLookup<UpdateMapTag> UpdateMapTagLookup;
         public void Execute(
@@ -252,15 +316,152 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         {
             if (CellEntityMultiMap.Count() > CellEntityMultiMap.Capacity * 0.9f)
             {
-                 CellMapEntites.Capacity = CellMapEntites.Capacity * 2;
+                CellMapEntites.Capacity = CellMapEntites.Capacity * 2;
                 CellMapBuildingsIDs.Capacity = CellMapBuildingsIDs.Capacity * 2;
                 CellEntityMultiMap.Capacity = CellEntityMultiMap.Capacity * 2;
+                IsBluePrintOrDemolitionPoints.Capacity = IsBluePrintOrDemolitionPoints.Capacity * 2;
+                CellWeights.Capacity = CellWeights.Capacity * 2;
+                CellDirections.Capacity = CellDirections.Capacity * 2;
             }
             if (Entities.Count() > Entities.Capacity * 0.9f)
             {
                 Entities.Capacity = Entities.Capacity * 2;
             }
             UpdateMapTagLookup.SetComponentEnabled(MapEntity,false);
+        }
+    }
+    [BurstCompile]
+    public struct CalculateDestructionWeightsJob : IJob
+    {
+        [ReadOnly] public NativeParallelHashMap<int2, int> Buildings;
+        [ReadOnly] public BuildingConfigReference buildingConfigReference;
+        public NativeParallelHashMap<int2, float> Weights;
+
+        public void Execute()
+        {
+            Weights.Clear();
+            var queue = new NativeQueue<int2>(Allocator.Temp);
+
+            foreach (var building in Buildings)
+            {
+                int2 bPos = building.Key;
+                int buildingID = building.Value;
+
+                float startWeight = 0f;
+                if (buildingConfigReference.BuildingsBaseConfigs.Value.TryGetConfig(buildingID, out var config))
+                {
+                    // Используем твой скоринг: чем меньше число, тем притягательнее здание
+                    // Вычитаем из 0, чтобы получить приоритет
+                    startWeight = GetPriorityScore(config.buildingType, config.typeOfLogic);
+                }
+
+                Weights[bPos] = startWeight; 
+                queue.Enqueue(bPos);
+            }
+
+            // Радиус распространения влияния зданий
+            int maxSearchDist = 20; 
+
+            while (queue.TryDequeue(out int2 curr))
+            {
+                float currWeight = Weights[curr];
+
+                for (int x = -1; x <= 1; x++)
+                {
+                    for (int y = -1; y <= 1; y++)
+                        {
+                            if (x == 0 && y == 0) continue;
+                            int2 neighbor = curr + new int2(x, y);
+
+                            // Если в клетке уже здание, мы его не перезаписываем (у них приоритет от конфига)
+                            if (Buildings.ContainsKey(neighbor)) continue;
+
+                            float distMod = (x != 0 && y != 0) ? 1.41f : 1.0f;
+                            
+                            // Клетки пола просто добавляют стоимость расстояния
+                            float stepCost = 1.0f * distMod; 
+                            float newWeight = currWeight + stepCost;
+
+                            if (newWeight > maxSearchDist) continue;
+
+                            if (!Weights.TryGetValue(neighbor, out float oldWeight) || newWeight < oldWeight)
+                            {
+                                Weights[neighbor] = newWeight;
+                                queue.Enqueue(neighbor);
+                            }
+                        }
+                }
+            }
+        }
+
+        private float GetPriorityScore(BuildingsTypes type, TypeOfLogic logic)
+        {
+            // Твои веса: Special (1) будет "тянуть" сильнее, чем Defence (20)
+            switch (type)
+            {
+                case BuildingsTypes.Special:    return 1f;   
+                case BuildingsTypes.Enegry:     return 5f;
+                case BuildingsTypes.Logistic:   return 10f;
+                case BuildingsTypes.Procession: return 15f;
+                case BuildingsTypes.Defence:    return 20f + (logic == TypeOfLogic.WorkWithItems ? 10 : 0);  
+                default:                        return 20f;
+            }
+        }
+    }
+    [BurstCompile]
+    public struct GenerateFlowDirectionsJob : IJob
+    {
+        [ReadOnly] public NativeParallelHashMap<int2, float> Weights; 
+        [ReadOnly] public NativeParallelHashMap<int2, int> BuildingIDs; 
+        public NativeParallelHashMap<int2, float2> Directions;
+
+       public void Execute()
+        {
+            Directions.Clear();
+
+            foreach (var entry in Weights)
+            {
+                int2 curr = entry.Key;
+                if (BuildingIDs.ContainsKey(curr))
+                {
+                    Directions.TryAdd(curr, float2.zero);
+                    continue;
+                }
+
+                float currWeight = entry.Value;
+                float2 aggregateDir = float2.zero;
+                bool foundLower = false;
+
+                for (int x = -1; x <= 1; x++)
+                {
+                    for (int y = -1; y <= 1; y++)
+                    {
+                        if (x == 0 && y == 0) continue;
+                        int2 neighbor = curr + new int2(x, y);
+
+                        if (Weights.TryGetValue(neighbor, out float nWeight))
+                        {
+                            if (nWeight < currWeight)
+                            {
+                                float2 toNeighbor = new float2(x, y);
+                                float weightDiff = currWeight - nWeight;
+                                
+                                aggregateDir += math.normalize(toNeighbor) * weightDiff;
+                                foundLower = true;
+                            }
+                        }
+                    }
+                }
+
+                if (foundLower && math.lengthsq(aggregateDir) > 0.001f)
+                {
+                    Directions.TryAdd(curr, math.normalize(aggregateDir));
+                }
+                else
+                {
+                    Directions.TryAdd(curr, float2.zero);
+                }
+            }
         }
     }
 }

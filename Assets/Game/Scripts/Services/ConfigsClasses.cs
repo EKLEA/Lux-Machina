@@ -122,7 +122,35 @@ public class RecipeConfigList:IWrapper
 
 
 #endregion
+#region  Enemies
+
+[Serializable]
+public class EnemyBaseConfig
+{
+    public string id;
+    
+    public string title;
+    public string description;
+    public string iconPath;
+    public string prefabPath;
+    public float speed;
+    public float attackDamage;
+    public float attackInterval;
+    public float maxHealth;
+    public float timeToStartRestore;
+    public float restoreHealthPerSecond;
+    public int pointAmount;
+}
+
+[Serializable]
+public class EnemyBaseConfigList:IWrapper
+{
+    public List<EnemyBaseConfig> enemyBaseConfigs;
+}
+
+#endregion
 public interface IWrapper{}
+#region  Enums
 public enum ItemClass
 {
     Components=1,
@@ -183,3 +211,4 @@ public enum RequiredRecipesGroup
     Processing = 4,
     ManufactoryProcessing=5,
 }
+#endregion

@@ -4,6 +4,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Unity.VisualScripting;
 using UnityEngine;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
@@ -71,7 +72,9 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(ClusterLink),
             typeof(SaveInfo),
             typeof(LoadInfo),
-            typeof(DestroyVisualTag),
+            typeof(TakeDamage),
+            typeof(RoadPointHealthData),
+            
             
             typeof(ForceDestroyTag));
         
@@ -98,7 +101,9 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(NeedsClusterAssign),
             typeof(SaveInfo),
             typeof(LoadInfo),
-            typeof(DestroyVisualTag),
+            typeof(TakeDamage),
+            typeof(HealthData),
+            
             typeof(ForceDestroyTag));
         _simpleBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_simpleBuildingArchetype,Types=_simpleBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
@@ -123,13 +128,16 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(ExcessSlotData),
             typeof(CreateVisualTag),
             typeof(ClusterLink),
-            typeof(NeedsClusterAssign),
-             typeof(IsConnectedToEnergy),
+            typeof(NeedsClusterAssign), 
+            typeof(IsConnectedToEnergy),
+            typeof(SwitchIsOff),
             typeof(EnergyBuildingData),
             typeof(UpdateConnectStatus),
             typeof(SaveInfo),
             typeof(LoadInfo),
-            typeof(DestroyVisualTag),
+            typeof(TakeDamage),
+            typeof(HealthData),
+            
             typeof(ForceDestroyTag));
         _energyBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_energyBuildingArchetype,Types=_energyBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
@@ -156,7 +164,9 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(NeedsClusterAssign),
             typeof(SaveInfo),
             typeof(LoadInfo),
-            typeof(DestroyVisualTag),
+            typeof(TakeDamage),
+            typeof(HealthData),
+            
             typeof(ForceDestroyTag));
         _propBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_propBuildingArchetype,Types=_propBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
@@ -195,11 +205,12 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(IsLogicEnabled),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
-            
             typeof(CreateVisualTag),
-            typeof(DestroyVisualTag),
+            
             typeof(SaveInfo),
             typeof(LoadInfo),
+            typeof(TakeDamage),
+            typeof(HealthData),
             
             typeof(ForceDestroyTag));
         _processorBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_processorBuildingArchetype,Types=_processorBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
@@ -214,6 +225,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(ChangeDemolitionStateTag),
             typeof(IsDemolition),
             typeof(BuildingPosData),
+            typeof(ResourcesLink),
             typeof(IsInputConstructionEnabled),
             typeof(IsOutputConstuctionEnabled),
             typeof(IsConstuctionSlotsAssigned),
@@ -237,12 +249,12 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(IsLogicEnabled),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
-            
             typeof(CreateVisualTag),
-            typeof(DestroyVisualTag),
+            
             typeof(SaveInfo),
             typeof(LoadInfo),
-            
+            typeof(TakeDamage),
+            typeof(HealthData),
             typeof(ForceDestroyTag));
         _prodecerBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_prodecerBuildingArchetype,Types=_prodecerBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
@@ -281,9 +293,11 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(MarkOnMap),
             
             typeof(CreateVisualTag),
-            typeof(DestroyVisualTag),
+            
             typeof(SaveInfo),
             typeof(LoadInfo),
+            typeof(TakeDamage),
+            typeof(HealthData),
             
             typeof(ForceDestroyTag));
        _consumerBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_consumerBuildingArchetype,Types=_consumerBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
@@ -314,9 +328,11 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(MarkOnMap),
             
             typeof(CreateVisualTag),
-            typeof(DestroyVisualTag),
+            
             typeof(SaveInfo),
             typeof(LoadInfo),
+            typeof(TakeDamage),
+            typeof(HealthData),
             
             typeof(ForceDestroyTag) );
        _storageBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_storageBuildingArchetype,Types=_storageBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
@@ -352,9 +368,11 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(MarkOnMap),
             
             typeof(CreateVisualTag),
-            typeof(DestroyVisualTag),
+            
             typeof(SaveInfo),
             typeof(LoadInfo),
+            typeof(TakeDamage),
+            typeof(HealthData),
             
             typeof(ForceDestroyTag));
        _defenceBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_defenceBuildingArchetype,Types=_defenceBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
@@ -373,6 +391,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(NeedsClusterAssign),
             typeof(SaveInfo),
             typeof(LoadInfo),
+            typeof(TakeDamage),
+            typeof(HealthData),
             typeof(CraftingPriorityData),
             typeof(StorageSlotData),
             typeof(LogisticTag),
@@ -380,6 +400,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(EnergyTypeBuildingTag),
 
             typeof(IsConnectedToEnergy),
+            typeof(SwitchIsOff),
             typeof(EnergyBuildingData),
             typeof(UpdateConnectStatus));
        _coreBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_coreBuildingArchetype,Types=_coreBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
@@ -410,6 +431,7 @@ public partial struct BuildingCreateSystem : ISystem
                 IsBluePrintLookup=SystemAPI.GetComponentLookup<IsBlueprint>(false),
                 IsDemolitionLookup=SystemAPI.GetComponentLookup<IsDemolition>(false),
                 TransitionSlotDataLookup=SystemAPI.GetBufferLookup<TransitionSlotData>(false),
+                RoadPointHealthDataBufferLookUp=SystemAPI.GetBufferLookup<RoadPointHealthData>(false),
             };
             state.Dependency=CreateRoadJob.Schedule(state.Dependency);
         }
@@ -462,6 +484,7 @@ public partial struct BuildingCreateSystem : ISystem
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBluePrintLookup;
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
         [ReadOnly] public BufferLookup<TransitionSlotData> TransitionSlotDataLookup;
+        [ReadOnly] public BufferLookup<RoadPointHealthData> RoadPointHealthDataBufferLookUp;
 
         public void Execute(
                     Entity entity,
@@ -469,6 +492,7 @@ public partial struct BuildingCreateSystem : ISystem
                     in DynamicBuffer<MapPoint> points
         )
         {
+            if(!config.BuildingsBaseConfigs.Value.TryGetConfig(config.roadID,out var rCFG)) return;
             Entity road = ECB.CreateEntity(RoadArchetype);
             var buffer = ECB.AddBuffer<MapPoint>(road);
             
@@ -477,6 +501,16 @@ public partial struct BuildingCreateSystem : ISystem
             {
                 buffer.Add(p);
             }
+            if (RoadPointHealthDataBufferLookUp.HasBuffer(entity))
+            {
+                
+                var healthBuffer = ECB.AddBuffer<RoadPointHealthData>(road);
+                 foreach(var p in RoadPointHealthDataBufferLookUp[entity])
+                {
+                    healthBuffer.Add(p);
+                }
+            }
+           
             
             ECB.SetComponentEnabled<MarkOnMap>(road,true);
 
@@ -522,12 +556,10 @@ public partial struct BuildingCreateSystem : ISystem
             ECB.SetComponentEnabled<UpdateRoad>(road, false);
             
             ECB.SetComponent(road, new BuildingData { BuildingIDHash = config.roadID, BuildingUniqueID = roadData.UniqueBuildingID });
-            
 
             ECB.SetComponent(road, new ClusterLink{ClusterIds=new()});
 
             ECB.SetComponentEnabled<CreateVisualTag>(road, true);
-            ECB.SetComponentEnabled<DestroyVisualTag>(road, false);
             ECB.SetComponentEnabled<ForceDestroyTag>(road, false);
             
             // 5. Удаляем команду
@@ -588,8 +620,14 @@ public partial struct BuildingCreateSystem : ISystem
                     BuildingIDHash = data.buildingID,
                     BuildingUniqueID = data.UniqueBuildingID
                 });
-                
-            
+                ECB.SetComponent(building, new HealthData
+                {
+                    CurrHealth=BConfig.MaxHealth,
+                    MaxHealth=BConfig.MaxHealth,
+                    CurrTimeToRestore=0,
+                    TimeToRestore=BConfig.TimeToRestore,
+                    RestoreHpPerTick=BConfig.RestoreHpPerTick,
+                });
                     
                 ECB.SetComponentEnabled<CreateVisualTag>(building, true);
                 ECB.SetComponent(building, new ClusterLink{ClusterIds=new()});
@@ -604,9 +642,8 @@ public partial struct BuildingCreateSystem : ISystem
         }
         void HandleBase(Entity entity,Entity building,NativeArray<ComponentType> types)
         {
-            if (HasType(types, ComponentType.ReadWrite<DestroyVisualTag>()))
+            if (HasType(types, ComponentType.ReadWrite<ForceDestroyTag>()))
             {
-                ECB.SetComponentEnabled<DestroyVisualTag>(building, false);
                 ECB.SetComponentEnabled<ForceDestroyTag>(building, false);
             }
             if(HasType(types, ComponentType.ReadWrite<IsBlueprint>()))
@@ -674,6 +711,10 @@ public partial struct BuildingCreateSystem : ISystem
                 }
                 
                 ECB.SetComponentEnabled<IsConnectedToEnergy>(building, buildingID==config.CoreID);
+            }
+            if (HasType(types, ComponentType.ReadWrite<SwitchIsOff>()))
+            {
+                ECB.SetComponentEnabled<SwitchIsOff>(building,false);
             }
             if (HasType(types, ComponentType.ReadWrite<IsConnectedToEnergy>()))
             {

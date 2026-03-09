@@ -66,7 +66,6 @@ public partial struct CraftApplySystem : ISystem
                 ECB.SetBuffer<OutputConstructionSlotData>(entity);
                 ECB.SetComponentEnabled<UpdateClusterSlots>(mapEntity,true);
                 ECB.SetComponentEnabled<ForceDestroyTag>(entity,true);
-                ECB.SetComponentEnabled<DestroyVisualTag>(entity,true);
                 
             }
         }

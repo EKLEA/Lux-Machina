@@ -18,12 +18,14 @@ public class BuildingManagementWindowView:DragableUIWindow
     [SerializeField] Image workIndicatorOrb;
     [SerializeField] TextMeshProUGUI workIndicatorText;
     [SerializeField] Button DestroyBT;
+    [SerializeField] Button SwitchEnergy;
     [SerializeField] Image BuildingSprite;
     [SerializeField] TextMeshProUGUI BuildingText;
     [SerializeField] TextMeshProUGUI BuildingDescriptionText;
     [Header("Heads")]
     [SerializeField] Transform CraftArea;
     [SerializeField] Transform StorageArea;
+    [SerializeField] Transform EnergyArea;
     [SerializeField] Transform ConstructionArea;
     [SerializeField] Transform ExcessItemsArea;
     [SerializeField] RecipesAndItemsWindow RecipesAndItemsHead;
@@ -51,6 +53,9 @@ public class BuildingManagementWindowView:DragableUIWindow
     [SerializeField] Transform StorageSlotsHead;
     [SerializeField] AdjustableSlotButtonScript[] StorageSlots;
     [SerializeField] Button AddSlotBT;
+
+    [Header("EnergyArea")]
+    [SerializeField] ToggleButtonScript ToggleSwitchBT;
 
     [Header("ConstructionArea")]
     [SerializeField] Transform ConstructionHead;
@@ -92,9 +97,10 @@ public class BuildingManagementWindowView:DragableUIWindow
     ReactiveProperty<int> priority;
     ReactiveProperty<ConstructionViewData> constructionViewData;
     (bool,BuildingCraftViewData) recipeViewData;
-     ReactiveProperty<StorageSlotViewData[]> storageSlots;
+    ReactiveProperty<StorageSlotViewData[]> storageSlots;
     bool windowChanged;
     bool CanDestory;
+    ReactiveProperty<bool> SwitchData;
     public void BindModel(BuildingInfoViewModel model)
     {
         this.model=model;
@@ -102,7 +108,7 @@ public class BuildingManagementWindowView:DragableUIWindow
     }
     public void SetUpData(Entity entity)
     { 
-        model.GetBuildingData(entity,out BuildingViewData buildingViewDataS,out constructionViewData,out excessItems,out distribuitionViewData,out priority,out recipeViewData,out storageSlots,out CanDestory);
+        model.GetBuildingData(entity,out BuildingViewData buildingViewDataS,out constructionViewData,out excessItems,out distribuitionViewData,out priority,out recipeViewData,out storageSlots,out CanDestory,out SwitchData);
         buildingViewData=buildingViewDataS;
         Open();
     }
@@ -119,6 +125,7 @@ public class BuildingManagementWindowView:DragableUIWindow
         ShowBaseWindow();
         ShowCraftArea();
         ShowStorageArea();
+
         if(distribuitionViewData!=null||storageSlots!=null)
         {
             PriorityBT.Bind(priority);
@@ -155,12 +162,18 @@ public class BuildingManagementWindowView:DragableUIWindow
         BuildingText.text=buildingInfo.BuildingInfos[buildingViewData.buildingID].title;
         BuildingDescriptionText.text=buildingInfo.BuildingInfos[buildingViewData.buildingID].description;
         DestroyBT.gameObject.SetActive(CanDestory);
+        ToggleSwitchBT.gameObject.SetActive(SwitchData!=null);
+        if (SwitchData != null)
+        {
+            
+            ToggleSwitchBT.Bind(SwitchData);
+            allDisposables.Add(ToggleSwitchBT);
+        }
     }
     void ShowCraftArea()
     {
         if (distribuitionViewData != null)
         {
-            Debug.Log("asdsdsd");
             CraftAreaDispose=new();
             CraftArea.gameObject.SetActive(true);
             RecipeHead.gameObject.SetActive(true);
@@ -425,7 +438,6 @@ public class BuildingManagementWindowView:DragableUIWindow
             AddSlotBT.interactable=true;
             AddSlotBT.gameObject.SetActive(true);
         }
-        Debug.Log(slots.Length);
         if(slots.Length>0)
         {
             for(int i = 0; i < slots.Length; i++)
@@ -498,11 +510,14 @@ public class BuildingManagementWindowView:DragableUIWindow
     }
     void ResetWindow()
     {
+        
         RecipesAndItemsHead.Close();
         workStateDispose?.Dispose();
         workStateDispose=null;
         allDisposables?.Dispose();
         allDisposables=null;
+        
+        ToggleSwitchBT.gameObject.SetActive(false);  
         HideCraftArea();
         HideStorageArea();
         HideConstructionArea();

@@ -83,6 +83,11 @@ public class SaveService : IGameStateSaver,IReadOnlySave
         save.recipeBuildingSaveData=new();
         save.storageSlotsSaveData=new();
         save.buildingEnergyNetvorkLinkSaveData=new();
+        save.ResourcesCells=new();
+        save.ResourcesCells[new int2(5,5)]=new int2(1,2);
+        save.ResourcesCells[new int2(5,6)]=new int2(1,2);
+        save.ResourcesCells[new int2(6,5)]=new int2(1,2);
+        save.ResourcesCells[new int2(6,6)]=new int2(1,2);
 
         // save.buildingDatas = new();
         // save.roadPoints = new();
@@ -102,16 +107,18 @@ public class SaveService : IGameStateSaver,IReadOnlySave
         };
         var hash = "Core".GetStableHashCode();
         save.CoreID=hash;
+        save.CorePos=new int2(-1, -1);
         save.Buildings.Add(
             hash,
             new BaseBuildingSaveData
             {
                 buildingID=hash,
-                buildingPosition= new int2(-1, -1),
+                buildingPosition= save.CorePos,
                 rotation = 1,
                 isBlueprint=false,
             }
         );
+
         return save;
     }
 }

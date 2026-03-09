@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Burst;
@@ -30,7 +31,7 @@ public partial class BuildingSaveSystem : SystemBase
         {
             if (!loadState.ValueRO) continue; 
             loadState.ValueRW = false; 
-            LoadInfo(buildingData,building,ecb);
+            LoadBuildingInfo(buildingData,building,ecb);
         }
         if (!SaveLoadInfo.IsEmpty)
         {
@@ -40,7 +41,7 @@ public partial class BuildingSaveSystem : SystemBase
         ecb.Playback(EntityManager);
         ecb.Dispose();
     }
-    public void LoadInfo(BuildingData buildingData, Entity building,EntityCommandBuffer ecb)
+    public void LoadBuildingInfo(BuildingData buildingData, Entity building,EntityCommandBuffer ecb)
     {
         if (EntityManager.HasComponent<ConstructionPriorityData>(building))
         {

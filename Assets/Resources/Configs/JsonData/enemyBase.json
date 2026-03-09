@@ -1,0 +1,18 @@
+﻿{
+    "enemyBaseConfigs": [
+        {
+            "id": "baseEnemy",
+            "title": "базовый",
+            "description": "ыввыфвыф",
+            "iconPath": "enemyBase",
+            "prefabPath": "enemyBasePrefab",
+            "speed": 5.0,
+            "attackDamage": 1.0,
+            "attackInterval": 5.0,
+            "maxHealth": 5.0,
+            "timeToStartRestore": 5.0,
+            "restoreHealthPerSecond": 5.0,
+            "pointAmount": 1
+        }
+    ]
+}

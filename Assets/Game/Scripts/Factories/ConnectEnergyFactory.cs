@@ -42,7 +42,7 @@ public class ConnectEnergyFactory
     public void Disconnect(EnergyNode node)
     {
         if (!_connections.TryGetValue(node, out EnergyNode connectedNode)) return;
-
+        
         ResetLine(node);
         ResetLine(connectedNode);
 

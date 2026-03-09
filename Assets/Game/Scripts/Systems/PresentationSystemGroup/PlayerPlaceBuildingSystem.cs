@@ -34,12 +34,19 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
     public int2 NextConnectFrom;
     public  Action onBuildingDone;
     public EnergyNode energyNode;
+    RefAction UpdateFunc;
     // NativeList<MapPoint> removePoints;
-    public bool canBuild{get;private set;}
+    bool canBuild;
     int uniqueId;
+    EntitiesDictionary entitiesDictionary;
+    BuildingMap buildingMap;
+    EnergyMap energyMap;
+    ResourceMap resourceMap;
+    
     public void SetUpBuilding(int buildingID,IPlaceBuildingPlayerData buildingPlayerData,Entity playerState, int2? connectionFrom = null)
     {
         if(EntityManager.IsComponentEnabled<PlayerPlacingBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerPlacingRoad>(playerState)||EntityManager.IsComponentEnabled<PlayerDeletePoints>(playerState)) return;
+        if(!_buildingInfo.BuildingInfos.ContainsKey(buildingID)) return;
         _buildingID=buildingID;
         Guid newGuid = Guid.NewGuid();
         uniqueId  = newGuid.GetHashCode(); 
@@ -47,14 +54,27 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         _buildingPlayerData=buildingPlayerData;
         _rotation=buildingPlayerData.rotation;
         _buildingOnScene= _factorty.CreateBuilding(_buildingID,_buildingPlayerData.pos,_buildingPlayerData.rotation,true);
+        _preview=_visualBuildingFactory.PhantomizeObject(_buildingOnScene.gameObject);
+        EntityManager.SetComponentEnabled<PlayerPlacingBuilding>(playerState,true);
+        _playerState=playerState;
+
+        
+        Vector3Int size=_buildingInfo.BuildingInfos[_buildingID].size;
+        size = _rotation % 2 != 0
+                ? new Vector3Int(size.z, size.y, size.x)
+                : size;
+        UpdateFunc+=(ref bool b)=>UpdateBuild(ref b,size,energyMap,buildingMap);
+
         if(_connectionFrom.y!=-1&&_buildingOnScene is EnergyBuildingOnScene energyBuildingOnScene)
         {
             energyBuildingOnScene.SetUpNodes();
             energyNode=energyBuildingOnScene.nodes[_rotation%_buildingInfo.BuildingEnegryConfigs[_buildingID].maxConnections];
+            UpdateFunc+=(ref bool b)=>UpdateEnergy(ref b,entitiesDictionary);
         }
-        _preview=_visualBuildingFactory.PhantomizeObject(_buildingOnScene.gameObject);
-        EntityManager.SetComponentEnabled<PlayerPlacingBuilding>(playerState,true);
-        _playerState=playerState;
+        if(_buildingInfo.BuildingInfos[_buildingID].buildingType==BuildingsTypes.Procession&&_buildingInfo.BuildingProcessionInfos[_buildingID].typeOfProcession==TypeOfProcession.Generate)
+        {
+            UpdateFunc+=(ref bool b)=>UpdateResourceBuilding(ref b,size,resourceMap);
+        }        
     }
 
     protected override void OnCreate()
@@ -72,9 +92,10 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
     protected override void OnUpdate()
     {
         
-        var entitiesDic= SystemAPI.GetSingleton<EntitiesDictionary>();
-        var map= SystemAPI.GetSingleton<BuildingMap>();
-        var configs= SystemAPI.GetSingleton<BuildingConfigReference>();
+        entitiesDictionary= SystemAPI.GetSingleton<EntitiesDictionary>();
+        buildingMap= SystemAPI.GetSingleton<BuildingMap>();
+        energyMap= SystemAPI.GetSingleton<EnergyMap>();
+        resourceMap= SystemAPI.GetSingleton<ResourceMap>();
         
         if(_buildReadyQuery.IsEmpty) return;
         
@@ -82,52 +103,75 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         
         _rotation=_buildingPlayerData.rotation;
         _pos=_buildingPlayerData.pos;
-        Vector3Int size=_buildingInfo.BuildingInfos[_buildingID].size;
-        size = _rotation % 2 != 0
-                ? new Vector3Int(size.z, size.y, size.x)
-                : size;
-        var enData = SystemAPI.GetSingleton<EnergyMap>();
+        
         canBuild=true;
-        bool canConnect=false;
-        for(int x=0; x < size.x; x++)
-        {
-            for(int z=0; z < size.z; z++)
-            {
-                
-                var pos=new int2(_pos.x+x, _pos.y+z);
-                if(map.CellMapBuildingsIDs.ContainsKey(new int2(_pos.x+x, _pos.y+z)))
-                {
-                    canBuild=false;
-                    break;
-                }
-                else
-                {
-                    if(enData.CellToEnergyBuildingMap.ContainsKey(pos))
-                    {
-                        canConnect=true;
-                        break;
-                    }
-                }
-            }
-        }
-        bool connectRes=true;
-        if (_connectionFrom.y != -1)
-        {
-            
-            if(!entitiesDic.Entities.ContainsKey(_connectionFrom.y)) return;
-            var en=entitiesDic.Entities[_connectionFrom.y];
-            var buildingOnSceneFrom=EntityManager.GetComponentData<BuildingOnSceneReference>(en).buildingOnScene as EnergyBuildingOnScene;
-           
-            energyNode=(_buildingOnScene as EnergyBuildingOnScene).nodes[_rotation%_buildingInfo.BuildingEnegryConfigs[_buildingID].maxConnections];
-            connectTo=new int2(_rotation%_buildingInfo.BuildingEnegryConfigs[_buildingID].maxConnections,uniqueId);;
-            connectRes=math.distance(buildingOnSceneFrom.nodes[_connectionFrom.x].Connect.transform.position,energyNode.Connect.transform.position)<configs.range;
-        }
-        _buildingOnScene.SetOutLine(canConnect?_gameFieldSettings.selectBuildingColor:_gameFieldSettings.makeAsDemolitionBuidlingColor);
-        canBuild=canBuild&&connectRes;
+        UpdateFunc?.Invoke(ref canBuild);
         _preview.CanBuild(canBuild,_buildingPlayerData.isForce);
         _factorty.MoveBuilding(_preview.gameObject,_pos,_connectionFrom.y != -1?0:_rotation,_buildingID);
 
     } 
+    void UpdateBuild(ref bool prevBool, Vector3Int size, EnergyMap enData, BuildingMap map)
+    {
+        bool canConnect = false;
+        bool isOverlapping = false; 
+
+        for (int x = 0; x < size.x; x++)
+        {
+            for (int z = 0; z < size.z; z++)
+            {
+                var pos = new int2(_pos.x + x, _pos.y + z);
+                
+                if (map.CellMapBuildingsIDs.ContainsKey(pos))
+                {
+                    isOverlapping = true;
+                    break; 
+                }
+                
+                if (!canConnect && enData.CellToEnergyBuildingMap.ContainsKey(pos))
+                {
+                    canConnect = true;
+                }
+            }
+            if (isOverlapping) break; 
+        }
+
+        prevBool = !isOverlapping; 
+        _buildingOnScene.SetOutLine(canConnect?_gameFieldSettings.selectBuildingColor:_gameFieldSettings.makeAsDemolitionBuidlingColor);
+    }
+    void UpdateEnergy(ref bool prevBool,EntitiesDictionary entitiesDic)
+    {
+        bool result=false;
+        if(entitiesDic.Entities.ContainsKey(_connectionFrom.y))
+        {
+             var en=entitiesDic.Entities[_connectionFrom.y];
+            var buildingOnSceneFrom=EntityManager.GetComponentData<BuildingOnSceneReference>(en).buildingOnScene as EnergyBuildingOnScene;
+            
+            energyNode=(_buildingOnScene as EnergyBuildingOnScene).nodes[_rotation%_buildingInfo.BuildingEnegryConfigs[_buildingID].maxConnections];
+            connectTo=new int2(_rotation%_buildingInfo.BuildingEnegryConfigs[_buildingID].maxConnections,uniqueId);;
+            result=math.distance(buildingOnSceneFrom.nodes[_connectionFrom.x].Connect.transform.position,energyNode.Connect.transform.position)<_gameFieldSettings.range;
+        }
+        
+        prevBool=prevBool&&result;
+    }
+    void UpdateResourceBuilding(ref bool prevBool,Vector3Int size,ResourceMap resourceMap)
+    {
+        bool result=false;
+        for(int x=0; x < size.x; x++)
+        {
+            for(int z=0; z < size.z; z++)
+            {
+                var pos=new int2(_pos.x+x, _pos.y+z);
+                if(resourceMap.ResouecesMap.ContainsKey(pos))
+                {
+                    result=true;
+                    break;
+                }
+            }
+        }
+        prevBool=prevBool&&result;
+        
+        Debug.Log(prevBool);
+    }
     public void PlaceBuilding(bool isHold,bool IsBlueprint)
     {
         var ecb = World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>().CreateCommandBuffer();
@@ -168,5 +212,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         onBuildingDone?.Invoke();
         
         onBuildingDone=null;
+        UpdateFunc=null;
     }
+    public delegate void RefAction(ref bool value);
 }

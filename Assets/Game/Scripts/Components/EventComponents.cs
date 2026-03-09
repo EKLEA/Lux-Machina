@@ -9,6 +9,11 @@ public struct CreateBuildingEventData : IComponentData
     public int2 buildingPosition;
     public int rotation;
 }
+public struct CreateEnemyEventData : IComponentData
+{
+    public int EnemyID;
+    public float3 pos;
+}
 public struct LinkNetworkEnergyTo : IBufferElementData
 {
     public int2 LinkToBuilding; //x=node , y entity

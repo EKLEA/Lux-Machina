@@ -59,6 +59,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "Spawn",
+                    "type": "Button",
+                    "id": "469c98ab-6457-42c0-b9a2-af3095f76e91",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -169,6 +178,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "Camera Rotate BT",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "dc686d6b-24cf-4382-8b0a-a8ae1e4110b4",
+                    "path": "<Keyboard>/c",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Spawn",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

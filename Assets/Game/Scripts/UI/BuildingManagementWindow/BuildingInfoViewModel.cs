@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading;
+using Kino;
 using UniRx;
 using Unity.Entities;
 using Unity.Entities.UniversalDelegates;
@@ -38,6 +39,9 @@ public class BuildingInfoViewModel
     ReactiveProperty<float> _timeToCraft;
     ReactiveProperty<float> _currTime;
     ReactiveProperty<int> _countInPack;
+
+    
+    ReactiveProperty<bool> _isSwitchOff;  
 
     CompositeDisposable disposables;
     CompositeDisposable storageDisposables;
@@ -93,7 +97,8 @@ public class BuildingInfoViewModel
                                 out ReactiveProperty<int> priority, 
                                 out (bool,BuildingCraftViewData) recipeViewData,
                                 out ReactiveProperty<StorageSlotViewData[]>StorageSlots,
-                                out bool CanDestory)
+                                out bool CanDestory,
+                                out ReactiveProperty<bool> SwitchData)
     { 
         ClearViewModel();
         _constructionViewDataRP=new();
@@ -130,7 +135,13 @@ public class BuildingInfoViewModel
 
         _inputSlots=GetSlotsFromBuff<InputSlotData>(building);
         _outputSlots=GetSlotsFromBuff<OutputSlotData>(building);
-        
+        if (entityManager.HasComponent<EnergyBuildingData>(building))
+        {
+            _isSwitchOff=new(entityManager.IsComponentEnabled<SwitchIsOff>(building));
+            SwitchData=_isSwitchOff;
+            _isSwitchOff.Subscribe((value)=>ChangeEnergySwitch()).AddTo(disposables);
+        }
+        else SwitchData=null;
         if (_inputSlots!=null|| _outputSlots!=null)
         {
             _isActiveInput=entityManager.HasComponent<IsInputCraftEnabled>(building)? new(entityManager.IsComponentEnabled<IsInputCraftEnabled>(building)) :null;
@@ -439,6 +450,16 @@ public class BuildingInfoViewModel
                .CreateCommandBuffer();
         ecb.SetComponentEnabled<ChangeDemolitionStateTag>(viewData.buildingEntity,IsDemolition);
     }
+    public void TurnSwitch()
+    {
+        if (entityManager.HasComponent<SwitchIsOff>(viewData.buildingEntity))
+        {
+              var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
+               .CreateCommandBuffer();
+            ecb.SetComponentEnabled<SwitchIsOff>(viewData.buildingEntity,!entityManager.IsComponentEnabled<SwitchIsOff>(viewData.buildingEntity));
+            ecb.SetComponentEnabled<UpdateConnectStatus>(viewData.buildingEntity,!entityManager.IsComponentEnabled<SwitchIsOff>(viewData.buildingEntity));
+        }
+    }
     public void MarkAsForceDestory()
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
@@ -451,7 +472,6 @@ public class BuildingInfoViewModel
     public void AddStorageSlot(int ItemID, int Capacity)
     {
         
-            Debug.Log("ыфввыфвыфвыфвыффвыфвыыфв");
         if (entityManager.HasBuffer<StorageSlotData>(viewData.buildingEntity))
         {
             Debug.Log("ssdds");
@@ -478,6 +498,19 @@ public class BuildingInfoViewModel
             ecb.AddComponent(Command,new RemoveStorageSlotData{slotIND=slotIND});
         }
     }   
+    void ChangeEnergySwitch()
+    {
+        if (entityManager.HasComponent<SwitchIsOff>(viewData.buildingEntity))
+        {
+            if(_isSwitchOff.Value==entityManager.IsComponentEnabled<SwitchIsOff>(viewData.buildingEntity))  return;
+             var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
+            .CreateCommandBuffer();
+            
+            ecb.SetComponentEnabled<SwitchIsOff>(viewData.buildingEntity,!entityManager.IsComponentEnabled<SwitchIsOff>(viewData.buildingEntity));
+            var buildingMap = entityManager.CreateEntityQuery(typeof(BuildingMap)).GetSingletonEntity();
+            ecb.SetComponentEnabled<UpdateConnectionsTag>(buildingMap,true);
+        }
+    }
     void ChangePriority(bool isConstrucionPriority,int priorityValue)
     {
        

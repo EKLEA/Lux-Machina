@@ -33,6 +33,7 @@ public partial struct ProcessRoadPointsSystem : ISystem
                 IsBluePrintLookUp=SystemAPI.GetComponentLookup<IsBlueprint>(false),
                 IsDemolitionLookUp=SystemAPI.GetComponentLookup<IsDemolition>(false),
                 TransitionSlotDataLookUp=SystemAPI.GetBufferLookup<TransitionSlotData>(false),
+                SecondBufferLookUp=SystemAPI.GetBufferLookup<RoadPointHealthData>(true),
                 ECB=ecb
 
             }.Schedule(state.Dependency);
@@ -48,6 +49,7 @@ public partial struct ProcessRoadPointsSystem : ISystem
         public ComponentLookup<IsBlueprint> IsBluePrintLookUp;
         public ComponentLookup<IsDemolition> IsDemolitionLookUp;
         public BufferLookup<TransitionSlotData> TransitionSlotDataLookUp;
+        [ReadOnly] public BufferLookup<RoadPointHealthData> SecondBufferLookUp; 
         public EntityCommandBuffer ECB;
         int pointCountInCommand;
         
@@ -59,7 +61,12 @@ public partial struct ProcessRoadPointsSystem : ISystem
                 ECB.DestroyEntity(entity);
                 return;
             }
-            
+             NativeParallelHashMap<int2, RoadPointHealthData> extraDataMap = new(points.Length, Allocator.Temp);
+            if (SecondBufferLookUp.HasBuffer(entity))
+            {
+                var extraBuff = SecondBufferLookUp[entity];
+                foreach (var item in extraBuff) extraDataMap.TryAdd(item.pos, item);
+            }
             NativeList<int2> filteredPoints = new NativeList<int2>(points.Length, Allocator.Temp);
             foreach (var p in points)
             {
@@ -88,14 +95,15 @@ public partial struct ProcessRoadPointsSystem : ISystem
                     items[i]=(buff[i].amount,buff[i]);
                 }
             }
-            ClusterPoints(filteredPoints, IsBluePrint,IsDemolition,hasTransitSlots,ref items);
-            
+            ClusterPoints(filteredPoints, IsBluePrint,IsDemolition,hasTransitSlots,ref items,extraDataMap);
+
+            extraDataMap.Dispose();
             filteredPoints.Dispose();
             items.Dispose();
             ECB.DestroyEntity(entity);
         }
         
-        private void ClusterPoints(NativeList<int2> points, bool IsBluePrint, bool IsDemolition, bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items)
+        private void ClusterPoints(NativeList<int2> points, bool IsBluePrint, bool IsDemolition, bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items, NativeParallelHashMap<int2, RoadPointHealthData> extraDataMap)
         {
             int pointCount = points.Length;
             pointCountInCommand = pointCount;
@@ -104,8 +112,6 @@ public partial struct ProcessRoadPointsSystem : ISystem
             for (int i = 0; i < pointCount; i++)
                 clusterIds[i] = i;
 
-            // 1. Связываем только соседей (dx+dy == 1)
-            // Убираем do-while, одного прохода по парам достаточно для Union-Find
             for (int i = 0; i < pointCount; i++)
             {
                 for (int j = i + 1; j < pointCount; j++)
@@ -122,8 +128,6 @@ public partial struct ProcessRoadPointsSystem : ISystem
                 }
             }
 
-            // 2. Группируем точки по их финальному корню
-            // Важно: создаем список СНАРУЖИ мапы, чтобы не было проблем с копированием структур
             NativeParallelHashMap<int, NativeList<int2>> clusters = new(pointCount, Allocator.Temp);
             
             for (int i = 0; i < pointCount; i++)
@@ -132,26 +136,23 @@ public partial struct ProcessRoadPointsSystem : ISystem
                 
                 if (!clusters.TryGetValue(root, out var list))
                 {
-                    // Создаем новый список для нового кластера
                     list = new NativeList<int2>(Allocator.Temp);
                     list.Add(points[i]);
                     clusters.Add(root, list);
                 }
                 else
                 {
-                    // Добавляем в существующий и ОБЯЗАТЕЛЬНО перезаписываем в мапе
                     list.Add(points[i]);
                     clusters[root] = list; 
                 }
             }
 
-            // 3. Запускаем создание сущностей
             var enumerator = clusters.GetEnumerator();
             while (enumerator.MoveNext())
             {
                 var clusterList = enumerator.Current.Value;
-                ProcessCluster(clusterList, IsBluePrint, IsDemolition, hasTransitSlots,ref items);
-                clusterList.Dispose(); // Чистим каждый список
+                ProcessCluster(clusterList, IsBluePrint, IsDemolition, hasTransitSlots,ref items,extraDataMap);
+                clusterList.Dispose(); 
             }
             
             clusters.Dispose();
@@ -161,7 +162,6 @@ public partial struct ProcessRoadPointsSystem : ISystem
         
         private int FindRoot(int index, NativeArray<int> parents)
         {
-            // Классический FindRoot без лишних мутаций внутри условия
             int root = index;
             while (parents[root] != root)
             {
@@ -170,7 +170,7 @@ public partial struct ProcessRoadPointsSystem : ISystem
             return root;
         }
         
-        private void ProcessCluster(NativeList<int2> clusterPoints,bool IsBluePrint,bool IsDemolition,bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items)
+        private void ProcessCluster(NativeList<int2> clusterPoints,bool IsBluePrint,bool IsDemolition,bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items, NativeParallelHashMap<int2, RoadPointHealthData> extraDataMap)
         {
             if (clusterPoints.Length == 0) return;
            
@@ -182,11 +182,17 @@ public partial struct ProcessRoadPointsSystem : ISystem
 
             
             var buff = ECB.AddBuffer<MapPoint>(createRoadCommand);
+            DynamicBuffer<RoadPointHealthData> extraBuff = default;
+            if (!extraDataMap.IsEmpty) extraBuff = ECB.AddBuffer<RoadPointHealthData>(createRoadCommand);
             if(IsBluePrint) ECB.AddComponent<IsBlueprint>(createRoadCommand);
             if(IsDemolition) ECB.AddComponent<IsDemolition>(createRoadCommand);
             foreach(var p in clusterPoints)
             {
                 buff.Add(new MapPoint{pos=p});
+                if (extraBuff.IsCreated && extraDataMap.TryGetValue(p, out var data))
+                {
+                    extraBuff.Add(data);
+                }
             }
             if (hasTransitSlots)
             {

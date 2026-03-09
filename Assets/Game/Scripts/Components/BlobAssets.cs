@@ -2,6 +2,7 @@ using System;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.VisualScripting;
 public interface IConfigBase
 {
     public int id{get;set;}
@@ -9,7 +10,15 @@ public interface IConfigBase
 public struct BlobLibrary<T> where T : unmanaged,IConfigBase
 {
     public BlobArray<T> Configs;
-
+    public int GetIdByPos(int position)
+    {
+        if (position >= 0 && position < Configs.Length)
+        {
+            return Configs[position].id;
+        }
+        
+        return -1; 
+    }
     public bool TryGetConfig(int id, out T result)
     {
         int low = 0;
@@ -33,18 +42,19 @@ public struct BlobLibrary<T> where T : unmanaged,IConfigBase
         return false;
     }
 }
-#region Configs
 
+#region Configs
 public struct BuildingBaseStructConfig:IConfigBase
 {
-    
     public int id {get;set;}
     public BuildingsTypes buildingType;
     public ActionType actionType;
     public int3 size;
     public TypeOfLogic typeOfLogic;
+    public float RestoreHpPerTick;        
+    public float TimeToRestore;
+    public float MaxHealth;
 }
-
 public struct BuildingStorageStructConfig:IConfigBase
 {
     
@@ -87,9 +97,38 @@ public struct RecipeIngredientStruct
     public int ItemId;
     public int Amount;
 }
+
+public struct ItemsStructConfig : IConfigBase
+{
+    public int id{get;set;}
+    public int ItemClass;
+    public int ItemType;
+}
+
+public struct EnemyBaseStructConfig : IConfigBase
+{
+    public int id{get;set;}
+    public int costInPoints;
+}
 #endregion
 #region  Reference
-
+public struct EnemyBaseConfigRefence: IComponentData, IDisposable
+{
+     public BlobAssetReference<BlobLibrary<EnemyBaseStructConfig>> EnemyBaseConfigs;
+    
+    public void Dispose()
+    {
+        EnemyBaseConfigs.Dispose();
+    }
+}
+public struct ItemsConfigReference : IComponentData, IDisposable
+{
+    public BlobAssetReference<BlobLibrary<ItemsStructConfig>> ItemsConfigs;
+    public void Dispose()
+    {
+        ItemsConfigs.Dispose();
+    }
+}
 public struct BuildingConfigReference : IComponentData,IDisposable
 {
     public BlobAssetReference<BlobLibrary<BuildingBaseStructConfig>> BuildingsBaseConfigs;
@@ -110,9 +149,13 @@ public struct BuildingConfigReference : IComponentData,IDisposable
         BuildingEnergyStructConfig.Dispose();
     }
 }
-public struct RecipeConfigRefernce : IComponentData
+public struct RecipeConfigRefernce : IComponentData,IDisposable
 {
     public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
+    public void Dispose()
+    {
+        RecipesConfig.Dispose();
+    }
 }
 
 #endregion

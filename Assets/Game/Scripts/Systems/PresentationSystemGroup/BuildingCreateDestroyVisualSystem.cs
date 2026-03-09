@@ -14,6 +14,7 @@ using Zenject;
 public partial class BuildingCreateDestroyVisualSystem : SystemBase
 {
     [Inject] BuildingObjectFactory _factorty;
+    [Inject] EnemyFactory _enemyFactory;
     
     protected override void OnUpdate()
     {
@@ -26,6 +27,11 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
         {
             SpawnRoad(buildingData,points,entity,ecb);
         }
+        foreach(var (enemyData,entity) in SystemAPI.Query<CreateEnemyEventData>().WithEntityAccess())
+        {
+            _enemyFactory.CreateEnemy(enemyData.EnemyID,enemyData.pos);
+            ecb.DestroyEntity(entity);
+        }
         foreach (var (buildingRef,updateRoad,buff,entity) in SystemAPI.Query<BuildingOnSceneReference,EnabledRefRW<UpdateRoad>,DynamicBuffer<MapPoint>>().WithEntityAccess())
         {
             var nativeArray = buff.AsNativeArray();
@@ -36,7 +42,7 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
             updateRoad.ValueRW=false;
             Debug.Log(entity);
         }
-        foreach (var (buildingOnSceneReference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<DestroyVisualTag>().WithEntityAccess())
+        foreach (var (buildingOnSceneReference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ForceDestroyTag>().WithEntityAccess())
         {
             DeleteVisual(buildingOnSceneReference,entity,ecb);
         }
@@ -101,7 +107,6 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
     void DeleteVisual(BuildingOnSceneReference reference,Entity building,EntityCommandBuffer ecb)
     {
         _factorty.DestoryObject(reference.buildingOnScene);
-        Debug.Log("ssdds");
         ecb.SetComponent(building,new BuildingOnSceneReference{buildingOnScene=null});
     }
 }

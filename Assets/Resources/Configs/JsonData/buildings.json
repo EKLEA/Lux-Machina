@@ -14,9 +14,9 @@
                 "z": 1
             },
             "typeOfLogic": 0,
-            "maxHealth": 100.0,
+            "maxHealth": 5.0,
             "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
+            "restoreHealthPerSecond": 5.0
         },
         {
             "id": "Core",
@@ -32,7 +32,7 @@
                 "z": 5
             },
             "typeOfLogic": 0,
-            "maxHealth": 100.0,
+            "maxHealth": 1000000.0,
             "timeToStartRestore": 5.0,
             "restoreHealthPerSecond": 20.0
         },
@@ -68,7 +68,7 @@
                 "z": 3
             },
             "typeOfLogic": 1,
-            "maxHealth": 100.0,
+            "maxHealth": 10.0,
             "timeToStartRestore": 5.0,
             "restoreHealthPerSecond": 20.0
         },

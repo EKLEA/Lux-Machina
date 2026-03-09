@@ -8,14 +8,15 @@ public class GameSceneBindings : MonoInstaller
 {
     [SerializeField]
     PlayerController playerController;
-     [SerializeField]
+    [SerializeField]
     GridVisualizer gridVisualizer;
-
+      [SerializeField]
+    FlowFieldVisualizer FlowFieldVisualizer;
     [SerializeField]
     CameraController cameraController;
     [SerializeField]
     UIManager UIManager;
-
+    [SerializeField] EnemyFactory enemyFactory;
     public override void InstallBindings()
     {
         BindServices();
@@ -24,38 +25,6 @@ public class GameSceneBindings : MonoInstaller
     }
 
 
-    // void BindEcsSystems()
-    // {
-    //     var world = World.DefaultGameObjectInjectionWorld;
-    //     if (world == null)
-    //         return;
-
-    //     var buildingVisualSystem = world.GetOrCreateSystemManaged<BuildingVisualSystem>();
-    //     var pathfindingSystem = world.GetOrCreateSystemManaged<PathfindingSystem>();
-    //     var buildingMapQuerySystem = world.GetOrCreateSystemManaged<PublicBuildingMapSystem>();
-    //     var buildingLogicAssignSystem = world.GetOrCreateSystemManaged<BuildingLogicAssignSystem>();
-    //     var recipeCacheFillSystem = world.GetOrCreateSystemManaged<RecipeCacheFillSystem>();
-
-    //     var fixedSimulationGroup = world.GetOrCreateSystemManaged<FixedStepSimulationSystemGroup>();
-    //     var simulationGroup = world.GetOrCreateSystemManaged<SimulationSystemGroup>();
-
-    //     Container.Inject(buildingVisualSystem);
-    //     Container.Inject(pathfindingSystem);
-    //     Container.Inject(buildingMapQuerySystem);
-    //     Container.Inject(buildingLogicAssignSystem);
-    //     Container.Inject(recipeCacheFillSystem);
-
-    //     Container.Bind<PublicBuildingMapSystem>().FromInstance(buildingMapQuerySystem).AsSingle();
-    //     Container.Bind<BuildingVisualSystem>().FromInstance(buildingVisualSystem).AsSingle();
-    //     Container.Bind<PathfindingSystem>().FromInstance(pathfindingSystem).AsSingle();
-    //     Container.Bind<RecipeCacheFillSystem>().FromInstance(recipeCacheFillSystem).AsSingle();
-    //     Container.Bind<BuildingLogicAssignSystem>().FromInstance(buildingLogicAssignSystem).AsSingle();
-    //     Container.Bind<FixedStepSimulationSystemGroup>().FromInstance(fixedSimulationGroup).AsSingle();
-    //     Container.Bind<SimulationSystemGroup>().FromInstance(simulationGroup).AsSingle();
-
-    //     var ecsSystemsManager = new ECSSystemsManager();
-    //     Container.Bind<ECSSystemsManager>().FromInstance(ecsSystemsManager).AsSingle();
-    // }
 
     void BindServices()
     {
@@ -63,6 +32,7 @@ public class GameSceneBindings : MonoInstaller
         Container.Bind<VisualBuildingFactory>().AsSingle().NonLazy();
         Container.Bind<BuildingObjectFactory>().AsSingle().NonLazy();
         Container.Bind<ConnectEnergyFactory>().AsSingle().NonLazy();
+        Container.Bind<EnemyFactory>().FromInstance(enemyFactory).AsSingle();
     }
 
     void BindGameScene()
@@ -97,6 +67,7 @@ public class GameSceneBindings : MonoInstaller
         ).AsSingle();
         Container.Bind<PlayerController>().FromInstance(playerController).AsSingle();
         Container.Bind<GridVisualizer>().FromInstance(gridVisualizer).AsSingle();
+        Container.Bind<FlowFieldVisualizer>().FromInstance(FlowFieldVisualizer).AsSingle();
         
 
     }

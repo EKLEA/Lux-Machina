@@ -51,6 +51,10 @@ public class GameController : IInitializable
         Timestep*=2;
        // fixedStepSimulationSystemGroup.Timestep = Timestep;
     }
+    public void SpawnMobs()
+    {
+        World.EntityManager.SetComponentEnabled<SpawnMobs>(Map,true);
+    }
     public Vector2Int GetMapPos(Vector3 pos)
     {
         return new Vector2Int(
@@ -126,6 +130,8 @@ public class GameController : IInitializable
         AddUnmanaged<CraftSystem>(simGroup);
         AddUnmanaged<CraftApplySystem>(simGroup);
         AddUnmanaged<PathFindingSystem>(simGroup);
+        AddUnmanaged<EnemyAISystem>(simGroup);
+        AddUnmanaged<HealthSystem>(simGroup);
 
         RegisterManagedSystem<BuildingCreateDestroyVisualSystem>(presGroup);
         RegisterManagedSystem<BuildingChangeVisualSystem>(presGroup);
@@ -154,7 +160,15 @@ public class GameController : IInitializable
             CellMapEntites=new(1000,Allocator.Persistent),
             CellEntityMultiMap=new(1000,Allocator.Persistent),
             IsBluePrintOrDemolitionPoints=new(1000,Allocator.Persistent),
+            CellWeights=new(1000,Allocator.Persistent),
+            CellDirections=new(1000,Allocator.Persistent),
+            CorePos=gameStateData.CorePos
         });
+        World.EntityManager.AddComponentData(Map,new SpawnMobs
+        {
+            points=1,
+        });
+        World.EntityManager.SetComponentEnabled<SpawnMobs>(Map,false);
         World.EntityManager.AddComponentData(Map, new EnergyMap
         {
             CellToEnergyBuildingMap=new(1000,Allocator.Persistent),
@@ -167,6 +181,8 @@ public class GameController : IInitializable
         {
             Entities=new(250,Allocator.Persistent)
         });
+        
+        await PrepareWorld(Map,gameStateData);
         World.EntityManager.AddComponentData(Map, new ClusterMap(Allocator.Persistent));
 
         World.EntityManager.AddComponent<UpdateMapTag>(Map);
@@ -190,6 +206,18 @@ public class GameController : IInitializable
         World.EntityManager.AddComponent<SavingMapTag>(Map);
         World.EntityManager.SetComponentEnabled<SavingMapTag>(Map,false);
         await UniTask.Yield();
+    }
+    async UniTask PrepareWorld(Entity Map,GameStateData gameStateData)
+    {
+        ResourceMap resourceMap=new ResourceMap
+        {
+            ResouecesMap=new(10000,Allocator.Persistent)
+        };
+        foreach(var c in gameStateData.ResourcesCells)
+        {
+            resourceMap.ResouecesMap.Add(c.Key,c.Value);
+        }
+         World.EntityManager.AddComponentData(Map, resourceMap);
     }
     async UniTask LoadSavedEntities(GameStateData gameStateData)
     {

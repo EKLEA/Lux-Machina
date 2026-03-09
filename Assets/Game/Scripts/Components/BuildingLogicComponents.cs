@@ -30,8 +30,6 @@ public struct BuildingTag : IComponentData{}
         public int State;
     }
     public struct CreateVisualTag : IComponentData, IEnableableComponent{}
-    public struct DestroyVisualTag : IComponentData, IEnableableComponent{}
-    
     public struct ForceDestroyTag: IComponentData, IEnableableComponent{}
     public struct MarkOnMap: IComponentData, IEnableableComponent{}
     public struct UpdateRoad: IComponentData, IEnableableComponent{}
@@ -41,6 +39,12 @@ public struct BuildingTag : IComponentData{}
     #endregion
 
     #region распределение ресурсов
+    public struct ResourcesLink : IComponentData
+    {
+        public FixedList512Bytes<int2> ResourcesCells;
+        public int indexCell;
+    }
+
     public struct TransitionSlotData : IBufferElementData
     {
         public int itemID;
@@ -152,7 +156,9 @@ public struct BuildingTag : IComponentData{}
     #region электричество
     public struct IsConnectedToEnergy:IComponentData, IEnableableComponent
     {
-        //ссылка на башню   
+    }
+    public struct SwitchIsOff:IComponentData, IEnableableComponent
+    {
     }
     public struct ConnectToEnegyEntities:IComponentData
     {
@@ -188,7 +194,21 @@ public struct BuildingTag : IComponentData{}
         public float TimeToRestore;
 
     }
+    public struct TakeDamage : IBufferElementData
+    {
+        public int2 pos;
+        public float Damage;
+    }
     
+    public struct RoadPointHealthData: IBufferElementData
+    {
+        public int2 pos;
+        public float CurrHealth;
+        public float MaxHealth;
+        public float CurrTimeToRestore;
+        public float RestoreHpPerTick;        
+        public float TimeToRestore;
+    }
     [Serializable]
     public enum DistributionPriority 
     {
