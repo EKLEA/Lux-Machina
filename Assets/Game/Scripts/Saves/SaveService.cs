@@ -6,10 +6,11 @@ using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using Zenject;
 
-public class SaveService : IGameStateSaver,IReadOnlySave
+public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
 {
     [Inject]
     IReadOnlyBuildingInfo buildingInfo;
+    public EnemyAIConfig EnemyAiConfig=>GameState.EnemyAiConfig;
     string SavePath;
     public int saveIndex;
     public GameStateData GameState { get; private set; }
@@ -76,6 +77,8 @@ public class SaveService : IGameStateSaver,IReadOnlySave
     GameStateData GenerateDefault()
     {
         var save = new GameStateData();
+        
+        save.EnemyAiConfig=new();
         save.Buildings=new();
         save.RoadsBuildings=new();
         save.constructionSlotsSaveData=new();
@@ -122,6 +125,10 @@ public class SaveService : IGameStateSaver,IReadOnlySave
         return save;
     }
 }
+public interface  IEnemyAIConfig
+{
+    public EnemyAIConfig EnemyAiConfig{get;}
+}
 public interface IReadOnlySave
 {
     public GameStateData GameState{get;}
@@ -129,4 +136,19 @@ public interface IReadOnlySave
 public interface IGameStateSaver
 {
     public UniTask SaveGameState();
+}
+public class EnemyAIConfig
+{
+    public float ProgressThreshold {get;private set;}
+    public float BaseIncome{get;private set;}
+    public float PowerMultiplier{get;private set;}
+    public float TimeDifficultyFactor{get;private set;}  
+
+    public EnemyAIConfig(float ProgressThreshold=10000, float BaseIncome=40, float PowerMultiplier=1.5f, float TimeDifficultyFactor=0.1f)
+    {
+        this.ProgressThreshold=ProgressThreshold;
+        this.BaseIncome=BaseIncome;
+        this.PowerMultiplier=PowerMultiplier;
+        this.TimeDifficultyFactor=TimeDifficultyFactor;
+    }
 }

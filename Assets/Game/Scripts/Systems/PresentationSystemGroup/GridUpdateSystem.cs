@@ -26,16 +26,16 @@ public partial class GridUpdateSystem : SystemBase
         .WithAny<PlayerPlacingBuilding,PlayerDeletePoints,PlayerPlacingRoad>()
         
         .Build(this);
-        //RequireForUpdate(_buildQuery);
+        RequireForUpdate(_buildQuery);
     }
     protected override void OnUpdate()
     {
         if (!SystemAPI.TryGetSingleton<BuildingMap>(out var map)) return;
-        flowFieldVisualizer.DrawFlowField(
-              new Vector2Int(0,0), 
-                100, 
-                map
-        );
+        // flowFieldVisualizer.DrawFlowField(
+        //       new Vector2Int(0,0), 
+        //         100, 
+        //         map
+        // );
         if (!_buildQuery.IsEmpty)
         {
              _visualizer.DrawGrid(

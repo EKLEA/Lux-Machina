@@ -40,7 +40,6 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
             nativeArray.Dispose();
             UpdateRoad(buildingRef.buildingOnScene as RoadOnScene,managedArray);
             updateRoad.ValueRW=false;
-            Debug.Log(entity);
         }
         foreach (var (buildingOnSceneReference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ForceDestroyTag>().WithEntityAccess())
         {

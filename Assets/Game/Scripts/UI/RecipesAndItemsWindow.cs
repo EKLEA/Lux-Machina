@@ -51,23 +51,26 @@ public class RecipesAndItemsWindow : UIScreen
         SetUpRecipesByItemClassesButtons(classes.First(),groups);
         Open();
     }
-    public void SetUpWindowAsItemsByItemClasses(HashSet<ItemClass>  itemClasses)
+    public void SetUpWindowAsItemsByItemClasses(HashSet<ItemType>  ItemTypes)
     {
         foreach(var bt in ItemClassBTs)
         {
             bt.onClick.RemoveAllListeners();
             bt.gameObject.SetActive(false);
         }
+        
+        var items=itemsInfo.ItemsInfos.Where(f=>ItemTypes.Contains(f.Value.ItemType)).Select(f=>f.Value);
+        HashSet<ItemClass> classes=items.Select(f=>f.ItemClass).ToHashSet();
         int i=0;
-        foreach(ItemClass c in itemClasses)
+        foreach(ItemClass c in classes)
         {
             ItemClassBTs[i].image.sprite=itemsInfo.GetItemClassBTSprite((int)c);
             ItemClassBTs[i].gameObject.SetActive(true);
-            ItemClassBTs[i].onClick.AddListener(()=>SetUpItemsByItemClassesButtons(c));
+            ItemClassBTs[i].onClick.AddListener(()=>SetUpItemsByItemClassesButtons(items.Where(f=>f.ItemClass==c)));
             i++;
         }
         
-        SetUpItemsByItemClassesButtons(itemClasses.First());
+        SetUpItemsByItemClassesButtons(items.Where(f=>f.ItemClass==classes.First()));
         Open();
     }
     public override void Close()
@@ -85,19 +88,19 @@ public class RecipesAndItemsWindow : UIScreen
         onItemChoosed=null;
         base.Close();
     }
-    void SetUpItemsByItemClassesButtons(ItemClass itemClass)
+    void SetUpItemsByItemClassesButtons(IEnumerable<ItemConfig> itemConfigs)
     {
+        
         foreach(var bt in ItemButtons)
         {
             bt.onClick.RemoveAllListeners();
             bt.gameObject.SetActive(false);
         }
-        var items=itemsInfo.ItemsInfos.Where(f=>f.Value.ItemClass==itemClass).Select(f=>f.Value);
         
         ItemText.text="Предметы";
         int i=0;
         
-        foreach(var r in items)
+        foreach(var r in itemConfigs)
         {
             ItemButtons[i].image.sprite=recipeInfoInfo.GetRecipeSprite(r.id);
             ItemButtons[i].gameObject.SetActive(true);

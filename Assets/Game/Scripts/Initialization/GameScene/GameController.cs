@@ -53,7 +53,9 @@ public class GameController : IInitializable
     }
     public void SpawnMobs()
     {
-        World.EntityManager.SetComponentEnabled<SpawnMobs>(Map,true);
+        var ecb= World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
+               .CreateCommandBuffer();
+        ecb.SetComponentEnabled<SpawnMobsData>(Map,true);
     }
     public Vector2Int GetMapPos(Vector3 pos)
     {
@@ -131,11 +133,12 @@ public class GameController : IInitializable
         AddUnmanaged<CraftApplySystem>(simGroup);
         AddUnmanaged<PathFindingSystem>(simGroup);
         AddUnmanaged<EnemyAISystem>(simGroup);
+        AddUnmanaged<TurretSystem>(simGroup);
+        AddUnmanaged<ProjectileSystem>(simGroup);
         AddUnmanaged<HealthSystem>(simGroup);
 
         RegisterManagedSystem<BuildingCreateDestroyVisualSystem>(presGroup);
         RegisterManagedSystem<BuildingChangeVisualSystem>(presGroup);
-        RegisterManagedSystem<BuildingGameObjectClusterAssignSystem>(presGroup);
         RegisterManagedSystem<ProccessDeletePointsSystem>(presGroup);
         RegisterManagedSystem<BuildingSaveSystem>(presGroup);
 
@@ -164,11 +167,23 @@ public class GameController : IInitializable
             CellDirections=new(1000,Allocator.Persistent),
             CorePos=gameStateData.CorePos
         });
-        World.EntityManager.AddComponentData(Map,new SpawnMobs
+        World.EntityManager.AddComponentData(Map,new SpawnMobsData
         {
-            points=1,
+            CountOfCicle=0,
         });
-        World.EntityManager.SetComponentEnabled<SpawnMobs>(Map,false);
+        World.EntityManager.AddComponentData(Map,new TurretGrid
+        {
+            EnemyGridMap=new(1000,Allocator.Persistent),
+            EnemyToTurret=new(1000,Allocator.Persistent),
+            TurretGridClaim=new(1000,Allocator.Persistent),
+            EnemyInCellsMap=new(1000,Allocator.Persistent),
+            CellSize=gameFieldSettings.cellSize
+        });
+        World.EntityManager.AddBuffer<SpawnPointElement>(Map);
+        World.EntityManager.SetComponentEnabled<SpawnMobsData>(Map,false);
+
+
+
         World.EntityManager.AddComponentData(Map, new EnergyMap
         {
             CellToEnergyBuildingMap=new(1000,Allocator.Persistent),
@@ -181,7 +196,9 @@ public class GameController : IInitializable
         {
             Entities=new(250,Allocator.Persistent)
         });
+      
         
+       
         await PrepareWorld(Map,gameStateData);
         World.EntityManager.AddComponentData(Map, new ClusterMap(Allocator.Persistent));
 
@@ -205,6 +222,9 @@ public class GameController : IInitializable
         World.EntityManager.AddComponent<LoadingMapTag>(Map);
         World.EntityManager.AddComponent<SavingMapTag>(Map);
         World.EntityManager.SetComponentEnabled<SavingMapTag>(Map,false);
+
+
+        
         await UniTask.Yield();
     }
     async UniTask PrepareWorld(Entity Map,GameStateData gameStateData)
@@ -218,6 +238,7 @@ public class GameController : IInitializable
             resourceMap.ResouecesMap.Add(c.Key,c.Value);
         }
          World.EntityManager.AddComponentData(Map, resourceMap);
+        await UniTask.Yield();
     }
     async UniTask LoadSavedEntities(GameStateData gameStateData)
     {

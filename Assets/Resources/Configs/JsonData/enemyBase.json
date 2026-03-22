@@ -12,7 +12,7 @@
             "maxHealth": 5.0,
             "timeToStartRestore": 5.0,
             "restoreHealthPerSecond": 5.0,
-            "pointAmount": 1
+            "pointAmount": 15
         }
     ]
 }

@@ -256,7 +256,7 @@ public class BuildingManagementWindowView:DragableUIWindow
                     RecipesAndItemsHead.SetUpWindowAsItemsByItemClasses(
                         buildingInfo.BuildingStorageInfos[buildingViewData.buildingID].ItemsTypes.Count>0?
                         buildingInfo.BuildingStorageInfos[buildingViewData.buildingID].ItemsTypes.ToHashSet():
-                        Enum.GetValues(typeof(ItemClass)).Cast<ItemClass>()
+                        Enum.GetValues(typeof(ItemType)).Cast<ItemType>()
                                  .ToHashSet());
             });
 

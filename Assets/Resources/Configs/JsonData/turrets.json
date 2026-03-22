@@ -1,0 +1,20 @@
+﻿{
+    "TurretConfigs": [
+        {
+            "BuildingID": "Turret",
+            "AttackRange": 15.0,
+            "Angle": 135.0,
+            "CoolDown": 0.5,
+            "ProjectilePrefabID": "bullet",
+            "projectileType": 1
+        },
+        {
+            "BuildingID": "Artillery",
+            "AttackRange": 30.0,
+            "Angle": 180.0,
+            "CoolDown": 0.75,
+            "ProjectilePrefabID": "artilleryShell",
+            "projectileType": 2
+        }
+    ]
+}

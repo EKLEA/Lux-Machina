@@ -27,7 +27,6 @@ public partial class ProccessDeletePointsSystem : SystemBase
         NativeParallelMultiHashMap<Entity, MapPoint> entitiesToPoints = new(points.Length, Allocator.Temp);
         foreach (var p in points)
         {
-            Debug.Log(p.pos);
             if (mapData.CellMapEntites.TryGetValue(p.pos, out Entity roadEntity))
             {
                 
@@ -43,7 +42,6 @@ public partial class ProccessDeletePointsSystem : SystemBase
         foreach (Entity road in uniqueEntities)
         {
             
-            Debug.Log(road);
             if (!EntityManager.HasBuffer<MapPoint>(road)) continue;
             
                     

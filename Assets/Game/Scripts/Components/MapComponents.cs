@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -42,6 +43,7 @@ public struct EnergyMap: IComponentData, IDisposable
        EnergyLinks.Dispose();
     }
 }
+
 public struct ResourceMap : IComponentData, IDisposable
 {
     
@@ -50,6 +52,43 @@ public struct ResourceMap : IComponentData, IDisposable
     {
         ResouecesMap.Dispose();
     }
+}
+public struct TurretGrid : IComponentData, IDisposable
+{
+    public NativeParallelMultiHashMap<int, Entity> EnemyGridMap;
+    public NativeParallelMultiHashMap<Entity,int> EnemyToTurret;
+    public NativeParallelMultiHashMap<int2, int> TurretGridClaim;
+    public NativeParallelMultiHashMap<int2, Entity> EnemyInCellsMap; 
+    public float CellSize;
+    public void Dispose()
+    {
+        EnemyGridMap.Dispose();
+        TurretGridClaim.Dispose();
+        EnemyToTurret.Dispose();
+        EnemyInCellsMap.Dispose();
+    }
+
+}
+public struct SpawnMobsData : IComponentData, IEnableableComponent
+{
+    public int CountOfCicle;
+    public float pointsToSpawnMobs;
+    public float pointsPerCicle;
+    public float totalWeights;
+    public float playerProgress;
+    public float AttackThreshold => math.max(50f, playerProgress * 0.8f); 
+
+}
+[InternalBufferCapacity(128)]
+public struct SpawnPointElement : IBufferElementData
+{
+    public int2 Position;
+    public float Weight;
+}
+
+public struct SpawnPointComparer : IComparer<SpawnPointElement>
+{
+    public int Compare(SpawnPointElement x, SpawnPointElement y) => y.Weight.CompareTo(x.Weight);
 }
 public struct EntitiesDictionary: IComponentData, IDisposable
 {

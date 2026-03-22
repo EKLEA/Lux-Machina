@@ -1,0 +1,28 @@
+﻿{
+    "ProjectileConfigs": [
+        {
+            "itemID": 35,
+            "Speed": 5.0,
+            "Damage": 5.0,
+            "Radius": 0.0
+        },
+        {
+            "itemID": 36,
+            "Speed": 10.0,
+            "Damage": 10.0,
+            "Radius": 2.0
+        },
+        {
+            "itemID": 37,
+            "Speed": 10.0,
+            "Damage": 10.0,
+            "Radius": 5.0
+        },
+        {
+            "itemID": 38,
+            "Speed": 20.0,
+            "Damage": 20.0,
+            "Radius": 10.0
+        }
+    ]
+}

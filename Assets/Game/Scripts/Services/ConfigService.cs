@@ -11,6 +11,7 @@ public class ConfigService
         IReadOnlyTypeBuildingButtonInfo,
         IReadOnlyEnemyBaseConfig
 {
+    
     public Dictionary<int, ItemConfig> ItemsInfos { get; private set; }
     public Dictionary<int, RecipeConfig> RecipeInfos { get; private set; }
     public Dictionary<int, string> TypeBuildingButtonConfig { get; private set; }
@@ -19,10 +20,14 @@ public class ConfigService
     public Dictionary<int, BuildingProcessionConfig> BuildingProcessionInfos { get; private set; }
     public Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; private set; }
     public Dictionary<int, BuildingEnegryConfig> BuildingEnegryConfigs  { get; private set; }
+    public Dictionary<int, TurretConfig> TurretsConfigs { get; private set; }
 
     public Dictionary<int, string> ItemClassButtonConfig  { get; private set; }
 
     public Dictionary<int, EnemyBaseConfig> EnemyBaseConfigs { get; private set; }
+
+    public Dictionary<int, ProjectileConfig> ProjectileConfigs { get; private set; }
+
 
     Dictionary<int, Sprite> _spriteCache = new Dictionary<int, Sprite>();
     Dictionary<int, GameObject> _prefabCache = new Dictionary<int, GameObject>();
@@ -30,11 +35,13 @@ public class ConfigService
     public ConfigService()
     {
         ItemsInfos = new Dictionary<int, ItemConfig>();
+        ProjectileConfigs = new Dictionary<int, ProjectileConfig>();
         BuildingInfos = new Dictionary<int, BuildingBaseConfig>();
         BuildingStorageInfos = new Dictionary<int, BuildingStorageConfig>();
         BuildingProcessionInfos = new Dictionary<int, BuildingProcessionConfig>();
         BuildingItemRequestsInfos = new Dictionary<int, BuildingItemRequestsConfig>();
         BuildingEnegryConfigs = new Dictionary<int, BuildingEnegryConfig>();
+        TurretsConfigs = new Dictionary<int, TurretConfig>();
         RecipeInfos = new Dictionary<int, RecipeConfig>();
         TypeBuildingButtonConfig=new Dictionary<int, string>();
         EnemyBaseConfigs=new Dictionary<int, EnemyBaseConfig>();
@@ -44,19 +51,56 @@ public class ConfigService
     public async UniTask LoadConfigs()
     {
         LoadItems();
+        LoadProjectiles();
         LoadBuildingsBase();
         LoadBuildingsStorages();
         LoadBuildingsProcession();
         LoadBuildingsItemRequests();
         LoadBuildingsEnergy();
+        LoadTurrets();
         LoadRecipes();
         LoadTypeBuildingButtons();
         LoadEnemyBaseConfigs();
         await UniTask.Yield();
     }
 
+    private void LoadTurrets()
+    {
+        var wrapper = LoadJson<TurretConfigList>("Configs/JsonData/turrets");
+        if (wrapper?.TurretConfigs != null)
+        {
+            foreach (var turret in wrapper.TurretConfigs)
+            {
+                TurretsConfigs[turret.BuildingID.GetStableHashCode()] = turret;
+            }
+            Debug.Log($"Loaded {wrapper.TurretConfigs.Count} turrets");
+        }
+        else
+        {
+            Debug.LogError("Failed to load turrets - wrapper or turrets list is null");
+        }
+    }
+
+    private void LoadProjectiles()
+    {
+        var wrapper = LoadJson<ProjectileConfigList>("Configs/JsonData/projectiles");
+        if (wrapper?.ProjectileConfigs != null)
+        {
+            foreach (var tile in wrapper.ProjectileConfigs)
+            {
+                ProjectileConfigs[tile.itemID] = tile;
+            }
+            Debug.Log($"Loaded {wrapper.ProjectileConfigs.Count} projectiles");
+        }
+        else
+        {
+            Debug.LogError("Failed to load projectiles - wrapper or projectiles list is null");
+        }
+    }
+
     private void LoadEnemyBaseConfigs()
     {
+
         var wrapper = LoadJson<EnemyBaseConfigList>("Configs/JsonData/enemyBase");
         if (wrapper?.enemyBaseConfigs != null)
         {
@@ -428,7 +472,8 @@ public class ConfigService
 public interface IReadOnlyItemsInfo
 {
     Dictionary<int, ItemConfig> ItemsInfos { get; }
-    public Dictionary<int, string> ItemClassButtonConfig { get; }
+    Dictionary<int,ProjectileConfig> ProjectileConfigs{ get; }
+    Dictionary<int, string> ItemClassButtonConfig { get; }
     Sprite GetItemSprite(int itemId);
     Sprite GetItemClassBTSprite(int itemClass);
 }
@@ -440,6 +485,7 @@ public interface IReadOnlyBuildingInfo
     Dictionary<int, BuildingProcessionConfig> BuildingProcessionInfos { get; }
     Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; }
     Dictionary<int, BuildingEnegryConfig> BuildingEnegryConfigs { get; }
+    Dictionary<int, TurretConfig> TurretsConfigs{ get; }
     GameObject GetBuildingPrefab(int buildingId);
     Sprite GetBuildingSprite(int buildingId);
     Sprite GetEnumSprite<T>(int id)where T : struct, Enum;

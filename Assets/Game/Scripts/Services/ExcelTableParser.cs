@@ -15,6 +15,8 @@ public class CsvTableParserEditor : EditorWindow
     TextAsset recipesCsv;
     TextAsset itemsCsv;
     TextAsset enemyBaseCsv;
+    TextAsset turretCsv;
+    TextAsset projectileCsv;
 
     [MenuItem("Tools/Parse CSV Tables")]
     public static void ShowWindow()
@@ -53,6 +55,12 @@ public class CsvTableParserEditor : EditorWindow
             as TextAsset;
         enemyBaseCsv =
             EditorGUILayout.ObjectField("EnemyBase CSV", enemyBaseCsv, typeof(TextAsset), false)
+            as TextAsset;
+        turretCsv =
+            EditorGUILayout.ObjectField("Turrrets CSV", turretCsv, typeof(TextAsset), false)
+            as TextAsset;
+        projectileCsv =
+            EditorGUILayout.ObjectField("Projectiles CSV", projectileCsv, typeof(TextAsset), false)
             as TextAsset;
         if (GUILayout.Button("Parse All Tables"))
         {
@@ -129,7 +137,7 @@ public class CsvTableParserEditor : EditorWindow
                 );
                 ParseItems(csvText);
             }
-             if (enemyBaseCsv != null)
+            if (enemyBaseCsv != null)
             {
                 Debug.Log($"Parsing Enemy Base Csv CSV: {enemyBaseCsv.name}");
                 string csvText = File.ReadAllText(
@@ -137,6 +145,24 @@ public class CsvTableParserEditor : EditorWindow
                     System.Text.Encoding.UTF8
                 );
                 ParseEnemyBase(csvText);
+            }
+            if (turretCsv != null)
+            {
+                Debug.Log($"Parsing Turret Csv CSV: {turretCsv.name}");
+                string csvText = File.ReadAllText(
+                    AssetDatabase.GetAssetPath(turretCsv),
+                    System.Text.Encoding.UTF8
+                );
+                ParseTurret(csvText);
+            }
+            if (projectileCsv != null)
+            {
+                Debug.Log($"Parsing projectile Csv CSV: {projectileCsv.name}");
+                string csvText = File.ReadAllText(
+                    AssetDatabase.GetAssetPath(projectileCsv),
+                    System.Text.Encoding.UTF8
+                );
+                ParseProjectile(csvText);
             }
             EditorUtility.DisplayDialog("Success", "All tables parsed successfully!", "OK");
             AssetDatabase.Refresh();
@@ -147,7 +173,92 @@ public class CsvTableParserEditor : EditorWindow
             Debug.LogError($"Parse error: {ex.Message}\n{ex.StackTrace}");
         }
     }
+    private void ParseProjectile(string csvText)
+    {
+        var rows = ParseCsv(csvText);
+        if (rows.Count < 2)
+            return;
 
+        var projectiles = new List<ProjectileConfig>();
+
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Length < 4)
+            {
+                Debug.LogWarning(
+                    $"Skipping row {i} in Projectile CSV: not enough columns ({row.Length})"
+                );
+                continue;
+            }
+
+            try
+            {
+                projectiles.Add(
+                    new ProjectileConfig
+                    {
+                        itemID = int.Parse(row[0]),
+                        Speed =float.Parse(row[1]),
+                        Damage =float.Parse(row[2]),
+                        Radius = float.Parse(row[3])
+                    }
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error parsing projectiles at row {i}: {ex.Message}");
+                Debug.LogError($"Row data: {string.Join(" | ", row)}");
+                throw;
+            }
+        }
+
+        SaveToJson(new ProjectileConfigList { ProjectileConfigs = projectiles }, "projectiles");
+        Debug.Log($"Parsed {projectiles.Count} projectiles");
+    }
+    private void ParseTurret(string csvText)
+    {
+        var rows = ParseCsv(csvText);
+        if (rows.Count < 2)
+            return;
+
+        var turrets = new List<TurretConfig>();
+
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (row.Length < 6)
+            {
+                Debug.LogWarning(
+                    $"Skipping row {i} in Turret CSV: not enough columns ({row.Length})"
+                );
+                continue;
+            }
+
+            try
+            {
+                turrets.Add(
+                    new TurretConfig
+                    {
+                        BuildingID = row[0],
+                        projectileType=(ProjectileType)int.Parse(row[1]),
+                        AttackRange =float.Parse(row[2]),
+                        Angle =float.Parse(row[3]),
+                        CoolDown = float.Parse(row[4]),
+                        ProjectilePrefabID = row[5]
+                    }
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"Error parsing turret at row {i}: {ex.Message}");
+                Debug.LogError($"Row data: {string.Join(" | ", row)}");
+                throw;
+            }
+        }
+
+        SaveToJson(new TurretConfigList { TurretConfigs = turrets }, "turrets");
+        Debug.Log($"Parsed {turrets.Count} turrets");
+    }
     private void ParseEnemyBase(string csvText)
     {
          var rows = ParseCsv(csvText);
@@ -279,7 +390,7 @@ public class CsvTableParserEditor : EditorWindow
                     {
                         BuildingID = row[0],
                         MaxSlots = int.Parse(row[1]),
-                        ItemsTypes=ParseHashSet<ItemClass>(row[2]) 
+                        ItemsTypes=ParseHashSet<ItemType>(row[2]) 
 
                     }
                 );

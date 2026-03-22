@@ -11,6 +11,20 @@
             "BuildingID": "StorageFT",
             "MaxSlots": 10,
             "ItemsTypes": []
+        },
+        {
+            "BuildingID": "Turret",
+            "MaxSlots": 1,
+            "ItemsTypes": [
+                9
+            ]
+        },
+        {
+            "BuildingID": "Artillery",
+            "MaxSlots": 1,
+            "ItemsTypes": [
+                10
+            ]
         }
     ]
 }

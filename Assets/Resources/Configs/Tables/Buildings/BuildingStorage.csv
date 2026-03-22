@@ -1,3 +1,5 @@
 ﻿id;MaxSlots;ItemsTypes
 Core;20;1
 StorageFT;10;0
+Turret;1;9
+Artillery;1;10

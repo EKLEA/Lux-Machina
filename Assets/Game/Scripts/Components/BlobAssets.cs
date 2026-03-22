@@ -110,11 +110,34 @@ public struct EnemyBaseStructConfig : IConfigBase
     public int id{get;set;}
     public int costInPoints;
 }
+public struct TurretStructConfig : IConfigBase
+{
+    public int id{get;set;}
+    public float AttackRange;
+    public float Angle;
+    public float CoolDown;
+    public int ProjectilePrefabID;
+    public ProjectileType projectileType;
+
+}
+public struct ProjectileStructConfig : IConfigBase
+{
+    public int id{get;set;}
+    //колор
+    public float Speed;
+    public float Damage;   
+    public float Radius;   
+
+}
 #endregion
 #region  Reference
 public struct EnemyBaseConfigRefence: IComponentData, IDisposable
 {
-     public BlobAssetReference<BlobLibrary<EnemyBaseStructConfig>> EnemyBaseConfigs;
+    public BlobAssetReference<BlobLibrary<EnemyBaseStructConfig>> EnemyBaseConfigs;
+    public float ProgressThreshold;      // Сколько totalWeights нужно для "100 прогресса" (н-р: 1000)
+    public float BaseIncome;             // Минимум очков в день (н-р: 50)
+    public float PowerMultiplier;        // Насколько база игрока бустит доход ИИ (н-р: 2.0)
+    public float TimeDifficultyFactor;   
     
     public void Dispose()
     {
@@ -124,9 +147,11 @@ public struct EnemyBaseConfigRefence: IComponentData, IDisposable
 public struct ItemsConfigReference : IComponentData, IDisposable
 {
     public BlobAssetReference<BlobLibrary<ItemsStructConfig>> ItemsConfigs;
+    public BlobAssetReference<BlobLibrary<ProjectileStructConfig>> ProjectileStructConfigs;
     public void Dispose()
     {
         ItemsConfigs.Dispose();
+        ProjectileStructConfigs.Dispose();
     }
 }
 public struct BuildingConfigReference : IComponentData,IDisposable
@@ -136,6 +161,7 @@ public struct BuildingConfigReference : IComponentData,IDisposable
     public BlobAssetReference<BlobLibrary<BuildingProcessionStructConfig>> BuildingProcessionStructConfigs;
     public BlobAssetReference<BlobLibrary<BuildingItemRequestsStructConfig>> BuildingItemRequestsStructConfigs;
     public BlobAssetReference<BlobLibrary<BuildingEnergyStructConfig>> BuildingEnergyStructConfig;
+    public BlobAssetReference<BlobLibrary<TurretStructConfig>> TurretStructConfig;
     public int roadID;
     public int CoreID;
     public int range;
@@ -147,6 +173,7 @@ public struct BuildingConfigReference : IComponentData,IDisposable
         BuildingProcessionStructConfigs.Dispose();
         BuildingItemRequestsStructConfigs.Dispose();
         BuildingEnergyStructConfig.Dispose();
+        TurretStructConfig.Dispose();
     }
 }
 public struct RecipeConfigRefernce : IComponentData,IDisposable

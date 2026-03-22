@@ -102,7 +102,6 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         
         entityManager.AddBuffer<MapPoint>(PlaceCommand); 
         gridVisualizer.Init();
-        FlowFieldVisualizer.Init();
     }
     void BindMaps()
     {

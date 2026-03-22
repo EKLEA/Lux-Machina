@@ -67,7 +67,7 @@ public class GameSceneBindings : MonoInstaller
         ).AsSingle();
         Container.Bind<PlayerController>().FromInstance(playerController).AsSingle();
         Container.Bind<GridVisualizer>().FromInstance(gridVisualizer).AsSingle();
-        Container.Bind<FlowFieldVisualizer>().FromInstance(FlowFieldVisualizer).AsSingle();
+        //Container.Bind<FlowFieldVisualizer>().FromInstance(FlowFieldVisualizer).AsSingle();
         
 
     }

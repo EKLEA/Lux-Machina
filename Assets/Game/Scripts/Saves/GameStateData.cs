@@ -16,4 +16,5 @@ public class GameStateData
     public Dictionary<int,StorageSlotsSaveData> storageSlotsSaveData;
     public Dictionary<int,BuildingEnergyNetvorkLinkSaveData> buildingEnergyNetvorkLinkSaveData;
     public Dictionary<int2,int2> ResourcesCells;
+    public EnemyAIConfig EnemyAiConfig;
 }

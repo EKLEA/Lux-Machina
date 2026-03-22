@@ -1,5 +1,6 @@
     using System;
-    using Unity.Collections;
+using NUnit.Framework;
+using Unity.Collections;
     using Unity.Entities;
 using Unity.Mathematics;
 
@@ -184,7 +185,7 @@ public struct BuildingTag : IComponentData{}
     public struct SaveInfo : IComponentData, IEnableableComponent{}
     public struct LoadInfo : IComponentData, IEnableableComponent{}
     #endregion
-   
+    #region  Здоровье
     public struct HealthData: IComponentData, IEnableableComponent
     {
         public float CurrHealth;
@@ -208,6 +209,49 @@ public struct BuildingTag : IComponentData{}
         public float CurrTimeToRestore;
         public float RestoreHpPerTick;        
         public float TimeToRestore;
+    }
+    #endregion
+    #region оборона
+    public struct ShooterTag : IComponentData { }
+    public struct ArtilleryTag : IComponentData { }
+    public struct TurretStats : IComponentData
+    {
+        public bool isEnergyAmmo;
+        public float AttackRange;
+        public ProjectileType projectileType;
+        public float Angle;
+        public float CoolDown;
+        public float TimeToCoolDown;
+        public int ProjectilePrefabID;
+    }
+    public struct TurretTranform : IComponentData
+    {
+        public int AttacMode;
+        public float3 projectTyleSpawn;
+        public float2 rotation; 
+    }
+    public struct ProjectileData : IComponentData
+    {
+        public float3 StartPos;
+        public float3 TargetPos;
+        public float Speed;
+        public float Progress;
+        public float ArcHeight;
+        public float Damage;   
+        public float Radius;   
+    }
+    public struct ProjectilePrefabElement : IBufferElementData
+    {
+        public int ID; 
+        public Entity PrefabEntity;
+    }
+    #endregion
+    
+    [Serializable]
+    public enum AttakMode 
+    {
+        Distance=1,
+        Health=2
     }
     [Serializable]
     public enum DistributionPriority 

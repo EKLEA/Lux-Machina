@@ -1,0 +1,3 @@
+﻿id;ProjectileType;AttackRange;Angle;CoolDown;ProjectilePrefabID
+Turret;1;15;135;0,25;bullet
+Artillery;2;30;180;0,75;artilleryShell

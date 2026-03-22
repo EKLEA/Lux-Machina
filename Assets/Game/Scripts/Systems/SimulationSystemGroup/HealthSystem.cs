@@ -9,7 +9,7 @@ using UnityEngine;
 
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
-[UpdateAfter(typeof(EnemyAISystem))]
+[UpdateAfter(typeof(ProjectileSystem))]
 [BurstCompile]
 public partial struct   HealthSystem: ISystem
 {
@@ -19,7 +19,7 @@ public partial struct   HealthSystem: ISystem
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<BuildingMap>();
-        state.RequireForUpdate<SpawnMobs>();
+        state.RequireForUpdate<SpawnMobsData>();
 
         _deadlyOBJs= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<HealthData,TakeDamage>()
@@ -40,6 +40,7 @@ public partial struct   HealthSystem: ISystem
         var health=SystemAPI.GetComponentLookup<HealthData>(true);
         var road=SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(true);
         var roadHealth=SystemAPI.GetBufferLookup<RoadPointHealthData>(true);
+        var ForceDestroyTagLookup=SystemAPI.GetComponentLookup<ForceDestroyTag>(true);
         if (!_deadlyOBJs.IsEmpty)
         {
             state.Dependency =new TakeDamageJob
@@ -48,6 +49,7 @@ public partial struct   HealthSystem: ISystem
                 buildingBaseConfig=buildingConfig,
                 HealthDataLookup= health,
                 RoadLookUP=road,
+                ForceDestroyTagLookup = ForceDestroyTagLookup,
                 RoadPointHealthDataLookup=roadHealth
             }.ScheduleParallel(state.Dependency);
         }
@@ -82,6 +84,7 @@ public partial struct   HealthSystem: ISystem
         public BuildingConfigReference buildingBaseConfig;
         [ReadOnly] public ComponentLookup<HealthData> HealthDataLookup;
         [ReadOnly] public BufferLookup<RoadPointHealthData> RoadPointHealthDataLookup;
+        [ReadOnly] public ComponentLookup<ForceDestroyTag> ForceDestroyTagLookup;
         public void Execute([ChunkIndexInQuery] int sortKey,Entity entity,ref DynamicBuffer<TakeDamage> takeDamage)
         {
             var buff=takeDamage;
@@ -144,7 +147,10 @@ public partial struct   HealthSystem: ISystem
                         if (health.CurrHealth - d.Damage <= 0)
                         {
                             health.CurrHealth=0;
-                            ECB.SetComponentEnabled<ForceDestroyTag>(sortKey,entity,true);
+                            if (ForceDestroyTagLookup.HasComponent(entity))
+                            {
+                                ECB.SetComponentEnabled<ForceDestroyTag>(sortKey,entity,true);
+                            }
                             break;
                         }
                         else

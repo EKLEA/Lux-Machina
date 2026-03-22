@@ -23,6 +23,26 @@ public partial class BuildingChangeVisualSystem : SystemBase
         var ecb = new EntityCommandBuffer(Allocator.Temp);
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
         EntitiesDictionary entitiesDictionary = SystemAPI.GetSingleton<EntitiesDictionary>();
+
+        foreach (var (turretData, reference) in SystemAPI.Query<RefRO<TurretTranform>, BuildingOnSceneReference>())
+        { 
+            if(!(reference.buildingOnScene is TurretOnScene view)) return;
+            if (view == null || view.TurretHead == null || view.TurretBarrel == null) continue;
+            float deltaTime = SystemAPI.Time.DeltaTime;
+            float lerpSpeed = 10f; 
+
+            view.TurretHead.localRotation = math.slerp(
+                view.TurretHead.localRotation, 
+                quaternion.Euler(0, turretData.ValueRO.rotation.y, 0),
+                deltaTime * lerpSpeed
+            );
+
+            view.TurretBarrel.localRotation = math.slerp(
+                view.TurretBarrel.localRotation, 
+                quaternion.Euler(turretData.ValueRO.rotation.x, 0, 0), 
+                deltaTime * lerpSpeed
+            );
+        }
         foreach (var (reference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ChangeBluePrintState>().WithEntityAccess())
         {
             ChangeBluePrintState(reference,entity,ecb);

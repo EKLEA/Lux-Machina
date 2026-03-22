@@ -1,10 +1,9 @@
+
 using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.VisualScripting;
 using UnityEngine;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
@@ -355,11 +354,16 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(InputConstructionSlotData),
             typeof(OutputConstructionSlotData),
             typeof(StorageSlotData),
+            typeof(StorageTypeBuildingTag),
             typeof(CraftingPriorityData),
              typeof(IsConnectedToEnergy),
             typeof(UpdateConnectStatus),
             typeof(ConnectToEnegyEntities),
             //доп компоненты для оружия
+            
+            typeof(TurretStats),
+            typeof(TurretTranform),
+            
             typeof(BuildingRequiredStorageGroupData),
             typeof(ClusterLink),
             typeof(NeedsClusterAssign),
@@ -485,6 +489,7 @@ public partial struct BuildingCreateSystem : ISystem
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
         [ReadOnly] public BufferLookup<TransitionSlotData> TransitionSlotDataLookup;
         [ReadOnly] public BufferLookup<RoadPointHealthData> RoadPointHealthDataBufferLookUp;
+        [ReadOnly] public DynamicBuffer<ProjectilePrefabElement> projectilePrefabElements;
 
         public void Execute(
                     Entity entity,
@@ -577,6 +582,7 @@ public partial struct BuildingCreateSystem : ISystem
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBluePrintLookup;
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
         [ReadOnly] public BufferLookup<LinkNetworkEnergyTo> LinkNetworkEnergyToLookup;
+        [ReadOnly] public DynamicBuffer<ProjectilePrefabElement> projectilePrefabElements;
         
         public ArchetypeInfo SimpleBuildingArchetypeInfo;
         public ArchetypeInfo EnergyBuildingArchetypeInfo;
@@ -597,6 +603,7 @@ public partial struct BuildingCreateSystem : ISystem
                 ECB.DestroyEntity(entity);
                 return;
             }
+            
             ArchetypeInfo info=GetBuildingType(BConfig);
             Entity building = ECB.CreateEntity(info.Archetype);
             
@@ -637,6 +644,7 @@ public partial struct BuildingCreateSystem : ISystem
                 HandleBase(entity,building,info.Types);
                 HandleEnergy(entity,building,info.Types,BConfig.id);
                 HandleResources(building,info.Types,BConfig.id);
+                HandleDefence(building,info.Types,BConfig.id,ECB);
             }
             ECB.DestroyEntity(entity);
         }
@@ -763,10 +771,35 @@ public partial struct BuildingCreateSystem : ISystem
             }
         }
 
-
+        void HandleDefence(Entity building,NativeArray<ComponentType> types,int buildingID,EntityCommandBuffer ecb)
+        {
+            if (HasType(types, ComponentType.ReadWrite<TurretStats>()))
+            {
+                if(config.TurretStructConfig.Value.TryGetConfig(buildingID,out var turretStructConfig))
+                {
+                    switch (turretStructConfig.projectileType)
+                    {
+                        case ProjectileType.Directly:
+                            ecb.AddComponent<ShooterTag>(building);
+                            break;
+                        case ProjectileType.Arch:
+                            ecb.AddComponent<ArtilleryTag>(building);
+                            break;
+                    }
+                    ecb.AddComponent(building, new TurretStats
+                    {
+                        AttackRange=turretStructConfig.AttackRange,
+                        projectileType=turretStructConfig.projectileType,
+                        Angle=turretStructConfig.Angle,
+                        CoolDown=turretStructConfig.CoolDown,
+                        TimeToCoolDown=0,
+                        ProjectilePrefabID=turretStructConfig.ProjectilePrefabID,
+                    });
+                }
+            }
+        }
         ArchetypeInfo GetBuildingType(BuildingBaseStructConfig BConfig)
         {
-          
             if (BConfig.buildingType == BuildingsTypes.Special)
             {
                 if (BConfig.id == config.CoreID)

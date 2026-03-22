@@ -31,7 +31,7 @@ public class BuildingStorageConfig
 {
     public string BuildingID;
     public int MaxSlots;
-    public List<ItemClass> ItemsTypes; 
+    public List<ItemType> ItemsTypes; 
 }
 
 [Serializable]
@@ -73,6 +73,16 @@ public class BuildingItemRequestsConfigList:IWrapper
 public class BuildingEnegryConfigList:IWrapper
 {
     public List<BuildingEnegryConfig> buildingEnegryConfigs;
+}
+[Serializable]
+public class TurretConfigList:IWrapper
+{
+    public List<TurretConfig> TurretConfigs;
+}
+[Serializable]
+public class ProjectileConfigList:IWrapper
+{
+    public List<ProjectileConfig> ProjectileConfigs;
 }
 #endregion
 #region  Items
@@ -128,7 +138,6 @@ public class RecipeConfigList:IWrapper
 public class EnemyBaseConfig
 {
     public string id;
-    
     public string title;
     public string description;
     public string iconPath;
@@ -141,7 +150,26 @@ public class EnemyBaseConfig
     public float restoreHealthPerSecond;
     public int pointAmount;
 }
+[Serializable]
+public class TurretConfig 
+{
+    public string BuildingID;
+    public float AttackRange;
+    public float Angle;
+    public float CoolDown;
+    public string ProjectilePrefabID;
+    public ProjectileType projectileType;
+}
+[Serializable]
+public class ProjectileConfig 
+{
+    public int itemID;
+    //колор
+    public float Speed;
+    public float Damage;   
+    public float Radius;   
 
+}
 [Serializable]
 public class EnemyBaseConfigList:IWrapper
 {
@@ -151,6 +179,11 @@ public class EnemyBaseConfigList:IWrapper
 #endregion
 public interface IWrapper{}
 #region  Enums
+public enum ProjectileType
+{
+    Directly=1,
+    Arch=2
+}
 public enum ItemClass
 {
     Components=1,

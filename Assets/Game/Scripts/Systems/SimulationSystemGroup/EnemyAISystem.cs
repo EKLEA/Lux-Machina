@@ -1,6 +1,7 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
@@ -12,15 +13,15 @@ using UnityEngine;
 public partial struct EnemyAISystem : ISystem
 {
    
-    EntityQuery _spawnEnemies;
+    EntityQuery _spawnMobs;
     EntityQuery _enemies;
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<BuildingMap>();
-        state.RequireForUpdate<SpawnMobs>();
+        state.RequireForUpdate<SpawnMobsData>();
 
-        _spawnEnemies= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<SpawnMobs>()
+        _spawnMobs= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<SpawnMobsData>()
             .Build(ref state);
         _enemies= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<EnemyStats>()
@@ -33,65 +34,238 @@ public partial struct EnemyAISystem : ISystem
     public void OnUpdate(ref SystemState state)
     {
         var map = SystemAPI.GetSingleton<BuildingMap>();
+        var turretMap = SystemAPI.GetSingletonRW<TurretGrid>();
+        var managerEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
         var configRef = SystemAPI.GetSingleton<EnemyBaseConfigRefence>();
-        var damageLookUp = SystemAPI.GetBufferLookup<TakeDamage>(true); 
+        
         var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
-        var parallelEcb = ecb.AsParallelWriter(); 
-        float time=(float)SystemAPI.Time.ElapsedTime;
 
-        if (!_spawnEnemies.IsEmpty)
+       
+        if (!_spawnMobs.IsEmpty)
         {
-            var spawnJob = new SpawnMobsJob
+           
+            var kvArrays = map.CellWeights.GetKeyValueArrays(Allocator.TempJob);
+            var tempPoints = new NativeList<SpawnPointElement>(kvArrays.Length, Allocator.TempJob);
+            state.Dependency= new EvaluateSpawnZonesParallelJob
             {
-                ECB = ecb,
-                enemyBaseConfig = configRef,
-                ElapsedTime =time
-            };
-            state.Dependency = spawnJob.Schedule(state.Dependency);
-        }
+                AllPositions = kvArrays.Keys,
+                AllWeights = kvArrays.Values,
+                WeightsMap = map.CellWeights,
+                ResultPoints= tempPoints.AsParallelWriter() 
+            }.Schedule(kvArrays.Length, 64, state.Dependency);
+            kvArrays.Dispose(state.Dependency);
 
+            var spawnMobsLookup = state.GetComponentLookup<SpawnMobsData>(false);
+            state.Dependency = new IntegratedSpawnJob 
+            {
+                SpawnManagerEntity = managerEntity,
+                SpawnMobsDataLookup = spawnMobsLookup,
+                SpawnPoints = tempPoints,
+                EnemyConfigs = configRef,
+                ECB = ecb,
+                ElapsedTime = SystemAPI.Time.ElapsedTime,
+                Seed = (uint)(SystemAPI.Time.ElapsedTime * 1000)
+            }.Schedule(state.Dependency);
+            tempPoints.Dispose(state.Dependency);
+        }   
+          
         if (!_enemies.IsEmpty)
         {
+            var clearJob = new ClearMultiHashMapsJob
+            {
+                TurretTargets = turretMap.ValueRW.EnemyGridMap,
+                TargetsToTurrets = turretMap.ValueRW.EnemyToTurret,
+                EnemyInCellsMap = turretMap.ValueRW.EnemyInCellsMap
+            };
+            JobHandle clearHandle = clearJob.Schedule(state.Dependency);
 
-            var logicJob = new EnemyLogicJob
+            var logicEcb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
+            
+            // 3. Основная логика
+            state.Dependency = new EnemyLogicJob
             { 
-                ECB = parallelEcb,
+                ECB = logicEcb.AsParallelWriter(),
                 FlowDirections = map.CellDirections,
                 CellEntities = map.CellMapEntites,
-                DamageLookUp = damageLookUp,
+                TurretCells = turretMap.ValueRW.TurretGridClaim,
+                EnemyInCellsMap= turretMap.ValueRW.EnemyInCellsMap.AsParallelWriter(),
+                
+                TargetsToTurrets = turretMap.ValueRW.EnemyToTurret.AsParallelWriter(),
+                TurretTargets = turretMap.ValueRW.EnemyGridMap.AsParallelWriter(),
+                
+                DamageLookUp = SystemAPI.GetBufferLookup<TakeDamage>(false),
                 DeltaTime = SystemAPI.Time.DeltaTime,
-                ElapsedTime = time
-            };
-            state.Dependency = logicJob.ScheduleParallel(state.Dependency);
+                ElapsedTime = (float)SystemAPI.Time.ElapsedTime
+            }.ScheduleParallel(clearHandle); // ЗАВИСИМ ОТ CLEAR!
         }
     }
 }
 [BurstCompile]
-public partial struct SpawnMobsJob : IJobEntity
+public struct IntegratedSpawnJob : IJob
 {
+    public Entity SpawnManagerEntity;
+    [ReadOnly] public NativeList<SpawnPointElement> SpawnPoints;
+
+    public ComponentLookup<SpawnMobsData> SpawnMobsDataLookup;
+    [ReadOnly] public EnemyBaseConfigRefence EnemyConfigs;
     
     public EntityCommandBuffer ECB;
-    public EnemyBaseConfigRefence enemyBaseConfig;
-    public float ElapsedTime;
-    public void Execute(Entity entity,in SpawnMobs spawnMobs)
-    {
-        
-        for(int i = 0; i < spawnMobs.points;i++)
-        {
-            if (enemyBaseConfig.EnemyBaseConfigs.Value.GetIdByPos(0) != -1)
-            {
-               
-                var command= ECB.CreateEntity();
-                 uint seed = (uint)command.Index + (uint)(ElapsedTime * 1000);
-                var random = new Unity.Mathematics.Random(seed);
-                float2 noise = random.NextFloat2(new float2(-40f, -40f), new float2(40f, 40f));
-                ECB.AddComponent(command,new CreateEnemyEventData{EnemyID=enemyBaseConfig.EnemyBaseConfigs.Value.GetIdByPos(0),pos=new float3(noise.x,1,noise.y)});
-            }
-          
-        }
-        ECB.SetComponentEnabled<SpawnMobs>(entity,false);
+    public double ElapsedTime;
+    public uint Seed;
 
+    public void Execute()
+    {
+        var config = SpawnMobsDataLookup[SpawnManagerEntity];
+
+        config.playerProgress = config.totalWeights / EnemyConfigs.ProgressThreshold;
+        float powerIncome = math.sqrt(config.totalWeights) * EnemyConfigs.PowerMultiplier;
+        float timeMultiplier = 1f + (config.CountOfCicle * EnemyConfigs.TimeDifficultyFactor);
+        
+        config.pointsPerCicle = (EnemyConfigs.BaseIncome + powerIncome) * timeMultiplier;
+        config.pointsToSpawnMobs += config.pointsPerCicle;
+        config.pointsToSpawnMobs=config.pointsToSpawnMobs/100;
+        // --- ЛОГИКА SpawnMobsData ---
+        if (config.pointsToSpawnMobs >= config.AttackThreshold && !SpawnPoints.IsEmpty)
+        {
+            var sortedPoints = new NativeArray<SpawnPointElement>(SpawnPoints.AsArray(), Allocator.Temp);
+                
+            sortedPoints.Sort(new SpawnPointComparer());
+
+            var rnd = Unity.Mathematics.Random.CreateFromIndex(Seed ^ (uint)(ElapsedTime * 1000));
+            float totalBudget = config.pointsToSpawnMobs;
+            bool isAdvanced = config.playerProgress > 100f;
+            
+            float budgetToSpend = totalBudget * rnd.NextFloat(0.8f, 1.0f);
+            float remainingBudget = totalBudget - budgetToSpend;
+
+            int directionsCount = isAdvanced 
+                ? math.min(rnd.NextInt(6, 9), sortedPoints.Length) 
+                : sortedPoints.Length;
+
+            for (int i = 0; i < directionsCount; i++)
+            {
+                if (budgetToSpend <= 0) break;
+
+
+                var spawnPoint = sortedPoints[i];
+                float3 basePos = new float3(spawnPoint.Position.x, 0, spawnPoint.Position.y);
+                float sectorBudget = budgetToSpend / (directionsCount - i);
+                
+                while (sectorBudget > 0)
+                {
+                    int enemyIdx = PickEnemyIndex(ref rnd, isAdvanced, sectorBudget);
+                    if (enemyIdx == -1) break;
+
+                    var enemyCfg = EnemyConfigs.EnemyBaseConfigs.Value.Configs[enemyIdx];
+                    if (sectorBudget < enemyCfg.costInPoints) break;
+
+                    Entity eventEntity = ECB.CreateEntity();
+                    float2 noise = rnd.NextFloat2Direction() * rnd.NextFloat(1f, 5f);
+                    
+                    ECB.AddComponent(eventEntity, new CreateEnemyEventData { 
+                        EnemyID = enemyCfg.id, 
+                        pos = basePos + new float3(noise.x, 0, noise.y) 
+                    });
+
+                    sectorBudget -= enemyCfg.costInPoints;
+                    budgetToSpend -= enemyCfg.costInPoints;
+                }
+            }
+            config.pointsToSpawnMobs = budgetToSpend + remainingBudget;
+            config.CountOfCicle++;
+        }
+
+        // Сохраняем измененный config и очищаем буфер
+        ECB.SetComponent(SpawnManagerEntity, config);
+        ECB.SetComponentEnabled<SpawnMobsData>(SpawnManagerEntity,false);
+        ECB.SetBuffer<SpawnPointElement>(SpawnManagerEntity).Clear();
+    }
+
+    private int PickEnemyIndex(ref Unity.Mathematics.Random rnd, bool isAdvanced, float currentSectorBudget)
+    {
+        int maxAffordableIndex = -1;
+        
+        for (int i = EnemyConfigs.EnemyBaseConfigs.Value.Configs.Length - 1; i >= 0; i--)
+        {
+            if (EnemyConfigs.EnemyBaseConfigs.Value.Configs[i].costInPoints <= currentSectorBudget)
+            {
+                maxAffordableIndex = i;
+                break;
+            }
+        }
+
+        if (maxAffordableIndex == -1) return -1;
+
+        if (isAdvanced && rnd.NextFloat() > 0.5f)
+        {
+            int lowerBound = math.max(0, (maxAffordableIndex * 2) / 3);
+            return rnd.NextInt(lowerBound, maxAffordableIndex + 1);
+        }
+
+        return rnd.NextInt(0, maxAffordableIndex + 1);
+    }
+}
+[BurstCompile]
+public struct EvaluateSpawnZonesParallelJob : IJobParallelFor
+{
+    [ReadOnly] public NativeArray<int2> AllPositions;
+    [ReadOnly] public NativeArray<float> AllWeights;
+    [ReadOnly] public NativeParallelHashMap<int2, float> WeightsMap; 
+    
+    public NativeList<SpawnPointElement>.ParallelWriter ResultPoints;
+
+    public void Execute(int index)
+    {
+        int2 centerPos = AllPositions[index];
+        float currentWeight = AllWeights[index];
+
+        if (currentWeight < 18f || currentWeight > 20f) return;
+
+        float areaSum = 0f;
+        const int searchRadius = 30;
+        const int step = 6; 
+
+        for (int x = -searchRadius; x <= searchRadius; x += step)
+        {
+            for (int y = -searchRadius; y <= searchRadius; y += step)
+            {
+                if (x * x + y * y > searchRadius * searchRadius) continue;
+
+                int2 neighbor = centerPos + new int2(x, y);
+                if (WeightsMap.TryGetValue(neighbor, out float nWeight))
+                {
+                    areaSum += (21f - nWeight); 
+                }
+            }
+        }
+
+        if (areaSum > 0.5f)
+        {
+            // Потокобезопасное добавление без блокировок всего джоба
+            ResultPoints.AddNoResize(new SpawnPointElement 
+            { 
+                Position = centerPos, 
+                Weight = areaSum 
+            });
+        }
+    }
+}
+
+[BurstCompile]
+public struct ClearMultiHashMapsJob : IJob
+{
+    public NativeParallelMultiHashMap<int, Entity> TurretTargets;
+    public NativeParallelMultiHashMap<Entity, int> TargetsToTurrets;
+    
+    public NativeParallelMultiHashMap<int2, Entity> EnemyInCellsMap;
+    
+
+    public void Execute()
+    {
+        TurretTargets.Clear();
+        TargetsToTurrets.Clear();
+        EnemyInCellsMap.Clear();
     }
 }
 [BurstCompile]
@@ -100,16 +274,34 @@ public partial struct EnemyLogicJob : IJobEntity
 {
     [ReadOnly] public NativeParallelHashMap<int2, float2> FlowDirections;
     [ReadOnly] public NativeParallelHashMap<int2, Entity> CellEntities;
+    
+
+    [ReadOnly] public NativeParallelMultiHashMap<int2, int> TurretCells;
+
     [ReadOnly] public BufferLookup<TakeDamage> DamageLookUp;
     public EntityCommandBuffer.ParallelWriter ECB;   
-     public float DeltaTime;
+    public NativeParallelMultiHashMap<int, Entity>.ParallelWriter TurretTargets;
+    public NativeParallelMultiHashMap<Entity, int>.ParallelWriter TargetsToTurrets;
+    
+     public NativeParallelMultiHashMap<int2, Entity>.ParallelWriter  EnemyInCellsMap;
+    public float DeltaTime;
     public float ElapsedTime;
 
     public void Execute(Entity entity,  [ChunkIndexInQuery] int chunkIndex,ref LocalTransform transform, ref EnemyStats stats)
     {
         float2 currentPos = transform.Position.xz;
         int2 cellPos = (int2)math.floor(currentPos);
-
+         EnemyInCellsMap.Add(cellPos, entity);
+        if (TurretCells.TryGetFirstValue(cellPos, out int turretIndex, out var it))
+        {
+            do
+            {
+                TurretTargets.Add(turretIndex, entity);
+                TargetsToTurrets.Add(entity, turretIndex);
+            } 
+            while (TurretCells.TryGetNextValue(out turretIndex, ref it));
+        }
+        
         if (FlowDirections.TryGetValue(cellPos, out float2 moveDir))
         {
             int2 nextCell = (int2)math.floor(currentPos + moveDir * 0.5f); 

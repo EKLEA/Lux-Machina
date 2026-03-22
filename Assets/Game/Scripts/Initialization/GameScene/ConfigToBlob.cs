@@ -1,8 +1,6 @@
-using System;
+
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
-using Unity.Cecil.Awesome.CFG;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -16,6 +14,7 @@ public class ConfigToBlob : IInitializable
     [Inject] IReadOnlyItemsInfo _itemsInfo;
     [Inject] IReadOnlyEnemyBaseConfig _enemyBaseConfig;
     [Inject] GameFieldSettings _gameFieldSetting;
+    [Inject] IEnemyAIConfig _enemyAIConfig;
     Entity configEntity;
     public async UniTask LoadConfigs(EntityManager entityManager)
     {
@@ -24,11 +23,11 @@ public class ConfigToBlob : IInitializable
         CreateBuildingConfig(configEntity,_buildingInfo);
         CreateRecipeConfig(configEntity,_recipeInfoInfo);
         CreateItemsConfig(configEntity,_itemsInfo);
-        CreateEnemyBaseConfig(configEntity,_enemyBaseConfig);
+        CreateEnemyBaseConfig(configEntity,_enemyBaseConfig, _enemyAIConfig.EnemyAiConfig);
         await UniTask.Yield();
     }
 
-    private void CreateEnemyBaseConfig(Entity configEntity, IReadOnlyEnemyBaseConfig enemyBaseConfig)
+    private void CreateEnemyBaseConfig(Entity configEntity, IReadOnlyEnemyBaseConfig enemyBaseConfig,EnemyAIConfig enemyAIConfig)
     { 
         List<EnemyBaseStructConfig> enemyBaseStructConfigs=new();
         foreach(var cfg in enemyBaseConfig.EnemyBaseConfigs)
@@ -39,11 +38,16 @@ public class ConfigToBlob : IInitializable
                 costInPoints=cfg.Value.pointAmount,
             };
             enemyBaseStructConfigs.Add(str);
+            
         }
         enemyBaseStructConfigs.Sort((a, b) => a.costInPoints.CompareTo(b.costInPoints));
         _entityManager.AddComponentData(configEntity,new EnemyBaseConfigRefence
         {
             EnemyBaseConfigs=CreateConfigReference(enemyBaseStructConfigs.ToArray()),
+            ProgressThreshold=enemyAIConfig.ProgressThreshold,
+            BaseIncome=enemyAIConfig.BaseIncome,
+            PowerMultiplier=enemyAIConfig.PowerMultiplier,
+            TimeDifficultyFactor=enemyAIConfig.TimeDifficultyFactor,
         });
     }
 
@@ -55,6 +59,7 @@ public class ConfigToBlob : IInitializable
         List<BuildingProcessionStructConfig> buildingProcessionStructConfig=new();
         List<BuildingItemRequestsStructConfig> buildingItemRequestsStructConfig=new();
         List<BuildingEnergyStructConfig> buildingEnergyStructConfig=new();
+        List<TurretStructConfig> turretStructConfigs=new();
 
 
         foreach(var cfg in info.BuildingInfos)
@@ -129,12 +134,25 @@ public class ConfigToBlob : IInitializable
             };
             buildingEnergyStructConfig.Add(sturctCFG);
         }
+        foreach(var cfg in info.TurretsConfigs)
+        {
+             var sturctCFG=new TurretStructConfig
+            {
+                id=cfg.Key,
+                AttackRange=cfg.Value.AttackRange,
+                CoolDown=cfg.Value.CoolDown,
+                Angle=cfg.Value.Angle,
+                ProjectilePrefabID=cfg.Value.ProjectilePrefabID.GetStableHashCode(),
+            };
+            turretStructConfigs.Add(sturctCFG);
+        }
         _entityManager.AddComponentData(configEntity,new BuildingConfigReference{ 
             BuildingsBaseConfigs=CreateConfigReference(buildingBaseConfigs.ToArray()),
             BuildingStorageStructConfigs=CreateConfigReference(buildingStorageStructConfig.ToArray()),
             BuildingProcessionStructConfigs=CreateConfigReference(buildingProcessionStructConfig.ToArray()),
             BuildingItemRequestsStructConfigs=CreateConfigReference(buildingItemRequestsStructConfig.ToArray()),
             BuildingEnergyStructConfig=CreateConfigReference(buildingEnergyStructConfig.ToArray()),
+            TurretStructConfig=CreateConfigReference(turretStructConfigs.ToArray()),
             roadID="Road".GetStableHashCode(),
             CoreID="Core".GetStableHashCode(),
             range=_gameFieldSetting.range});
@@ -142,6 +160,7 @@ public class ConfigToBlob : IInitializable
     void CreateItemsConfig(Entity configEntity,IReadOnlyItemsInfo info)
     {
         List<ItemsStructConfig> itemsStructConfig=new();
+        List<ProjectileStructConfig> ProjectileStructConfigs=new();
         foreach(var cfg in info.ItemsInfos)
         {
             var str = new ItemsStructConfig
@@ -152,9 +171,21 @@ public class ConfigToBlob : IInitializable
             };
             itemsStructConfig.Add(str);
         }
+        foreach(var cfg in info.ProjectileConfigs)
+        {
+            var str = new ProjectileStructConfig
+            {
+                id=cfg.Key,
+                Damage=cfg.Value.Damage,
+                Radius=cfg.Value.Radius,
+                Speed=cfg.Value.Speed,
+            };
+            ProjectileStructConfigs.Add(str);
+        }
         _entityManager.AddComponentData(configEntity,new ItemsConfigReference
         {
             ItemsConfigs=CreateConfigReference(itemsStructConfig.ToArray()),
+            ProjectileStructConfigs=CreateConfigReference(ProjectileStructConfigs.ToArray()),
         });
     }
     void CreateRecipeConfig(Entity configEntity,IReadOnlyRecipeInfo info)
