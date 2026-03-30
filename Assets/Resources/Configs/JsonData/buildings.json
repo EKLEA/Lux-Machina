@@ -118,8 +118,8 @@
             "actionType": 0,
             "size": {
                 "x": 1,
-                "y": 1,
-                "z": 10
+                "y": 10,
+                "z": 1
             },
             "typeOfLogic": 0,
             "maxHealth": 50.0,
@@ -136,8 +136,8 @@
             "actionType": 0,
             "size": {
                 "x": 2,
-                "y": 2,
-                "z": 10
+                "y": 10,
+                "z": 2
             },
             "typeOfLogic": 0,
             "maxHealth": 50.0,

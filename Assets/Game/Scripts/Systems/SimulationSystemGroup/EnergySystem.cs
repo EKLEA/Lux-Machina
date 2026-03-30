@@ -391,7 +391,7 @@ public partial struct EnergySystem : ISystem
             
             foreach (var c in cells)
             {
-                if (buildingMap.CellMapEntites.TryGetValue(c, out var buildingEntity))
+                if (buildingMap.CellMapEntites.TryGetValue(c, out var buildingEntity)&&UpdateConnectStatusLookup.HasComponent(buildingEntity))
                 {
                     entitiesToUpdate.Add(buildingEntity);
                 }

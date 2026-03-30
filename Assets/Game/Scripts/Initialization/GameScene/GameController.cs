@@ -51,12 +51,7 @@ public class GameController : IInitializable
         Timestep*=2;
        // fixedStepSimulationSystemGroup.Timestep = Timestep;
     }
-    public void SpawnMobs()
-    {
-        var ecb= World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
-               .CreateCommandBuffer();
-        ecb.SetComponentEnabled<SpawnMobsData>(Map,true);
-    }
+  
     public Vector2Int GetMapPos(Vector3 pos)
     {
         return new Vector2Int(
@@ -69,6 +64,14 @@ public class GameController : IInitializable
         await _loadingService.LoadWithProgressAsync(saveService.LoadGameState, LoadGameField);
          
     }
+    public void SaveGame()
+    {
+        var ecb= World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
+               .CreateCommandBuffer();
+        ecb.SetComponentEnabled<SavingMapTag>(Map,true);
+         
+    }
+
     public bool GetEntity(int id,out Entity entity)
     {
        var buildingEntities= World.EntityManager.GetComponentData<EntitiesDictionary>(Map);
@@ -136,11 +139,15 @@ public class GameController : IInitializable
         AddUnmanaged<TurretSystem>(simGroup);
         AddUnmanaged<ProjectileSystem>(simGroup);
         AddUnmanaged<HealthSystem>(simGroup);
+        AddUnmanaged<TickGeneratorSystem>(simGroup);
+        AddUnmanaged<TickCleanerSystem>(simGroup);
 
         RegisterManagedSystem<BuildingCreateDestroyVisualSystem>(presGroup);
         RegisterManagedSystem<BuildingChangeVisualSystem>(presGroup);
         RegisterManagedSystem<ProccessDeletePointsSystem>(presGroup);
+        RegisterManagedSystem<BuildingLoadSystem>(presGroup);
         RegisterManagedSystem<BuildingSaveSystem>(presGroup);
+        RegisterManagedSystem<SunUpdateSystem>(presGroup);
 
         var BuildSystem=RegisterManagedSystem<PlayerPlaceBuildingSystem>(presGroup);
         var RoadSystem= RegisterManagedSystem<PlayerPlaceRoadSystem>(presGroup);
@@ -210,10 +217,15 @@ public class GameController : IInitializable
         World.EntityManager.SetComponentEnabled<UpdateClustersTag>(Map,false);
         World.EntityManager.SetComponentEnabled<UpdateClusterSlots>(Map,false);
         World.EntityManager.SetComponentEnabled<UpdateConnectionsTag>(Map,false);
-         World.EntityManager.AddComponentData(Map, new TickInfoData
+         World.EntityManager.AddComponentData(Map, new WorldTime
         {
-            currTickPerSecond=gameFieldSettings.tickPerSecond,
+            CurrentTick=gameStateData.CurrTick,
+            TicksPerDay=400,
+            SpeedMultiplier=1,
+            baseTick=0.05f,
+            dayLength=0.7f
         });
+        World.EntityManager.AddComponent<IsTickFrame>(Map);
          World.EntityManager.AddComponentData(Map, new ProductionTable
         {
             produced=new(1000,Allocator.Persistent),
@@ -233,9 +245,9 @@ public class GameController : IInitializable
         {
             ResouecesMap=new(10000,Allocator.Persistent)
         };
-        foreach(var c in gameStateData.ResourcesCells)
+        foreach(var c in gameStateData.ResourcesCellsList)
         {
-            resourceMap.ResouecesMap.Add(c.Key,c.Value);
+            resourceMap.ResouecesMap.Add(c.pos,c.val);
         }
          World.EntityManager.AddComponentData(Map, resourceMap);
         await UniTask.Yield();
@@ -247,10 +259,10 @@ public class GameController : IInitializable
         var roadCommand = World.EntityManager.CreateArchetype(typeof(CreateRoadEventTag),typeof(MapPoint),typeof(IsBlueprint),typeof(IsDemolition));
         CreateBuildingCommand(buildingCommand,gameStateData);
 
-        using var entities = new NativeArray<Entity>(gameStateData.RoadsBuildings.Count, Allocator.TempJob);
+        using var entities = new NativeArray<Entity>(gameStateData.ManyPointsBuildings.Count, Allocator.TempJob);
         World.EntityManager.CreateEntity(roadCommand, entities);
         int index = 0;
-        foreach (var pair in gameStateData.RoadsBuildings)
+        foreach (var pair in gameStateData.ManyPointsBuildings)
         {
             Entity entity = entities[index];
             int id = pair.Key;
@@ -258,7 +270,7 @@ public class GameController : IInitializable
             for(int i =0;i<pair.Value.points.Length;i++)
                 buff.Add(new MapPoint{pos=pair.Value.points[i]});
             
-            World.EntityManager.SetComponentData(entity,new CreateRoadEventTag{UniqueBuildingID=id});
+            World.EntityManager.SetComponentData(entity,new CreateRoadEventTag{UniqueBuildingID=id});//тут изменить под стены
             World.EntityManager.SetComponentEnabled<IsBlueprint>(entity,pair.Value.isBlueprint);
             World.EntityManager.SetComponentEnabled<IsDemolition>(entity,pair.Value.IsDemolition);
             index++;
@@ -288,8 +300,10 @@ public class GameController : IInitializable
                 var links = gameStateData.buildingEnergyNetvorkLinkSaveData[id].entitesLink;
                 foreach(var link in links)
                 {
-                    buff.Add(new LinkNetworkEnergyTo{LinkFromBuilding=link.Item1,LinkToBuilding=link.Item2,});
+                    buff.Add(new LinkNetworkEnergyTo{LinkFromBuilding=link.from,LinkToBuilding=link.to,});
                 }
+                World.EntityManager.AddComponentData(entity,new SwitchIsOffCreateData{SwitchIsOff=gameStateData.buildingEnergyNetvorkLinkSaveData[id].isSwitchOff});
+                Debug.Log(id);
             }
             World.EntityManager.SetComponentEnabled<IsBlueprint>(entity,pair.Value.isBlueprint);
             World.EntityManager.SetComponentEnabled<IsDemolition>(entity,pair.Value.IsDemolition);

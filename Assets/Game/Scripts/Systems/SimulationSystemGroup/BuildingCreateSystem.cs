@@ -69,7 +69,7 @@ public partial struct BuildingCreateSystem : ISystem
             
             typeof(CreateVisualTag),
             typeof(ClusterLink),
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(RoadPointHealthData),
@@ -98,7 +98,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(CreateVisualTag),
             typeof(ClusterLink),
             typeof(NeedsClusterAssign),
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
@@ -132,7 +132,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(SwitchIsOff),
             typeof(EnergyBuildingData),
             typeof(UpdateConnectStatus),
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
@@ -161,7 +161,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(CreateVisualTag),
             typeof(ClusterLink),
             typeof(NeedsClusterAssign),
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
@@ -195,7 +195,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(IsRecipeAssigned),
             typeof(BuildingRequiredRecipesGroupData),
             typeof(CountOfPackInBuildingData),
-             typeof(IsConnectedToEnergy),
+            typeof(IsConnectedToEnergy),
             typeof(UpdateConnectStatus),
             typeof(ConnectToEnegyEntities),
             typeof(ClusterLink),
@@ -206,7 +206,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(MarkOnMap),
             typeof(CreateVisualTag),
             
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
@@ -250,7 +250,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(MarkOnMap),
             typeof(CreateVisualTag),
             
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
@@ -293,7 +293,7 @@ public partial struct BuildingCreateSystem : ISystem
             
             typeof(CreateVisualTag),
             
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
@@ -328,7 +328,7 @@ public partial struct BuildingCreateSystem : ISystem
             
             typeof(CreateVisualTag),
             
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
@@ -373,7 +373,7 @@ public partial struct BuildingCreateSystem : ISystem
             
             typeof(CreateVisualTag),
             
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
@@ -393,7 +393,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(CreateVisualTag),
             typeof(ClusterLink),
             typeof(NeedsClusterAssign),
-            typeof(SaveInfo),
+            typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
@@ -456,6 +456,7 @@ public partial struct BuildingCreateSystem : ISystem
                 CoreBuildingArchetype=_coreBuildingArchetypeInfo,
                 IsBluePrintLookup=SystemAPI.GetComponentLookup<IsBlueprint>(true),
                 IsDemolitionLookup=SystemAPI.GetComponentLookup<IsDemolition>(true),
+                SwitchIsOffCreateDataLookup=SystemAPI.GetComponentLookup<SwitchIsOffCreateData>(true),
                 LinkNetworkEnergyToLookup=SystemAPI.GetBufferLookup<LinkNetworkEnergyTo>(true),
             };
             state.Dependency=CreateBuildingJob.Schedule(state.Dependency);
@@ -581,6 +582,7 @@ public partial struct BuildingCreateSystem : ISystem
         public BuildingConfigReference config;
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBluePrintLookup;
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
+        [ReadOnly] public ComponentLookup<SwitchIsOffCreateData> SwitchIsOffCreateDataLookup;
         [ReadOnly] public BufferLookup<LinkNetworkEnergyTo> LinkNetworkEnergyToLookup;
         [ReadOnly] public DynamicBuffer<ProjectilePrefabElement> projectilePrefabElements;
         
@@ -722,7 +724,7 @@ public partial struct BuildingCreateSystem : ISystem
             }
             if (HasType(types, ComponentType.ReadWrite<SwitchIsOff>()))
             {
-                ECB.SetComponentEnabled<SwitchIsOff>(building,false);
+                ECB.SetComponentEnabled<SwitchIsOff>(building,SwitchIsOffCreateDataLookup.HasComponent(entity)&&SwitchIsOffCreateDataLookup[entity].SwitchIsOff);
             }
             if (HasType(types, ComponentType.ReadWrite<IsConnectedToEnergy>()))
             {

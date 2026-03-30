@@ -10,7 +10,7 @@ using Zenject;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(PresentationSystemGroup))]
 
-[UpdateAfter(typeof(BuildingSaveSystem))]
+[UpdateAfter(typeof(BuildingLoadSystem))]
 public partial class BuildingCreateDestroyVisualSystem : SystemBase
 {
     [Inject] BuildingObjectFactory _factorty;

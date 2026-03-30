@@ -6,276 +6,296 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.XR;
 using Zenject;
 [DisableAutoCreation]
-[UpdateInGroup(typeof(PresentationSystemGroup))]
-[UpdateAfter(typeof( ProccessDeletePointsSystem) )]
+[UpdateInGroup(typeof(PresentationSystemGroup), OrderLast = true)]
 public partial class BuildingSaveSystem : SystemBase
 {
     EntityQuery SaveLoadInfo;
-    [Inject] SaveService saveService;
-    [Inject] IReadOnlyBuildingInfo buildingInfo;
-    [Inject] GameFieldSettings gameFieldSettings;
-
+    [Inject] IGameStateSaver saveData;
     protected override void OnCreate()
     {
         SaveLoadInfo= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<BuildingMap,LoadingMapTag>()
+            .WithAll<BuildingMap,SavingMapTag>()
             .Build(World.EntityManager);
     }
     protected override void OnUpdate()
     {
         var ecb = new EntityCommandBuffer(Allocator.Temp);
-        foreach (var (buildingData,loadState,building) in SystemAPI.Query<BuildingData,EnabledRefRW<LoadInfo>>().WithEntityAccess())
-        {
-            if (!loadState.ValueRO) continue; 
-            loadState.ValueRW = false; 
-            LoadBuildingInfo(buildingData,building,ecb);
-        }
-        if (!SaveLoadInfo.IsEmpty)
-        {
-            Entity mapEntity=SystemAPI.GetSingletonEntity<BuildingMap>();
-            ecb.SetComponentEnabled<LoadingMapTag>(mapEntity,false);
-        }
-        ecb.Playback(EntityManager);
-        ecb.Dispose();
-    }
-    public void LoadBuildingInfo(BuildingData buildingData, Entity building,EntityCommandBuffer ecb)
-    {
-        if (EntityManager.HasComponent<ConstructionPriorityData>(building))
-        {
-            if (saveService.GameState.constructionSlotsSaveData.TryGetValue(buildingData.BuildingUniqueID,out var constructionSlotsSaveData))
-            {
-                if (constructionSlotsSaveData.InputConstructionItems != null)
-                {
-                    var inputConstBuff=ecb.SetBuffer<InputConstructionSlotData>(building);
-                    ecb.SetComponentEnabled<IsInputConstructionEnabled>(building,constructionSlotsSaveData.isInputEnabled);
-                    foreach(var iC in constructionSlotsSaveData.InputConstructionItems)
-                    {
-                        inputConstBuff.Add(iC);
-                    }
-                }
-                if (constructionSlotsSaveData.OutputConstructionItems != null)
-                {
-                    var outputConstBuff=ecb.SetBuffer<OutputConstructionSlotData>(building);
-                    ecb.SetComponentEnabled<IsOutputConstuctionEnabled>(building,constructionSlotsSaveData.isOutputEnabled);
-                    foreach(var oC in constructionSlotsSaveData.OutputConstructionItems)
-                    {
-                        outputConstBuff.Add(oC);
-                    }
-                }
-                ecb.SetComponent(building,new ConstructionPriorityData{ConstructionPriority=(int)constructionSlotsSaveData.priority});
-                
-                ecb.SetComponentEnabled<IsConstuctionSlotsAssigned>(building, true);
-            }
-            else
-            {
-                if(buildingInfo.BuildingItemRequestsInfos.TryGetValue(buildingData.BuildingIDHash,out var itemRequests))
-                {
-                    var k =1;
-                    if (EntityManager.HasComponent<RoadTypeBuildingTag>(building))
-                    {
-                        k=EntityManager.GetBuffer<MapPoint>(building).Length;
-                    }
-                    if (EntityManager.HasBuffer<TransitionSlotData>(building)&&EntityManager.GetBuffer<TransitionSlotData>(building).Length>0)
-                    {
-                        if (!EntityManager.IsComponentEnabled<IsDemolition>(building) && 
-                        EntityManager.IsComponentEnabled<ChangeDemolitionStateTag>(building))
-                        {
-                            
-                            Debug.Log("2213312132");
-                            var outputConstBuff=ecb.SetBuffer<OutputConstructionSlotData>(building);
-                            foreach(var iR in itemRequests.itemsRequest)
-                            {
-                                outputConstBuff.Add(new OutputConstructionSlotData{ItemId=iR.itemId,Amount=0,Capacity=iR.amount*k});
-                            }
-                            var tSlots=EntityManager.GetBuffer<TransitionSlotData>(building);
-                            for(int i = 0; i < outputConstBuff.Length; i++)
-                            {
-                                var outSlot=outputConstBuff[i];
-                                if(outSlot.Capacity==outSlot.Amount) continue;
-                                for(int j = 0; j < tSlots.Length; j++)
-                                {
-                                    var tSL=tSlots[j];
-                                    if (tSL.itemID == outSlot.ItemId)
-                                    {
-                                        int fill=outSlot.Capacity-outSlot.Amount;
-                                        if (tSL.amount > fill)
-                                        {
-                                            outSlot.Amount=outSlot.Capacity;
-                                            tSL.amount-=fill;
-                                        }
-                                        else
-                                        {
-                                            outSlot.Amount+=tSL.amount;
-                                            tSL.amount=0;
-                                        }
-                                    }
-                                    tSlots[j]=tSL;
-                                }
-                                outputConstBuff[i]=outSlot;
-                            }
-                            NativeList<TransitionSlotData> transitionSlotDatas=new(100,Allocator.Temp);
-                            foreach(var tSL in tSlots)
-                            {
-                                if(tSL.amount>0) transitionSlotDatas.Add(tSL);
-                            }
-                            if (transitionSlotDatas.Length > 0)
-                            {
-                                var ex=ecb.SetBuffer<ExcessSlotData>(building);
-                                foreach(var tSL in transitionSlotDatas)
-                                    ex.Add(new ExcessSlotData{ItemId=tSL.itemID,Amount=tSL.amount,Capacity=100});
-                            }
-                        }
-                        else
-                        {
-                            
-                            Debug.Log("ssssasas");
-                            var inputConstBuff=ecb.SetBuffer<InputConstructionSlotData>(building);
-                            foreach(var iR in itemRequests.itemsRequest)
-                            {
-                                inputConstBuff.Add(new InputConstructionSlotData{ItemId=iR.itemId,Amount=0,Capacity=iR.amount*k});
-                            }
-                            var tSlots=EntityManager.GetBuffer<TransitionSlotData>(building);
-                            for(int i = 0; i < inputConstBuff.Length; i++)
-                            {
-                                var inpSlot=inputConstBuff[i];
-                                if(inpSlot.Capacity==inpSlot.Amount) continue;
-                                for(int j = 0; j < tSlots.Length; j++)
-                                {
-                                    var tSL=tSlots[j];
-                                    if (tSL.itemID == inpSlot.ItemId)
-                                    {
-                                        int fill=inpSlot.Capacity-inpSlot.Amount;
-                                        if (tSL.amount > fill)
-                                        {
-                                            inpSlot.Amount=inpSlot.Capacity;
-                                            tSL.amount-=fill;
-                                        }
-                                        else
-                                        {
-                                            inpSlot.Amount+=tSL.amount;
-                                            tSL.amount=0;
-                                        }
-                                    }
-                                    tSlots[j]=tSL;
-                                }
-                                inputConstBuff[i]=inpSlot;
-                            }
-                            NativeList<TransitionSlotData> transitionSlotDatas=new(100,Allocator.Temp);
-                            foreach(var tSL in tSlots)
-                            {
-                                if(tSL.amount>0) transitionSlotDatas.Add(tSL);
-                            }
-                            if (transitionSlotDatas.Length > 0)
-                            {
-                                var ex=ecb.SetBuffer<ExcessSlotData>(building);
-                                foreach(var tSL in transitionSlotDatas)
-                                {
-                                    ex.Add(new ExcessSlotData{ItemId=tSL.itemID,Amount=tSL.amount,Capacity=100});
-                                    Debug.Log("dssddsds");
-                                }
-                            }
-                        }
-                        
-                        if (EntityManager.HasComponent<TransitionSlotData>(building))
-                        {
-                            //ecb.RemoveComponent<TransitionSlotData>(building);
-                        }
-                    }
-                    else
-                    {
-                        if (!EntityManager.IsComponentEnabled<IsBlueprint>(building) && 
-                            EntityManager.IsComponentEnabled<ChangeBluePrintState>(building))
-                        {
-                            var inputConstBuff=ecb.SetBuffer<InputConstructionSlotData>(building);
-                            foreach(var iR in itemRequests.itemsRequest)
-                            {
-                                inputConstBuff.Add(new InputConstructionSlotData{ItemId=iR.itemId,Amount=0,Capacity=iR.amount*k});
-                            }
-                        }
-                        else if  (!EntityManager.IsComponentEnabled<IsDemolition>(building) && 
-                            EntityManager.IsComponentEnabled<ChangeDemolitionStateTag>(building))
-                        {
-                            var outputConstBuff=ecb.SetBuffer<OutputConstructionSlotData>(building);
-                            foreach(var iR in itemRequests.itemsRequest)
-                            {
-                                outputConstBuff.Add(new OutputConstructionSlotData{ItemId=iR.itemId,Amount=iR.amount*k,Capacity=iR.amount*k});
-                            }
-                        }
-                    }
-                }
-                ecb.SetComponent(building,new ConstructionPriorityData{ConstructionPriority=(int)gameFieldSettings.defaultDistributionPriority});
-                ecb.SetComponentEnabled<IsConstuctionSlotsAssigned>(building, true);
-                
-            }
-        }
+        if(SaveLoadInfo.IsEmpty) return;
+        var save = new GameStateData(); 
 
+        var time=SystemAPI.GetSingleton<WorldTime>();
+        save.CurrTick=time.CurrentTick;
+        save.TicksPerDay=time.TicksPerDay;
+        save.dayLength=time.dayLength;
+        // Camerdata
+        save.CoreID=saveData.GameState.CoreID;
+        save.CorePos=saveData.GameState.CorePos;
+        save.EnemyAiConfig=saveData.GameState.EnemyAiConfig;
+        var query = SystemAPI.QueryBuilder()
+                .WithAll<SpawnMobsData>()
+                .WithOptions(EntityQueryOptions.IgnoreComponentEnabledState)
+                .Build();
 
-        if(saveService.GameState.excessSlotsSaveData.TryGetValue(buildingData.BuildingUniqueID,out var excessData))
-        {
-            var exBuff=ecb.SetBuffer<ExcessSlotData>(building);
-            foreach(var ex in excessData.ExcessItems)
-                exBuff.Add(ex);
-        }
+        save.SpawnMobsData = query.GetSingleton<SpawnMobsData>();
+        BuildingMap buildingMap = SystemAPI.GetSingleton<BuildingMap>();
+        Entity mapEn = SystemAPI.GetSingletonEntity<BuildingMap>();
+        int initialCount = buildingMap.CellMapEntites.Count();
 
-        if (EntityManager.HasComponent<IsRecipeAssigned>(building))
-        {
-            if(saveService.GameState.recipeBuildingSaveData.TryGetValue(buildingData.BuildingUniqueID,out var recipeData))
-            {
-                if (recipeData.InputCrafttems != null)
-                {
-                    var inputCraftBuff=ecb.SetBuffer<InputSlotData>(building);
-                    ecb.SetComponentEnabled<IsInputCraftEnabled>(building,recipeData.isInputEnabled);
-                    foreach(var iC in recipeData.InputCrafttems)
-                    {
-                        inputCraftBuff.Add(iC);
-                    }
-                }
-                if (recipeData.OutputCrafttems != null)
-                {
-                    var outputCraftBuff=ecb.SetBuffer<OutputSlotData>(building);
-                    ecb.SetComponentEnabled<IsOutputCraftEnabled>(building,recipeData.isOutputEnabled);
-                    foreach(var oC in recipeData.OutputCrafttems)
-                    {
-                        outputCraftBuff.Add(oC);
-                    }
-                }
-                
-                ecb.SetComponent(building,new CraftingPriorityData{CraftingPriority=(int)recipeData.priority});
-                ecb.SetComponent(building,
-                    new CountOfPackInBuildingData { CountOfPack = recipeData.ContOfPack });
-                ecb.SetComponent(building,new RecipeBuildingData{RecipeIDHash=recipeData.RecipeID,CurrTime=recipeData.CurrTime,TimeToCraft=recipeData.TimeToCraft});
-                ecb.SetComponentEnabled<IsRecipeAssigned>(building,true);
-            }
-            else
-            {
-                ecb.SetComponent(building,
-                    new CountOfPackInBuildingData { CountOfPack = 2 });
-                ecb.SetComponent(building,new CraftingPriorityData{CraftingPriority=(int)gameFieldSettings.defaultDistributionPriority});
-                ecb.SetComponent(building,new RecipeBuildingData{RecipeIDHash=-1,CurrTime=0,TimeToCraft=0});
-            }
-        }
-        if (EntityManager.HasComponent<StorageTypeBuildingTag>(building))
-        {
-            if(saveService.GameState.storageSlotsSaveData.TryGetValue(buildingData.BuildingUniqueID,out var storageData))
-            {
-                if (storageData.slots != null)
-                {
-                    var storageBuff=ecb.SetBuffer<StorageSlotData>(building);
-                    foreach(var iC in storageData.slots)
-                    {
-                        storageBuff.Add(iC);
-                    }
-                }   
-                ecb.SetComponent(building,new CraftingPriorityData{CraftingPriority=(int)storageData.priority});
-            }
-            else
-            {
-                ecb.SetComponent(building,new CraftingPriorityData{CraftingPriority=(int)gameFieldSettings.defaultDistributionPriority});
-            }
-        }
+        var buildings=new NativeParallelHashMap<int,BaseBuildingSaveData>(initialCount,Allocator.TempJob);
+        var manyPointsBuildings=new NativeParallelHashMap<int,ManyPointsBuildingSaveData>(initialCount,Allocator.TempJob);
+        var constructionSlotsSaveData=new NativeParallelHashMap<int,ConstructionSlotsSaveData>(initialCount,Allocator.TempJob);
+        var excessSlotsSaveData=new NativeParallelHashMap<int,ExcessSlotsSaveData>(initialCount,Allocator.TempJob);
+        var recipeBuildingSaveData=new NativeParallelHashMap<int,RecipeAndCraftBuildingSaveData>(initialCount,Allocator.TempJob);
+        var storageSlotsSaveData=new NativeParallelHashMap<int,StorageSlotsSaveData>(initialCount,Allocator.TempJob);
+        var buildingEnergyNetvorkLinkSaveData=new NativeParallelHashMap<int,BuildingEnergyNetvorkLinkSaveData>(initialCount,Allocator.TempJob);
         
+        var IsBluePrintLookUp=SystemAPI.GetComponentLookup<IsBlueprint>();
+        var IsDemolitionLookUp=SystemAPI.GetComponentLookup<IsDemolition>();
+
+        var IsInputConstructionEnabledLookUp=SystemAPI.GetComponentLookup<IsInputConstructionEnabled>();
+        var IsOutputConstuctionEnabledLookUp=SystemAPI.GetComponentLookup<IsOutputConstuctionEnabled>();
+        var InputConstructionSlotDataLookUp=SystemAPI.GetBufferLookup<InputConstructionSlotData>();
+        var OutputConstructionSlotDataLookUp =SystemAPI.GetBufferLookup<OutputConstructionSlotData>();
+        
+        var SwitchIsOffLookUp=SystemAPI.GetComponentLookup<SwitchIsOff>();
+
+        var IsInputCraftEnabledLookUp=SystemAPI.GetComponentLookup<IsInputCraftEnabled>();
+        var IsOutputCraftEnabledLookUp=SystemAPI.GetComponentLookup<IsOutputCraftEnabled>();
+        var InputSlotDataLookUp=SystemAPI.GetBufferLookup<InputSlotData>();
+        var OutputSlotDataLookUp =SystemAPI.GetBufferLookup<OutputSlotData>();
+
+       var handle= new BuildingSaveJob{buildings=buildings.AsParallelWriter(),IsBluePrintLookUp=IsBluePrintLookUp,IsDemolitionLookUp=IsDemolitionLookUp}.ScheduleParallel(this.Dependency);
+       handle= new RoadSaveJob{manyPointsBuildings=manyPointsBuildings.AsParallelWriter(),IsBluePrintLookUp=IsBluePrintLookUp,IsDemolitionLookUp=IsDemolitionLookUp}.ScheduleParallel(handle);
+       handle= new ConstructionSlotsSaveJob{
+            constructionSlotsSaveData=constructionSlotsSaveData.AsParallelWriter(),
+            InputConstructionSlotDataLookUp=InputConstructionSlotDataLookUp,
+            OutputConstructionSlotDataLookUp=OutputConstructionSlotDataLookUp,
+            IsInputConstructionEnabledLookUp=IsInputConstructionEnabledLookUp,
+            IsOutputConstuctionEnabledLookUp=IsOutputConstuctionEnabledLookUp}.ScheduleParallel(handle);
+        handle= new ExcessSlotsSaveJob{excessSlotsSaveData=excessSlotsSaveData.AsParallelWriter()}.ScheduleParallel(handle);
+        handle= new RecipeAdnCraftBuildingSaveData{
+            recipeBuildingSaveData=recipeBuildingSaveData.AsParallelWriter(),
+            InputSlotDataLookUp=InputSlotDataLookUp,
+            OutputSlotDataLookUp=OutputSlotDataLookUp,
+            IsInputCraftEnabledLookUp=IsInputCraftEnabledLookUp,
+            IsOutputCraftEnabledLookUp=IsOutputCraftEnabledLookUp
+            }.ScheduleParallel(handle);
+        handle= new EnegrySaveJob{buildingEnergyNetvorkLinkSaveData=buildingEnergyNetvorkLinkSaveData.AsParallelWriter(),SwitchIsOffLookUp=SwitchIsOffLookUp}.ScheduleParallel(handle);
+        handle= new StorageSaveJob{storageSlotsSaveData=storageSlotsSaveData.AsParallelWriter()}.ScheduleParallel(handle);
+        handle.Complete();
+        this.Dependency=handle;
+        save.ResourcesCellsList=saveData.GameState.ResourcesCellsList;
+        save.Buildings = new Dictionary<int, BaseBuildingSaveData>();
+        foreach (var pair in buildings) {
+            save.Buildings.Add(pair.Key, pair.Value);
+        }
+
+        save.ManyPointsBuildings = new Dictionary<int, ManyPointsBuildingSaveData>();
+        foreach (var pair in manyPointsBuildings) {
+            save.ManyPointsBuildings.Add(pair.Key, pair.Value);
+        }
+
+        save.constructionSlotsSaveData = new Dictionary<int, ConstructionSlotsSaveData>();
+        foreach (var pair in constructionSlotsSaveData) {
+            save.constructionSlotsSaveData.Add(pair.Key, pair.Value);
+        }
+
+        save.excessSlotsSaveData = new Dictionary<int, ExcessSlotsSaveData>();
+        foreach (var pair in excessSlotsSaveData) {
+            save.excessSlotsSaveData.Add(pair.Key, pair.Value);
+        }
+
+        save.recipeBuildingSaveData = new Dictionary<int, RecipeAndCraftBuildingSaveData>();
+        foreach (var pair in recipeBuildingSaveData) {
+            save.recipeBuildingSaveData.Add(pair.Key, pair.Value);
+        }
+
+        save.storageSlotsSaveData = new Dictionary<int, StorageSlotsSaveData>();
+        foreach (var pair in storageSlotsSaveData) {
+            save.storageSlotsSaveData.Add(pair.Key, pair.Value);
+        }
+
+        save.buildingEnergyNetvorkLinkSaveData = new Dictionary<int, BuildingEnergyNetvorkLinkSaveData>();
+        foreach (var pair in buildingEnergyNetvorkLinkSaveData) {
+            save.buildingEnergyNetvorkLinkSaveData.Add(pair.Key, pair.Value);
+        }
+        saveData.SaveGameState(save);
+        EntityManager.SetComponentEnabled<SavingMapTag>(mapEn,false);
+        buildings.Dispose();
+        manyPointsBuildings.Dispose();
+        constructionSlotsSaveData.Dispose();
+        excessSlotsSaveData.Dispose();
+        recipeBuildingSaveData.Dispose();
+        storageSlotsSaveData.Dispose();
+        buildingEnergyNetvorkLinkSaveData.Dispose();
+
+    }
+    partial struct BuildingSaveJob : IJobEntity
+    {
+        public NativeParallelHashMap<int,BaseBuildingSaveData>.ParallelWriter buildings;        
+        [ReadOnly] public ComponentLookup<IsBlueprint> IsBluePrintLookUp;
+        [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookUp;
+        public void Execute(Entity entity, BuildingPosData buildingPosData, BuildingData buildingData)
+        {
+            buildings.TryAdd(buildingData.BuildingUniqueID,new BaseBuildingSaveData
+            {
+                buildingID=buildingData.BuildingIDHash,
+                buildingPosition=buildingPosData.LeftCornerPos,
+                rotation=buildingPosData.Rotation,
+                isBlueprint=IsBluePrintLookUp.HasComponent(entity)&&IsBluePrintLookUp.IsComponentEnabled(entity),
+                IsDemolition=IsDemolitionLookUp.HasComponent(entity)&&IsDemolitionLookUp.IsComponentEnabled(entity)
+            });
+        }
+    }
+    [WithAll(typeof(RoadTypeBuildingTag))]
+    partial struct RoadSaveJob : IJobEntity
+    {
+        public NativeParallelHashMap<int,ManyPointsBuildingSaveData>.ParallelWriter manyPointsBuildings;        
+        [ReadOnly] public ComponentLookup<IsBlueprint> IsBluePrintLookUp;
+        [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookUp;
+        public void Execute(Entity entity,  BuildingData buildingData,DynamicBuffer<MapPoint> mapPoints)
+        {
+            FixedList512Bytes<int2> points =new();
+            foreach(var p in mapPoints) 
+                points.Add(p.pos);
+            manyPointsBuildings.TryAdd(buildingData.BuildingUniqueID,new ManyPointsBuildingSaveData
+            {
+                buildingID=buildingData.BuildingIDHash,
+                points=points,
+                isBlueprint=IsBluePrintLookUp.HasComponent(entity)&&IsBluePrintLookUp.IsComponentEnabled(entity),
+                IsDemolition=IsDemolitionLookUp.HasComponent(entity)&&IsDemolitionLookUp.IsComponentEnabled(entity)
+            });
+        }
+    }
+    [WithAny(typeof(IsBlueprint),typeof(IsDemolition))]
+    partial struct ConstructionSlotsSaveJob : IJobEntity
+    {
+        public NativeParallelHashMap<int,ConstructionSlotsSaveData>.ParallelWriter constructionSlotsSaveData;        
+        [ReadOnly] public BufferLookup<InputConstructionSlotData> InputConstructionSlotDataLookUp;
+        [ReadOnly] public BufferLookup<OutputConstructionSlotData> OutputConstructionSlotDataLookUp;
+        [ReadOnly] public ComponentLookup<IsInputConstructionEnabled> IsInputConstructionEnabledLookUp;
+        [ReadOnly] public ComponentLookup<IsOutputConstuctionEnabled> IsOutputConstuctionEnabledLookUp;
+        public void Execute(Entity entity,BuildingData buildingData,ConstructionPriorityData constructionPriorityData)
+        {
+            FixedList512Bytes<InputConstructionSlotData> input=new();
+            if (InputConstructionSlotDataLookUp.HasBuffer(entity))
+            {
+                foreach(var sIn in InputConstructionSlotDataLookUp[entity])
+                {
+                    input.Add(sIn);
+                }
+            }
+            FixedList512Bytes<OutputConstructionSlotData> output=new();
+            if (OutputConstructionSlotDataLookUp.HasBuffer(entity))
+            {
+                foreach(var sOut in OutputConstructionSlotDataLookUp[entity])
+                {
+                    output.Add(sOut);
+                }
+            }
+            if(input.Length==0&&output.Length==0) return;
+
+            constructionSlotsSaveData.TryAdd(buildingData.BuildingUniqueID,new ConstructionSlotsSaveData
+            {
+                isInputEnabled=IsInputConstructionEnabledLookUp.HasComponent(entity)&&IsInputConstructionEnabledLookUp.IsComponentEnabled(entity),
+                isOutputEnabled=IsOutputConstuctionEnabledLookUp.HasComponent(entity)&&IsOutputConstuctionEnabledLookUp.IsComponentEnabled(entity),
+                priority=(DistributionPriority)constructionPriorityData.ConstructionPriority,
+                InputConstructionItems=input,
+                OutputConstructionItems=output
+            });
+        }
+    }
+
+    partial struct ExcessSlotsSaveJob : IJobEntity
+    {
+        public NativeParallelHashMap<int,ExcessSlotsSaveData>.ParallelWriter excessSlotsSaveData;
+        public void Execute(BuildingData buildingData,DynamicBuffer<ExcessSlotData> slots)
+        {
+            FixedList512Bytes<ExcessSlotData> ExcessItems=new();
+            if(ExcessItems.Length<=0) return;
+            foreach(var s in slots) ExcessItems.Add(s);
+            excessSlotsSaveData.TryAdd(buildingData.BuildingUniqueID,new ExcessSlotsSaveData{ExcessItems=ExcessItems});
+        }
+    }
+
+    partial struct RecipeAdnCraftBuildingSaveData : IJobEntity
+    {
+        public NativeParallelHashMap<int,RecipeAndCraftBuildingSaveData>.ParallelWriter recipeBuildingSaveData;
+        [ReadOnly] public BufferLookup<InputSlotData> InputSlotDataLookUp;
+        [ReadOnly] public BufferLookup<OutputSlotData> OutputSlotDataLookUp;
+        [ReadOnly] public ComponentLookup<IsOutputCraftEnabled> IsOutputCraftEnabledLookUp;
+        [ReadOnly] public ComponentLookup<IsInputCraftEnabled> IsInputCraftEnabledLookUp;
+        public void Execute(Entity entity, CraftingPriorityData craftingPriorityData,BuildingData buildingData,RecipeBuildingData RecipeBuildingData,CountOfPackInBuildingData countOfPackInBuildingData)
+        {
+            if(RecipeBuildingData.RecipeIDHash==-1) return;
+            FixedList512Bytes<InputSlotData> input=new();
+            if (InputSlotDataLookUp.HasBuffer(entity))
+            {
+                foreach(var sIn in InputSlotDataLookUp[entity])
+                {
+                    input.Add(sIn);
+                }
+            }
+            FixedList512Bytes<OutputSlotData> output=new();
+            if (OutputSlotDataLookUp.HasBuffer(entity))
+            {
+                foreach(var sOut in OutputSlotDataLookUp[entity])
+                {
+                    output.Add(sOut);
+                }
+            }
+            recipeBuildingSaveData.TryAdd(buildingData.BuildingUniqueID,new RecipeAndCraftBuildingSaveData
+            {
+                RecipeID=RecipeBuildingData.RecipeIDHash,
+                CurrTime=RecipeBuildingData.CurrTime,
+                TimeToCraft=RecipeBuildingData.TimeToCraft,
+                isInputEnabled=IsInputCraftEnabledLookUp.HasComponent(entity)&&IsInputCraftEnabledLookUp.IsComponentEnabled(entity),
+                isOutputEnabled=IsOutputCraftEnabledLookUp.HasComponent(entity)&&IsOutputCraftEnabledLookUp.IsComponentEnabled(entity),
+                ContOfPack=countOfPackInBuildingData.CountOfPack,
+                priority=(DistributionPriority) craftingPriorityData.CraftingPriority,
+                InputCrafttems=input,
+                OutputCrafttems=output
+            });
+        }
+    }
+
+    partial struct EnegrySaveJob : IJobEntity
+    {
+        
+        [ReadOnly] public ComponentLookup<SwitchIsOff> SwitchIsOffLookUp;
+        
+        public NativeParallelHashMap<int,BuildingEnergyNetvorkLinkSaveData>.ParallelWriter buildingEnergyNetvorkLinkSaveData;
+        public void Execute( Entity entity, BuildingData buildingData,EnergyBuildingData EnergyBuildingData)
+        {
+            FixedList128Bytes<EntityLink> entitesLink =new();
+            foreach(var c in EnergyBuildingData.connections)
+            {
+                if(c.Item2.x==-1) continue;
+                entitesLink.Add(new EntityLink{from = new int2(c.Item1,buildingData.BuildingUniqueID),to=c.Item2});
+            }
+            if(entitesLink.Length==0) return;
+            buildingEnergyNetvorkLinkSaveData.TryAdd(buildingData.BuildingUniqueID,new BuildingEnergyNetvorkLinkSaveData {entitesLink=entitesLink,isSwitchOff=SwitchIsOffLookUp.HasComponent(entity)&&SwitchIsOffLookUp.IsComponentEnabled(entity)});
+        }
+    }
+
+    partial struct StorageSaveJob : IJobEntity
+    {
+        
+        public NativeParallelHashMap<int,StorageSlotsSaveData>.ParallelWriter storageSlotsSaveData;
+        public void Execute( BuildingData buildingData,CraftingPriorityData craftingPriorityData, DynamicBuffer<StorageSlotData> slotsBuff)
+        {
+            if(slotsBuff.Length<=0) return;
+            FixedList512Bytes<StorageSlotData> slots=new();
+            foreach(var s in slotsBuff)
+            {
+                slots.Add(s);
+            }
+            storageSlotsSaveData.TryAdd(buildingData.BuildingUniqueID,new StorageSlotsSaveData {slots=slots,priority=(DistributionPriority)craftingPriorityData.CraftingPriority });
+        }
     }
 }

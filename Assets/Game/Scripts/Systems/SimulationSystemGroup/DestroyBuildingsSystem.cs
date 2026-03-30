@@ -9,6 +9,8 @@ using UnityEngine;
 using UnityEngine.Splines.ExtrusionShapes;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
+
+[UpdateAfter(typeof(TickGeneratorSystem))]
 [BurstCompile]
 
 public partial struct DestroyBuildingsSystem : ISystem

@@ -178,14 +178,41 @@ public struct UpdateMapTag : IComponentData, IEnableableComponent { }
 public struct UpdateClustersTag:IComponentData, IEnableableComponent{}
 public struct UpdateClusterSlots:IComponentData, IEnableableComponent{}
 public struct UpdateConnectionsTag:IComponentData, IEnableableComponent{}
-public struct TickInfoData : IComponentData
+public struct WorldTime : IComponentData
 {
-    public int currTickPerSecond;
+    public long CurrentTick;       
+    public int TicksPerDay;       
+    public float dayLength;
+    
+    public float SpeedMultiplier;  
+    public float baseTick;
+    public float acceleretedTick=>baseTick*SpeedMultiplier;
+    public int CurrentDay => (int)(CurrentTick / TicksPerDay);
+    public float DayProgress => (float)(CurrentTick % TicksPerDay) / TicksPerDay;
+    public float Sunrise => 0.5f - (dayLength / 2f);
+    public float Sunset => 0.5f + (dayLength / 2f);
+
+    public bool IsDay => DayProgress >= Sunrise && DayProgress <= Sunset;
+
+    public float LocalProgress
+    {
+        get
+        {
+            if (IsDay)
+            {
+                return (DayProgress - Sunrise) / dayLength;
+            }
+            else
+            {
+                float nightDuration = 1f - dayLength;
+                if (DayProgress >= Sunset)
+                    return (DayProgress - Sunset) / nightDuration;
+                return (DayProgress + (1f - Sunset)) / nightDuration;
+            }
+        }
+    }
 }
-public struct SpawnMobs : IComponentData, IEnableableComponent
-{
-   public int points;
-}
+public struct IsTickFrame :IComponentData,IEnableableComponent{}
 public struct LoadingMapTag : IComponentData, IEnableableComponent { }
 public struct SavingMapTag : IComponentData, IEnableableComponent { }
 public struct ProductionTable : IComponentData, IDisposable

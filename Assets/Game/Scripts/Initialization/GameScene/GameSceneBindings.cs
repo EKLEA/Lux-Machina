@@ -17,6 +17,7 @@ public class GameSceneBindings : MonoInstaller
     [SerializeField]
     UIManager UIManager;
     [SerializeField] EnemyFactory enemyFactory;
+    [SerializeField] SunController sunController;
     public override void InstallBindings()
     {
         BindServices();
@@ -66,6 +67,7 @@ public class GameSceneBindings : MonoInstaller
             ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerConnectionEnergySystem>()
         ).AsSingle();
         Container.Bind<PlayerController>().FromInstance(playerController).AsSingle();
+        Container.Bind<SunController>().FromInstance(sunController).AsSingle();
         Container.Bind<GridVisualizer>().FromInstance(gridVisualizer).AsSingle();
         //Container.Bind<FlowFieldVisualizer>().FromInstance(FlowFieldVisualizer).AsSingle();
         

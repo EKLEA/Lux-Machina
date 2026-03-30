@@ -182,7 +182,7 @@ public struct BuildingTag : IComponentData{}
     public struct IsLogicEnabled : IComponentData, IEnableableComponent{}
     #endregion
     #region Загрузка
-    public struct SaveInfo : IComponentData, IEnableableComponent{}
+    public struct SavableTag : IComponentData{}
     public struct LoadInfo : IComponentData, IEnableableComponent{}
     #endregion
     #region  Здоровье

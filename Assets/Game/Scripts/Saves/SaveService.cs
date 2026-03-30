@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.IO;
 using Cysharp.Threading.Tasks;
+using Newtonsoft.Json;
 using NUnit.Framework;
 using Unity.Mathematics;
 using UnityEngine;
@@ -14,56 +16,85 @@ public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
     string SavePath;
     public int saveIndex;
     public GameStateData GameState { get; private set; }
-
-    public async UniTask LoadGameState()
+    private readonly JsonSerializerSettings _settings = new JsonSerializerSettings
     {
-        SavePath = Path.Combine(
-            Application.persistentDataPath,
-            string.Format("savegame{0}.json", saveIndex)
-        );
-        try
+        Formatting = Formatting.Indented,
+        ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+        // Если ты используешь Unity.Mathematics (int2, float3), 
+        // Newtonsoft обычно "ест" их как обычные структуры с полями x,y
+    };
+   public async UniTask LoadGameState()
+{
+    SavePath = Path.Combine(
+        Application.persistentDataPath,
+        string.Format("savegame{0}.json", saveIndex)
+    );
+    
+    Debug.Log($"[LOAD] Попытка загрузки по пути: {Path.GetFullPath(SavePath)}");
+
+    try
+    {
+        if (!File.Exists(SavePath))
         {
-            if (!File.Exists(SavePath))
-            {
-                Debug.Log("Файл сохранения не найден, создается новый");
-                GameState = GenerateDefault();
-            }
-            else
-            {
-                string jsonData;
-                using (StreamReader reader = new StreamReader(SavePath))
-                {
-                    jsonData = await reader.ReadToEndAsync();
-                }
-                GameStateData loadedData = JsonUtility.FromJson<GameStateData>(jsonData);
-                Debug.Log("Игра загружена успешно");
-            }
-        }
-        catch (System.Exception e)
-        {
-                Debug.LogError($"Ошибка загрузки: {e.Message}");
+            Debug.Log("[LOAD] Файл сохранения не найден, генерируется стандартный мир");
             GameState = GenerateDefault();
+            return;
+        }
+
+        string jsonData = await File.ReadAllTextAsync(SavePath);
+
+        // 4. КРИТИЧЕСКИ ВАЖНО: Добавляем конвертер в настройки загрузки
+        var settings = new JsonSerializerSettings 
+        { 
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+            Converters = new List<JsonConverter> { new UnityMathematicsConverter() }
+            
+        };
+
+        // 5. Десериализуем (теперь Newtonsoft передаст управление FixedList нашему конвертеру)
+        GameStateData loadedData = await UniTask.RunOnThreadPool(() => 
+            JsonConvert.DeserializeObject<GameStateData>(jsonData, settings)
+        );
+
+        if (loadedData != null)
+        {
+            GameState = loadedData;
+            Debug.Log("[LOAD] Игра загружена успешно!");
         }
     }
-
-    public async UniTask SaveGameState()
+    catch (System.Exception e)
     {
-        try
-        {
-            string jsonData = JsonUtility.ToJson(GameState, true);
-
-            using (StreamWriter writer = new StreamWriter(SavePath))
-            {
-                await writer.WriteAsync(jsonData);
-            }
-
-            Debug.Log($"Игра сохранена: {SavePath}");
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"Ошибка сохранения: {e.Message}");
-        }
+        // Выводим e.ToString(), чтобы видеть полную цепочку ошибок
+        Debug.LogError($"[LOAD КРИТИЧЕСКАЯ ОШИБКА]: {e}");
+        GameState = GenerateDefault();
     }
+}
+  public async UniTask SaveGameState(GameStateData gameStateData)
+{
+    try
+    {
+        Debug.Log("Начало сериализации...");
+        var settings = new JsonSerializerSettings
+        {
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+            // Проверьте, что вы создаете НОВЫЙ экземпляр конвертера здесь
+            Converters = { new UnityMathematicsConverter() } 
+        };
+
+        string jsonData = await UniTask.RunOnThreadPool(() => 
+            JsonConvert.SerializeObject(gameStateData, Formatting.Indented, settings)
+        );
+
+        await File.WriteAllTextAsync(SavePath, jsonData);
+        Debug.Log($"Файл сохранен успешно: {SavePath}");
+    }
+    catch (System.Exception e)
+    {
+        // Выводим e.ToString(), чтобы видеть ПОЛНЫЙ текст ошибки и строку кода
+        Debug.LogError($"[ОШИБКА]: {e}");
+    }
+}
+
 
     public void DeleteSave()
     {
@@ -77,20 +108,20 @@ public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
     GameStateData GenerateDefault()
     {
         var save = new GameStateData();
-        
+        save.CurrTick=0;
         save.EnemyAiConfig=new();
         save.Buildings=new();
-        save.RoadsBuildings=new();
+        save.ManyPointsBuildings=new();
         save.constructionSlotsSaveData=new();
         save.excessSlotsSaveData=new();
         save.recipeBuildingSaveData=new();
         save.storageSlotsSaveData=new();
         save.buildingEnergyNetvorkLinkSaveData=new();
-        save.ResourcesCells=new();
-        save.ResourcesCells[new int2(5,5)]=new int2(1,2);
-        save.ResourcesCells[new int2(5,6)]=new int2(1,2);
-        save.ResourcesCells[new int2(6,5)]=new int2(1,2);
-        save.ResourcesCells[new int2(6,6)]=new int2(1,2);
+        save.ResourcesCellsList=new();
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(5,5),val=new int2(1,2)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(5,6),val=new int2(1,2)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(6,5),val=new int2(1,2)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(6,6),val=new int2(1,2)});
 
         // save.buildingDatas = new();
         // save.roadPoints = new();
@@ -133,9 +164,9 @@ public interface IReadOnlySave
 {
     public GameStateData GameState{get;}
 }
-public interface IGameStateSaver
+public interface IGameStateSaver:IReadOnlySave
 {
-    public UniTask SaveGameState();
+    public UniTask SaveGameState(GameStateData gameStateData);
 }
 public class EnemyAIConfig
 {

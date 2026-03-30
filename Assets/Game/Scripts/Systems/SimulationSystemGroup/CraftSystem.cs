@@ -13,70 +13,62 @@ using UnityEngine;
 public partial struct CraftSystem : ISystem
 {
     
-    float _accumulatedTime;
-    uint _frameCount;   
     public void OnCreate(ref SystemState state)
     {
         
         
     }
-   public void OnUpdate(ref SystemState state)
+    public void OnUpdate(ref SystemState state)
     {
-        _accumulatedTime += SystemAPI.Time.DeltaTime;
-        var tickInfoData = SystemAPI.GetSingleton<TickInfoData>();
-        _frameCount++; 
+        var query = SystemAPI.QueryBuilder().WithAll<IsTickFrame>().Build();
+        if (query.IsEmpty) return;
 
-        if (_frameCount % tickInfoData.currTickPerSecond == 0) 
-        {   
-            
-            var recipeCache = SystemAPI.GetSingleton<RecipeConfigRefernce>();
-            var productionTable = SystemAPI.GetSingletonRW<ProductionTable>();
-            var canCraftLookup=SystemAPI.GetComponentLookup<CanCraft>(false);
-            var recipesRef = recipeCache.RecipesConfig; 
-            var ResourceMap = SystemAPI.GetSingletonRW<ResourceMap>();
+        var tickData=SystemAPI.GetSingleton<WorldTime>();
+        var recipeCache = SystemAPI.GetSingleton<RecipeConfigRefernce>();
+        var productionTable = SystemAPI.GetSingletonRW<ProductionTable>();
+        var canCraftLookup=SystemAPI.GetComponentLookup<CanCraft>(false);
+        var recipesRef = recipeCache.RecipesConfig; 
+        var ResourceMap = SystemAPI.GetSingletonRW<ResourceMap>();
 
-            var handle = new PingConsumerCraftBuildingJob 
-            { 
-                CanCraftLookup=canCraftLookup,
-                RecipesConfig = recipesRef 
-            }.ScheduleParallel(state.Dependency);
-             handle = new PingProducerCraftBuildingJob 
-            { 
-                RecipesConfig = recipesRef,
-                CanCraftLookup=canCraftLookup,
-                ResouecesMap=ResourceMap.ValueRO.ResouecesMap
-            }.Schedule(handle);
+        var handle = new PingConsumerCraftBuildingJob 
+        { 
+            CanCraftLookup=canCraftLookup,
+            RecipesConfig = recipesRef 
+        }.ScheduleParallel(state.Dependency);
+            handle = new PingProducerCraftBuildingJob 
+        { 
+            RecipesConfig = recipesRef,
+            CanCraftLookup=canCraftLookup,
+            ResouecesMap=ResourceMap.ValueRO.ResouecesMap
+        }.Schedule(handle);
 
-             handle = new PingProcessorCraftBuildingJob 
-            { 
-                RecipesConfig = recipesRef,
-                CanCraftLookup=canCraftLookup
-            }.Schedule(handle);
+            handle = new PingProcessorCraftBuildingJob 
+        { 
+            RecipesConfig = recipesRef,
+            CanCraftLookup=canCraftLookup
+        }.Schedule(handle);
 
-            handle = new ProducerCraftJob {
-                RecipesConfig = recipesRef,
-                produced = productionTable.ValueRW.produced.AsParallelWriter(),
-                timeStep = _accumulatedTime,
-                ResouecesMap=ResourceMap.ValueRW.ResouecesMap
-            }.ScheduleParallel(handle);
+        handle = new ProducerCraftJob {
+            RecipesConfig = recipesRef,
+            produced = productionTable.ValueRW.produced.AsParallelWriter(),
+            timeStep = tickData.acceleretedTick,
+            ResouecesMap=ResourceMap.ValueRW.ResouecesMap
+        }.ScheduleParallel(handle);
 
-            handle = new ConsumerCraftJob {
-                RecipesConfig = recipesRef,
-                consumed = productionTable.ValueRW.consumed.AsParallelWriter(),
-                timeStep = _accumulatedTime
-            }.ScheduleParallel(handle);
+        handle = new ConsumerCraftJob {
+            RecipesConfig = recipesRef,
+            consumed = productionTable.ValueRW.consumed.AsParallelWriter(),
+            timeStep = tickData.acceleretedTick
+        }.ScheduleParallel(handle);
 
-            handle = new ProcessorCraftJob {
-                RecipesConfig = recipesRef,
-                produced = productionTable.ValueRW.produced.AsParallelWriter(),
-                consumed = productionTable.ValueRW.consumed.AsParallelWriter(),
-                timeStep = _accumulatedTime
-            }.ScheduleParallel(handle);
+        handle = new ProcessorCraftJob {
+            RecipesConfig = recipesRef,
+            produced = productionTable.ValueRW.produced.AsParallelWriter(),
+            consumed = productionTable.ValueRW.consumed.AsParallelWriter(),
+            timeStep = tickData.acceleretedTick
+        }.ScheduleParallel(handle);
 
-            state.Dependency = handle;
-            
-            _accumulatedTime = 0; 
-        }
+        state.Dependency = handle;
     }
 
 

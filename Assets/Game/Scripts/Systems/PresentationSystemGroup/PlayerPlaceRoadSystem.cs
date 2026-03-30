@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
@@ -120,7 +121,7 @@ public partial class PlayerPlaceRoadSystem : SystemBase
             ecb.AddComponent<ProcessRoadPointsEventTag>(command);
             ecb.AddComponent<IsBlueprint>(command);
             ecb.SetComponentEnabled<IsBlueprint>(command,IsBlueprint);
-            
+            Debug.Log(IsBlueprint);
             var buff = ecb.AddBuffer<MapPoint>(command);
             foreach (var p in _roadPoints)
             {

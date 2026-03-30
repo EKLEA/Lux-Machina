@@ -14,6 +14,10 @@ public struct CreateEnemyEventData : IComponentData
     public int EnemyID;
     public float3 pos;
 }
+public struct SwitchIsOffCreateData : IComponentData
+{
+    public bool SwitchIsOff;
+}
 public struct LinkNetworkEnergyTo : IBufferElementData
 {
     public int2 LinkToBuilding; //x=node , y entity

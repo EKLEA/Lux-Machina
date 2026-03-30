@@ -25,7 +25,7 @@ public partial struct EnemyAISystem : ISystem
             .Build(ref state);
         _enemies= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<EnemyStats>()
-            .WithDisabled<LoadInfo,SaveInfo>()
+            .WithDisabled<LoadInfo>()
             .Build(ref state);
 
         
@@ -72,6 +72,7 @@ public partial struct EnemyAISystem : ISystem
           
         if (!_enemies.IsEmpty)
         {
+             var tickData=SystemAPI.GetSingleton<WorldTime>();
             var clearJob = new ClearMultiHashMapsJob
             {
                 TurretTargets = turretMap.ValueRW.EnemyGridMap,
@@ -82,7 +83,6 @@ public partial struct EnemyAISystem : ISystem
 
             var logicEcb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
             
-            // 3. Основная логика
             state.Dependency = new EnemyLogicJob
             { 
                 ECB = logicEcb.AsParallelWriter(),
@@ -95,9 +95,9 @@ public partial struct EnemyAISystem : ISystem
                 TurretTargets = turretMap.ValueRW.EnemyGridMap.AsParallelWriter(),
                 
                 DamageLookUp = SystemAPI.GetBufferLookup<TakeDamage>(false),
-                DeltaTime = SystemAPI.Time.DeltaTime,
+                DeltaTime = SystemAPI.Time.DeltaTime*tickData.SpeedMultiplier,
                 ElapsedTime = (float)SystemAPI.Time.ElapsedTime
-            }.ScheduleParallel(clearHandle); // ЗАВИСИМ ОТ CLEAR!
+            }.ScheduleParallel(clearHandle); 
         }
     }
 }
@@ -124,8 +124,7 @@ public struct IntegratedSpawnJob : IJob
         
         config.pointsPerCicle = (EnemyConfigs.BaseIncome + powerIncome) * timeMultiplier;
         config.pointsToSpawnMobs += config.pointsPerCicle;
-        config.pointsToSpawnMobs=config.pointsToSpawnMobs/100;
-        // --- ЛОГИКА SpawnMobsData ---
+        // config.pointsToSpawnMobs=config.pointsToSpawnMobs/100;
         if (config.pointsToSpawnMobs >= config.AttackThreshold && !SpawnPoints.IsEmpty)
         {
             var sortedPoints = new NativeArray<SpawnPointElement>(SpawnPoints.AsArray(), Allocator.Temp);
@@ -176,7 +175,6 @@ public struct IntegratedSpawnJob : IJob
             config.CountOfCicle++;
         }
 
-        // Сохраняем измененный config и очищаем буфер
         ECB.SetComponent(SpawnManagerEntity, config);
         ECB.SetComponentEnabled<SpawnMobsData>(SpawnManagerEntity,false);
         ECB.SetBuffer<SpawnPointElement>(SpawnManagerEntity).Clear();
@@ -242,7 +240,6 @@ public struct EvaluateSpawnZonesParallelJob : IJobParallelFor
 
         if (areaSum > 0.5f)
         {
-            // Потокобезопасное добавление без блокировок всего джоба
             ResultPoints.AddNoResize(new SpawnPointElement 
             { 
                 Position = centerPos, 
@@ -269,7 +266,7 @@ public struct ClearMultiHashMapsJob : IJob
     }
 }
 [BurstCompile]
-[WithDisabled(typeof(LoadInfo),typeof(SaveInfo))]
+[WithDisabled(typeof(LoadInfo))]
 public partial struct EnemyLogicJob : IJobEntity
 {
     [ReadOnly] public NativeParallelHashMap<int2, float2> FlowDirections;

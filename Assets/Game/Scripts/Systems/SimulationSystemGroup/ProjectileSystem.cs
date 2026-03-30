@@ -21,10 +21,11 @@ public partial struct ProjectileSystem : ISystem
         // ВАЖНО: Везде ставим true (ReadOnly), чтобы не было ошибок доступа
         var healthLookup = SystemAPI.GetComponentLookup<HealthData>(true);
         var transformLookup = SystemAPI.GetComponentLookup<LocalTransform>(true);
-
+        
+         var settings = SystemAPI.GetSingleton<WorldTime>(); 
         state.Dependency = new ProjectileMovementJob
         {
-            DeltaTime = SystemAPI.Time.DeltaTime,
+            DeltaTime = SystemAPI.Time.DeltaTime*settings.SpeedMultiplier,
             CellSize = grid.CellSize,
             // Здесь должна быть карта [int2 -> Entity врага]
             // Если её нет, снаряд не сможет найти кого ударить в клетке

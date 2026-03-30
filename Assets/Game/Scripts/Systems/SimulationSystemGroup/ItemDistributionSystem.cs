@@ -16,9 +16,6 @@ public partial struct ItemDistributionSystem : ISystem
     
     EntityQuery _deleteBuildingsQuery;
     EntityQuery _realizeBuildingsQuery;
-    
-    float _accumulatedTime;
-    uint _frameCount;   
     public void OnCreate(ref SystemState state)
     {
         MapUpdate=new EntityQueryBuilder(Allocator.Temp).WithAll<ClusterMap,UpdateClusterSlots>().Build(ref state);
@@ -119,11 +116,9 @@ public partial struct ItemDistributionSystem : ISystem
 
             state.Dependency= linkJob.Schedule(clusterMap.ValueRO.AllProducersList, 1, state.Dependency);
         }
-        _accumulatedTime += SystemAPI.Time.DeltaTime;
-        var tickInfoData = SystemAPI.GetSingleton<TickInfoData>();
-        
-        _frameCount++; 
-        if (_frameCount % tickInfoData.currTickPerSecond == 0) 
+        var query = SystemAPI.QueryBuilder().WithAll<IsTickFrame>().Build();
+        if (query.IsEmpty) return;
+        else
         {
             if (!SystemAPI.HasSingleton<ClusterMap>())
                 return;
@@ -177,7 +172,6 @@ public partial struct ItemDistributionSystem : ISystem
             state.Dependency= new ExcessCleanupJob{ECB=ecb.AsParallelWriter(),mapEntity=mapEntity}.ScheduleParallel(state.Dependency);
             
             transactions.Dispose(state.Dependency);
-            _accumulatedTime = 0; 
         }
     }
 

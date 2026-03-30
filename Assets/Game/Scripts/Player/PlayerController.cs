@@ -45,7 +45,6 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     InputAction RotateBuilding;
     InputAction ForceBuilding;
     InputAction Hold;
-    InputAction spawn;
     
     RaycastHit hit;
 
@@ -122,7 +121,6 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         RotateBuilding = Building.FindAction("Rotate");
         ForceBuilding = Building.FindAction("ForceBuilding");
         Hold = GamePlay.FindAction("Hold");
-        spawn = GamePlay.FindAction("Spawn");
     }
 
     void SetUp()
@@ -136,16 +134,8 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         SwitchToUIMode();
 
         handler.onBuildingSelected += SetUpAction;
-        spawn.performed+=Spawn;
         
         gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);
-    }
-    void Spawn(InputAction.CallbackContext context)
-    {
-        if (context.performed)
-        {
-           gameController.SpawnMobs();
-        }
     }
 
     void Update()

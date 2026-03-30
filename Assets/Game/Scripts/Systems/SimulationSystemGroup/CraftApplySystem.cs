@@ -81,6 +81,7 @@ public partial struct CraftApplySystem : ISystem
         public void Execute(Entity entity,in DynamicBuffer<InputConstructionSlotData> input)
         {
             bool shouldRealize=true;
+            
             foreach(var s in input)
             {
                 if(s.Amount!=s.Capacity)

@@ -80,7 +80,7 @@ public partial class BuildingChangeVisualSystem : SystemBase
         {
             if (!connect.ValueRO) continue;
             var en=reference.buildingOnScene as EnergyBuildingOnScene;
-            bool isConnected=EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity);
+            bool isConnected=EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity)&&!EntityManager.IsComponentEnabled<SwitchIsOff>(entity);
             foreach(var c in energyData.connections)
             {
                 var nodefrom=en.nodes[c.Item1];

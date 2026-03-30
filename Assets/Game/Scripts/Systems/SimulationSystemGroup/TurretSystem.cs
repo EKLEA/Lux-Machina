@@ -20,6 +20,7 @@ public partial struct TurretSystem : ISystem
         var itemsConfigReference = SystemAPI.GetSingleton<ItemsConfigReference>();
         var ecbSingleton = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>();
         var query = state.EntityManager.CreateEntityQuery(typeof(ProjectilePrefabElement));
+         var settings = SystemAPI.GetSingleton<WorldTime>(); 
         if (query.IsEmptyIgnoreFilter) return;
         
         // Получаем сущность синглтона
@@ -33,7 +34,7 @@ public partial struct TurretSystem : ISystem
             ShooterTagLookup = SystemAPI.GetComponentLookup<ShooterTag>(true), 
             ProjectilePrefabElementLookUp = SystemAPI.GetBufferLookup<ProjectilePrefabElement>(true),
             ConfigEntity = configEntity,
-            DeltaTime = SystemAPI.Time.DeltaTime,
+            DeltaTime = SystemAPI.Time.DeltaTime*settings.SpeedMultiplier,
             ECB = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter()
         };
 

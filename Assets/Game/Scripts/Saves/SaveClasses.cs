@@ -1,19 +1,20 @@
 using System;
-using System.Collections.Generic;
-using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Collections;
 
 
 [Serializable]
-public class RoadSaveData
+public struct ManyPointsBuildingSaveData
 {
-    public int2[] points;
+    
+    public int buildingID;
+    public FixedList512Bytes<int2> points; 
     public bool isBlueprint;
     public bool IsDemolition;
 }
 
 [Serializable]
-public class BaseBuildingSaveData
+public struct BaseBuildingSaveData
 {
     public int buildingID;
     public int2 buildingPosition;
@@ -21,27 +22,39 @@ public class BaseBuildingSaveData
     public bool isBlueprint;
     public bool IsDemolition;
 }
+
 [Serializable] 
-public class BuildingEnergyNetvorkLinkSaveData
+public struct BuildingEnergyNetvorkLinkSaveData
 {
-    public List<(int2,int2)> entitesLink;//x-node y -entity
+    public FixedList128Bytes<EntityLink> entitesLink; 
+    public bool isSwitchOff;
 }
+
 [Serializable]
-public class ConstructionSlotsSaveData
+public struct EntityLink
+{
+    public int2 from;
+    public int2 to;
+}
+
+[Serializable]
+public struct ConstructionSlotsSaveData
 {
     public bool isInputEnabled;
     public bool isOutputEnabled;
     public DistributionPriority priority;
-    public List<InputConstructionSlotData> InputConstructionItems;
-    public List<OutputConstructionSlotData> OutputConstructionItems;
+    public FixedList512Bytes<InputConstructionSlotData> InputConstructionItems;
+    public FixedList512Bytes<OutputConstructionSlotData> OutputConstructionItems;
 }
+
 [Serializable]
-public class ExcessSlotsSaveData
+public struct ExcessSlotsSaveData
 {
-    public List<ExcessSlotData> ExcessItems;
+    public FixedList512Bytes<ExcessSlotData> ExcessItems;
 }
+
 [Serializable]
-public class RecipeAndCraftBuildingSaveData
+public struct RecipeAndCraftBuildingSaveData
 {
     public int RecipeID;
     public float CurrTime;
@@ -50,12 +63,13 @@ public class RecipeAndCraftBuildingSaveData
     public bool isOutputEnabled;
     public int ContOfPack;
     public DistributionPriority priority;
-    public List<InputSlotData> InputCrafttems;
-    public List<OutputSlotData> OutputCrafttems;
+    public FixedList512Bytes<InputSlotData> InputCrafttems;
+    public FixedList512Bytes<OutputSlotData> OutputCrafttems;
 }
+
 [Serializable]
-public class StorageSlotsSaveData
+public struct StorageSlotsSaveData
 {
-    public List<StorageSlotData> slots;    
+    public FixedList512Bytes<StorageSlotData> slots;    
     public DistributionPriority priority;
 }

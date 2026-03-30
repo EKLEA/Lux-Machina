@@ -19,11 +19,10 @@ public class BaseEnemyAuthoring : MonoBehaviour
             AddBuffer<TakeDamage>(entity);
             AddComponent<HealthData>(entity);
             AddComponent<ForceDestroyTag>(entity);
-            AddComponent<SaveInfo>(entity);
+            AddComponent<SavableTag>(entity);
             AddComponent<LoadInfo>(entity);
 
             SetComponentEnabled<LoadInfo>(entity, false);
-            SetComponentEnabled<SaveInfo>(entity, false);
             SetComponentEnabled<ForceDestroyTag>(entity, false);
         }
     }
