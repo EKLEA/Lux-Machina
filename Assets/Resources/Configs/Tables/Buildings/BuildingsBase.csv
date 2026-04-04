@@ -5,7 +5,8 @@ Drill;Дрель;выфывф;drill;drillPrefab;2;0;3;3;3;1;100;5;20
 FurnaceFT;Печь первого уровня;выфывф;furnaceFT;furnaceFTPrefab;2;0;3;3;3;1;100;5;20
 ConstructionFT;Сборщик первого уровня;выфывф;constructionFT;constructionFTPrefab;2;0;3;3;3;1;100;5;20
 StorageFT;Хранилищие первого уровня;ывыфвыф;storageFT;storageFTPrefab;4;0;2;2;2;1;100;5;20
-Lep;Линия электро предач;saddsa;lep;lepPrefab;3;0;1;1;10;0;50;5;20
-Concentrator;Распределитель;sadsadsda;Concentrator;concentratorPrefab;3;0;2;2;10;0;50;5;20
+Lep;Линия электро предач;saddsa;lep;lepPrefab;3;0;1;10;1;0;50;5;20
+Concentrator;Распределитель;sadsadsda;Concentrator;concentratorPrefab;3;0;2;10;2;0;50;5;20
 Turret;туррель;asdsadsda;turret;turretPrefab;5;0;2;3;2;1;100;5;50
 Artillery;артилерия;фыввыффыв;artillery;artilleryPrefab;5;0;3;3;3;1;100;5;100
+FurnaceST;Печь второго уровня;вфывфвы;furnaceST;furnaceSTPrefab;2;0;5;5;5;1;500;5;100

@@ -6,13 +6,22 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 
 
-public abstract class UIScreen :MonoBehaviour, IInitializable
+public abstract class UIScreen :MonoBehaviour, IInitializable,IDisposable
 {
     public ReactiveProperty<bool> isOpened{ get; protected set; }
     public virtual void Close()
     {
         isOpened.Value = false;
         gameObject.SetActive(false);
+    }
+
+    public void Dispose()
+    {
+        isOpened=null;
+    }
+    void OnDestroy()
+    {
+        Dispose();
     }
 
     public virtual void Initialize()

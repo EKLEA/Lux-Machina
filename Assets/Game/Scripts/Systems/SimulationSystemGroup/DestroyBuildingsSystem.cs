@@ -44,7 +44,8 @@ public partial struct DestroyBuildingsSystem : ISystem
                 Map=mapEntity,
                 EntityDictionary=entitiesRW.ValueRW,
                 ECB=ecb,
-                RoadLookup=SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(true)
+                RoadLookup=SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(true),
+                CoreBuildingTagLookup=SystemAPI.GetComponentLookup<CoreBuildingTag>(true)
             };
             state.Dependency=deleteBJoB.Schedule(state.Dependency);
         }
@@ -72,7 +73,8 @@ public partial struct DestroyBuildingsSystem : ISystem
         public Entity Map;
         public EntityCommandBuffer ECB;
         [ReadOnly] public ComponentLookup<RoadTypeBuildingTag> RoadLookup;
-                public void Execute(Entity entity, in BuildingData buildingData,in BuildingPosData posData)
+        [ReadOnly] public ComponentLookup<CoreBuildingTag> CoreBuildingTagLookup;
+        public void Execute(Entity entity, in BuildingData buildingData,in BuildingPosData posData)
         {
             if (MapData.CellEntityMultiMap.ContainsKey(entity))
             {
@@ -90,6 +92,12 @@ public partial struct DestroyBuildingsSystem : ISystem
                 
                 MapData.CellEntityMultiMap.Remove(entity);
                 EntityDictionary.Entities.Remove(buildingData.BuildingUniqueID);
+                if (CoreBuildingTagLookup.HasComponent(entity))
+                {
+                    ECB.SetComponentEnabled<IsPause>(Map,true);
+                    ECB.SetComponentEnabled<IsGameOver>(Map,true);
+                    ECB.SetComponentEnabled<SavingMapTag>(Map,true);
+                } 
                 ECB.DestroyEntity(entity);
                 ECB.SetComponentEnabled<UpdateClusterSlots>(Map,true);
                 ECB.SetComponentEnabled<UpdateMapTag>(Map,true);

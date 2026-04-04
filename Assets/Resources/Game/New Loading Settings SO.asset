@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: New Loading Settings SO
   m_EditorClassIdentifier: 
   LoadingImages: []
-  TimeOfFade: 0.75
+  TimeOfFade: 0.25
   Smoothness: 0

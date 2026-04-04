@@ -58,7 +58,7 @@ public class RecipesAndItemsWindow : UIScreen
             bt.onClick.RemoveAllListeners();
             bt.gameObject.SetActive(false);
         }
-        
+       
         var items=itemsInfo.ItemsInfos.Where(f=>ItemTypes.Contains(f.Value.ItemType)).Select(f=>f.Value);
         HashSet<ItemClass> classes=items.Select(f=>f.ItemClass).ToHashSet();
         int i=0;

@@ -1,4 +1,5 @@
 ﻿id;typeOfProcession;requiredRecipesGroup
-Drill;2;2
-FurnaceFT;1;1
-ConstructionFT;1;3
+Drill;2;1
+FurnaceFT;1;2
+ConstructionFT;1;4
+FurnaceST;1;2,3

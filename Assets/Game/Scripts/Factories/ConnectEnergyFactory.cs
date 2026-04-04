@@ -75,7 +75,21 @@ public class ConnectEnergyFactory
         line.lineRenderer.SetPosition(0, owner);
         line.lineRenderer.SetPosition(1, target);
     }
-
+    public void UpdateLuxBall(LuxBall luxBall,bool IsConnecting)
+    {
+        if(IsConnecting)
+        {
+            
+            Debug.Log(1);
+            luxBall.ChangeColor(energyLineConfig.ConnectionColor,energyLineConfig.ConnectionPulseColor);
+        }
+        else
+        {
+            
+            Debug.Log(2);
+            luxBall.ChangeColor(energyLineConfig.DisconnectColor,energyLineConfig.DisconnectPulseColor);
+        }
+    }
     public void ResetLine(EnergyNode node)
     {
         if (node.energyLine.lineRenderer != null)

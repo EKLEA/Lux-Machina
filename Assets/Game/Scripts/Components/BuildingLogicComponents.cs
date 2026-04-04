@@ -7,6 +7,7 @@ using Unity.Mathematics;
 #region классификация построек
 public struct BuildingTag : IComponentData{}
     
+    public struct CoreBuildingTag : IComponentData{}
     public struct RoadTypeBuildingTag : IComponentData{}
     public struct ProcessorTypeBuildingTag:IComponentData{}
     public struct ProducerTypeBuildingTag:IComponentData{}

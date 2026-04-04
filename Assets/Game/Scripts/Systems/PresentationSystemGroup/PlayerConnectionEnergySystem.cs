@@ -192,7 +192,6 @@ public partial class PlayerConnectionEnergySystem : SystemBase
         }
         else
         {
-            Debug.Log("invoke");
             onActionDone?.Invoke();
         }
     }

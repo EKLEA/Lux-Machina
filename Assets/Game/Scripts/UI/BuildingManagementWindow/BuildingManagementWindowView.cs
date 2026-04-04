@@ -6,6 +6,7 @@ using UniRx;
 using Zenject;
 using Unity.Entities;
 using System.Linq;
+using System.Collections;
 
 public class BuildingManagementWindowView:DragableUIWindow
 {
@@ -18,14 +19,12 @@ public class BuildingManagementWindowView:DragableUIWindow
     [SerializeField] Image workIndicatorOrb;
     [SerializeField] TextMeshProUGUI workIndicatorText;
     [SerializeField] Button DestroyBT;
-    [SerializeField] Button SwitchEnergy;
     [SerializeField] Image BuildingSprite;
     [SerializeField] TextMeshProUGUI BuildingText;
     [SerializeField] TextMeshProUGUI BuildingDescriptionText;
     [Header("Heads")]
     [SerializeField] Transform CraftArea;
     [SerializeField] Transform StorageArea;
-    [SerializeField] Transform EnergyArea;
     [SerializeField] Transform ConstructionArea;
     [SerializeField] Transform ExcessItemsArea;
     [SerializeField] RecipesAndItemsWindow RecipesAndItemsHead;
@@ -143,6 +142,8 @@ public class BuildingManagementWindowView:DragableUIWindow
         }
         fC=0;
         base.Open();
+        
+        StartCoroutine(DeferredResize());
     }
     void UpdateState(int state)
     {
@@ -181,6 +182,7 @@ public class BuildingManagementWindowView:DragableUIWindow
             RecipeIndicator.gameObject.SetActive(false);
             ChangeRecipeBT.onClick.AddListener(()=>
             {
+
                 if(!recipeViewData.Item1&&RecipesAndItemsHead.isOpened.Value) return;
 
                 if (recipeViewData.Item1&&recipeViewData.Item2.recipeIDHash!=-1)
@@ -190,6 +192,7 @@ public class BuildingManagementWindowView:DragableUIWindow
                 CraftSlotsHead.gameObject.SetActive(false);
                 RecipesAndItemsHead.SetUpWindowAsRecipesByRecipeGroup(
                     buildingInfo.BuildingProcessionInfos[buildingViewData.buildingID].requiredRecipesGroup.ToHashSet());
+                UpdateWithResize();
             });     
             RecipesAndItemsHead.onItemChoosed += (value) => 
             {
@@ -256,8 +259,10 @@ public class BuildingManagementWindowView:DragableUIWindow
                     RecipesAndItemsHead.SetUpWindowAsItemsByItemClasses(
                         buildingInfo.BuildingStorageInfos[buildingViewData.buildingID].ItemsTypes.Count>0?
                         buildingInfo.BuildingStorageInfos[buildingViewData.buildingID].ItemsTypes.ToHashSet():
-                        Enum.GetValues(typeof(ItemType)).Cast<ItemType>()
+                        Enum.GetValues(typeof(ItemType)).Cast<ItemType>().Where(f=>f!=ItemType.None)
                                  .ToHashSet());
+                
+                UpdateWithResize();
             });
 
             RecipesAndItemsHead.onItemChoosed += (value) => 
@@ -529,7 +534,11 @@ public class BuildingManagementWindowView:DragableUIWindow
         base.Close();
     }
     
-       
+    IEnumerator DeferredResize()
+    {
+        yield return new WaitForEndOfFrame(); 
+        UpdateWithResize(); 
+    }
    private bool _pendingSetup = false;
     public void UpdateView()
     {
@@ -539,6 +548,7 @@ public class BuildingManagementWindowView:DragableUIWindow
         if (windowChanged)
         {
             windowChanged = false;
+            
             _pendingSetup = true; 
             return; 
         }
@@ -553,6 +563,7 @@ public class BuildingManagementWindowView:DragableUIWindow
         if (fC % 4 == 0)
         {
             if(gameController.GetEntity(buildingViewData.buildingID,out var en)&&en!=buildingViewData.buildingEntity) Close();
+            
             model.FixedUpdate();
             fC = 0;
         }

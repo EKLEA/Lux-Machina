@@ -96,8 +96,12 @@ public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
 }
 
 
-    public void DeleteSave()
+    public void DeleteSave(int index)
     {
+        SavePath = Path.Combine(
+        Application.persistentDataPath,
+        string.Format("savegame{0}.json", index)
+        );
         if (File.Exists(SavePath))
         {
             File.Delete(SavePath);
@@ -108,6 +112,7 @@ public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
     GameStateData GenerateDefault()
     {
         var save = new GameStateData();
+        save.IsGameOver=false;
         save.CurrTick=0;
         save.EnemyAiConfig=new();
         save.Buildings=new();

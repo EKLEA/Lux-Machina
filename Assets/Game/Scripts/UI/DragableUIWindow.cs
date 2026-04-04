@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 public abstract class DragableUIWindow : UIScreen,IDragableWindow
 {
@@ -65,6 +66,15 @@ public abstract class DragableUIWindow : UIScreen,IDragableWindow
     void IEndDragHandler.OnEndDrag(PointerEventData eventData)
     {
         isValidDrag = false;
+    }
+    public void UpdateWithResize()
+    {
+        // 1. Заставляем UI пересчитать размеры немедленно
+        LayoutRebuilder.ForceRebuildLayoutImmediate(windowToMove);
+        Canvas.ForceUpdateCanvases();
+
+        // 2. Теперь Clamp увидит актуальные windowToMove.rect.size
+        ClampToCanvasBounds();
     }
     void ClampToCanvasBounds()
     {

@@ -15,6 +15,8 @@ public partial struct EnemyAISystem : ISystem
    
     EntityQuery _spawnMobs;
     EntityQuery _enemies;
+    
+    EntityQuery _IsPause;
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<BuildingMap>();
@@ -27,12 +29,17 @@ public partial struct EnemyAISystem : ISystem
             .WithAll<EnemyStats>()
             .WithDisabled<LoadInfo>()
             .Build(ref state);
+         _IsPause= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<IsPause,BuildingMap>()
+            .Build(ref state);
 
         
     }
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        
+        if(!_IsPause.IsEmpty) return;
         var map = SystemAPI.GetSingleton<BuildingMap>();
         var turretMap = SystemAPI.GetSingletonRW<TurretGrid>();
         var managerEntity = SystemAPI.GetSingletonEntity<BuildingMap>();

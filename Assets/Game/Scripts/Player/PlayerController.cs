@@ -4,6 +4,7 @@ using NUnit.Framework;
 using UniRx;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -33,6 +34,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     [Inject] PlayerConnectionEnergySystem playerConnectionEnergySystem; 
     [Inject] GridUpdateSystem gridUpdateSystem; 
     InputActionMap GamePlay;
+    InputActionMap Menu;
     InputActionMap UI;
     InputActionMap Building;
 
@@ -45,8 +47,14 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     InputAction RotateBuilding;
     InputAction ForceBuilding;
     InputAction Hold;
+
+    //gamePlay actions
+    InputAction Pause;
+    //menu
+    InputAction Escape;
     
     RaycastHit hit;
+
 
 
     public int rotation {get;private set;}
@@ -69,6 +77,10 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     Color selectColor;
     BuildingOnScene cachedBuilding;
     PlayerState playerState;
+    IDisposable menuSub;
+    private void OnPauseNormal(InputAction.CallbackContext context) => OnPausePerformed(context, false);
+private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerformed(context, true);
+
     public void Initialize(PlayerPlaceBuildingSystem buildSystem, PlayerPlaceRoadSystem roadSystem,PlayerDeleteBuildingsSystem deleteBuildingsSystem,PlayerConnectionEnergySystem connSystem,GridUpdateSystem gridSystem)
     {
         playerPlaceBuildingSystem = buildSystem;
@@ -76,10 +88,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         playerDeleteBuildingsSystem=deleteBuildingsSystem;
         playerConnectionEnergySystem=connSystem;
         gridUpdateSystem=gridSystem;
-    }
-    void Start()
-    {
-        SetUp();
+         SetUp();
         isLoaded = true;
         entityManager= World.DefaultGameObjectInjectionWorld.EntityManager;
         PlaceCommand=entityManager.CreateEntity();
@@ -102,11 +111,17 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         entityManager.AddBuffer<MapPoint>(PlaceCommand); 
         gridVisualizer.Init();
     }
+    void OnDestroy() 
+    {
+        Dispose();
+        
+    }
     void BindMaps()
     {
         GamePlay = playerInput.FindActionMap("GamePlay");
         UI = playerInput.FindActionMap("UI");
         Building = playerInput.FindActionMap("Building");
+        Menu = playerInput.FindActionMap("Menu");
     }
 
     void BindUIActions()
@@ -122,20 +137,35 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         ForceBuilding = Building.FindAction("ForceBuilding");
         Hold = GamePlay.FindAction("Hold");
     }
+    void BindGamePlayActions()
+    {
+        Pause=GamePlay.FindAction("Pause");
+        Escape=Menu.FindAction("Escape");
+    }
 
     void SetUp()
     {
         BindMaps();
         BindUIActions();
         BindBuildingActions();
-
+        BindGamePlayActions();
+        GamePlay.Enable(); 
+        Menu.Enable(); 
         Building.Disable();
         UI.Disable(); 
         SwitchToUIMode();
 
         handler.onBuildingSelected += SetUpAction;
         
+        Pause.performed += OnPauseNormal;
+        Escape.performed += OnPauseEscape;
         gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);
+        menuSub = manager.pauseMenu.isOpened.Subscribe(value =>
+        {
+            if(value)
+                GamePlay.Disable();
+            else GamePlay.Enable();
+        });
     }
 
     void Update()
@@ -343,6 +373,28 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
             }
         }
     }
+    void OnPausePerformed(InputAction.CallbackContext context, bool isEscapeMenu)
+    {
+        if (!context.performed) return;
+        if (isEscapeMenu)
+        {
+            if (manager.pauseMenu.isOpened.Value)
+            {
+                manager.ClosePauseMenu();
+                gameController.SetPause(false); 
+            }
+            else
+            {
+                manager.ShowPauseMenu(PauseMenuType.pause);
+                gameController.SetPause(true);  
+            }
+        }
+        else
+        {
+             gameController.TogglePause();
+        }
+    }
+
 
     void OpenBuildingMenu(int buildingID)
     {
@@ -407,7 +459,8 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         PlacePoint.performed-= OnBuildingPlacePerformed;
         Back.performed -= OnBackPerformed;
         RotateBuilding.performed -= OnRotateBuildingPerformed;
-
+        
+        
         Building.Disable();
         UI.Disable();
 
@@ -415,15 +468,22 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         playerPlaceBuildingSystem.onBuildingDone -= SwitchToUIMode;
     }
 
-    void OnDestroy()
-    {
-        Dispose();
-    }
+    
 
     public void Dispose()
     {
         ClearAction();
+        Pause.performed -= OnPauseNormal;
+        Escape.performed -= OnPauseEscape;
 
+        UIClick.Dispose();
+        PlacePoint.Dispose();
+        Back.Dispose();
+        RotateBuilding.Dispose();
+        Pause.Dispose();
+        Escape.Dispose();
+
+        menuSub?.Dispose();
         if (handler != null)
             handler.onBuildingSelected -= SetUpAction;
     }

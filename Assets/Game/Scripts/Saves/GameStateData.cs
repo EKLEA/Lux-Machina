@@ -5,6 +5,7 @@ using Unity.Mathematics;
 [Serializable]
 public class GameStateData
 {
+    public bool IsGameOver;
     public long CurrTick;    
     public int TicksPerDay;       
     public float dayLength;

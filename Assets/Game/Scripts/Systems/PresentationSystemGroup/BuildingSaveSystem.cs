@@ -15,20 +15,33 @@ using Zenject;
 public partial class BuildingSaveSystem : SystemBase
 {
     EntityQuery SaveLoadInfo;
+    EntityQuery GameOver;
+    public event Action OnGameOver;
     [Inject] IGameStateSaver saveData;
+    bool isInvoked;
     protected override void OnCreate()
     {
         SaveLoadInfo= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<BuildingMap,SavingMapTag>()
             .Build(World.EntityManager);
+        GameOver= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<IsGameOver,BuildingMap>()
+            .Build(World.EntityManager);
+            isInvoked=false;
     }
     protected override void OnUpdate()
     {
-        var ecb = new EntityCommandBuffer(Allocator.Temp);
+        if(isInvoked) return;
+        if (!GameOver.IsEmpty&&!isInvoked)
+        {
+            OnGameOver?.Invoke();
+            isInvoked=true;
+        }
         if(SaveLoadInfo.IsEmpty) return;
         var save = new GameStateData(); 
 
         var time=SystemAPI.GetSingleton<WorldTime>();
+        save.IsGameOver=isInvoked;
         save.CurrTick=time.CurrentTick;
         save.TicksPerDay=time.TicksPerDay;
         save.dayLength=time.dayLength;
@@ -85,6 +98,8 @@ public partial class BuildingSaveSystem : SystemBase
             IsInputCraftEnabledLookUp=IsInputCraftEnabledLookUp,
             IsOutputCraftEnabledLookUp=IsOutputCraftEnabledLookUp
             }.ScheduleParallel(handle);
+
+            
         handle= new EnegrySaveJob{buildingEnergyNetvorkLinkSaveData=buildingEnergyNetvorkLinkSaveData.AsParallelWriter(),SwitchIsOffLookUp=SwitchIsOffLookUp}.ScheduleParallel(handle);
         handle= new StorageSaveJob{storageSlotsSaveData=storageSlotsSaveData.AsParallelWriter()}.ScheduleParallel(handle);
         handle.Complete();
@@ -278,7 +293,6 @@ public partial class BuildingSaveSystem : SystemBase
                 if(c.Item2.x==-1) continue;
                 entitesLink.Add(new EntityLink{from = new int2(c.Item1,buildingData.BuildingUniqueID),to=c.Item2});
             }
-            if(entitesLink.Length==0) return;
             buildingEnergyNetvorkLinkSaveData.TryAdd(buildingData.BuildingUniqueID,new BuildingEnergyNetvorkLinkSaveData {entitesLink=entitesLink,isSwitchOff=SwitchIsOffLookUp.HasComponent(entity)&&SwitchIsOffLookUp.IsComponentEnabled(entity)});
         }
     }

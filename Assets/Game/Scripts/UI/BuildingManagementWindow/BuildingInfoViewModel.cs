@@ -450,16 +450,6 @@ public class BuildingInfoViewModel
                .CreateCommandBuffer();
         ecb.SetComponentEnabled<ChangeDemolitionStateTag>(viewData.buildingEntity,IsDemolition);
     }
-    public void TurnSwitch()
-    {
-        if (entityManager.HasComponent<SwitchIsOff>(viewData.buildingEntity))
-        {
-              var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
-               .CreateCommandBuffer();
-            ecb.SetComponentEnabled<SwitchIsOff>(viewData.buildingEntity,!entityManager.IsComponentEnabled<SwitchIsOff>(viewData.buildingEntity));
-            ecb.SetComponentEnabled<UpdateConnectStatus>(viewData.buildingEntity,!entityManager.IsComponentEnabled<SwitchIsOff>(viewData.buildingEntity));
-        }
-    }
     public void MarkAsForceDestory()
     {
         var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
@@ -474,7 +464,6 @@ public class BuildingInfoViewModel
         
         if (entityManager.HasBuffer<StorageSlotData>(viewData.buildingEntity))
         {
-            Debug.Log("ssdds");
             var ecb= world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
                 .CreateCommandBuffer();
             var buff=entityManager.GetBuffer<StorageSlotData>(viewData.buildingEntity);
@@ -507,6 +496,7 @@ public class BuildingInfoViewModel
             .CreateCommandBuffer();
             
             ecb.SetComponentEnabled<SwitchIsOff>(viewData.buildingEntity,!entityManager.IsComponentEnabled<SwitchIsOff>(viewData.buildingEntity));
+            ecb.SetComponentEnabled<UpdateConnectStatus>(viewData.buildingEntity,true);
             var buildingMap = entityManager.CreateEntityQuery(typeof(BuildingMap)).GetSingletonEntity();
             ecb.SetComponentEnabled<UpdateConnectionsTag>(buildingMap,true);
         }

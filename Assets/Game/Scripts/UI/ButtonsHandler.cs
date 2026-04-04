@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEngine;
 using Zenject;
 
-public class ButtonsHandler : MonoBehaviour,IInitializable
+public class ButtonsHandler : UIScreen
 {
     Dictionary<int, UIScreen> Screens;
     [SerializeField] ScreenPair[] Pairs;
@@ -13,12 +13,14 @@ public class ButtonsHandler : MonoBehaviour,IInitializable
         Screens[id].Open();
     }
 
-    public void Initialize()
+    public override void Initialize()
     {
+        
         Screens = new();
         Screens = Pairs.ToDictionary(f => f.key, f => f.UIScreen);
         foreach (var s in Pairs)
             s.UIScreen.Initialize();
+        base.Initialize();
     }
 }
 [Serializable]

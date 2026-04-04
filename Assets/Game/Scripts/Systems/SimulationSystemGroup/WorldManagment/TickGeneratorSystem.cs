@@ -1,8 +1,7 @@
-using Unity.Entities;
-using Unity.Mathematics;
-using Unity.Rendering; // Для доступа к свету
-using Unity.Transforms;
 
+using Unity.Collections;
+using Unity.Entities;
+using UnityEngine;
 
 [UpdateInGroup(typeof(SimulationSystemGroup), OrderFirst = true)]
 public partial struct TickGeneratorSystem : ISystem
@@ -10,13 +9,18 @@ public partial struct TickGeneratorSystem : ISystem
     private float accumulator;
     private bool wasDayLastTick;
     private bool isFirstFrame; 
+    EntityQuery _IsPause;
     public void OnCreate(ref SystemState state)
     {
         isFirstFrame=true;
+         _IsPause= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<IsPause,BuildingMap>()
+            .Build(ref state);
     }
 
     public void OnUpdate(ref SystemState state)
     {
+        
         if (!SystemAPI.TryGetSingletonRW<WorldTime>(out var timeHandle)) return;
         if (isFirstFrame)
         {
@@ -24,6 +28,8 @@ public partial struct TickGeneratorSystem : ISystem
             isFirstFrame = false;
         }
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
+        
+        if(!_IsPause.IsEmpty) return;
         var ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>()
                 .CreateCommandBuffer(state.WorldUnmanaged);
         Entity timeHandleEntity = SystemAPI.GetSingletonEntity<WorldTime>();
@@ -31,7 +37,7 @@ public partial struct TickGeneratorSystem : ISystem
         float speedMult = timeHandle.ValueRO.SpeedMultiplier;
 
         accumulator += SystemAPI.Time.DeltaTime * speedMult;
-
+        
         while (accumulator >= baseTick)
         {
             timeHandle.ValueRW.CurrentTick++;

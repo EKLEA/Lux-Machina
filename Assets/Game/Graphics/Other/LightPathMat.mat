@@ -27,7 +27,7 @@ Material:
   m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 2
-  m_EnableInstancingVariants: 0
+  m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
@@ -84,11 +84,11 @@ Material:
     - _QueueOffset: 0
     - _Softness: 0.1
     m_Colors:
-    - _Color: {r: 3.2111173, g: 0, b: 0.088860504, a: 1}
+    - _Color: {r: 0, g: 3.2111173, b: 0.15130919, a: 1}
     - _GlowColor: {r: 0, g: 0, b: 0, a: 0}
     - _LineColor: {r: 0.07583425, g: 1, b: 0, a: 1}
     - _MainSpeed: {r: -0.5, g: 0, b: 0, a: 0}
-    - _PulseColor: {r: 118.03536, g: 0, b: 4.7681255, a: 0.7529412}
+    - _PulseColor: {r: 3.768972, g: 5.2164755, b: 0, a: 0.7529412}
     - _ScrollSpeed: {r: 1, g: 0, b: 0, a: 0}
     - _Speed: {r: 0.1, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []

@@ -20,6 +20,14 @@
             "requiredRecipesGroup": [
                 4
             ]
+        },
+        {
+            "BuildingID": "FurnaceST",
+            "typeOfProcession": 1,
+            "requiredRecipesGroup": [
+                2,
+                3
+            ]
         }
     ]
 }

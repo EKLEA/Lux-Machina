@@ -13,13 +13,18 @@ using UnityEngine;
 public partial struct CraftSystem : ISystem
 {
     
+    EntityQuery _IsPause;
     public void OnCreate(ref SystemState state)
     {
-        
+         _IsPause= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<IsPause,BuildingMap>()
+            .Build(ref state);
         
     }
     public void OnUpdate(ref SystemState state)
     {
+        
+        if(!_IsPause.IsEmpty) return;
         var query = SystemAPI.QueryBuilder().WithAll<IsTickFrame>().Build();
         if (query.IsEmpty) return;
 

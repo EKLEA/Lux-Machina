@@ -340,7 +340,7 @@ public class ConfigService
             return null;
         }
 
-        var prefab = GetOrLoadPrefab($"Prefabs/{building.prefabPath}");
+        var prefab = GetOrLoadPrefab($"Prefabs/Buildings/{building.prefabPath}");
         if (prefab == null)
         {
             Debug.LogError(

@@ -16,6 +16,8 @@ public partial struct ItemDistributionSystem : ISystem
     
     EntityQuery _deleteBuildingsQuery;
     EntityQuery _realizeBuildingsQuery;
+    
+    EntityQuery _IsPause;
     public void OnCreate(ref SystemState state)
     {
         MapUpdate=new EntityQueryBuilder(Allocator.Temp).WithAll<ClusterMap,UpdateClusterSlots>().Build(ref state);
@@ -28,9 +30,14 @@ public partial struct ItemDistributionSystem : ISystem
             .WithAll<IsBlueprint>()
             .WithDisabled<ChangeBluePrintState,ForceDestroyTag,IsDemolition>()
             .Build(ref state);
+         _IsPause= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<IsPause,BuildingMap>()
+            .Build(ref state);
     }
     public void OnUpdate(ref SystemState state)
     {
+        
+        if(!_IsPause.IsEmpty) return;
         var clusterMap= SystemAPI.GetSingletonRW<ClusterMap>();
         var mapEntity= SystemAPI.GetSingletonEntity<ClusterMap>();
         var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();

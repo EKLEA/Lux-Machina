@@ -13,6 +13,8 @@ public partial struct CraftApplySystem : ISystem
 {
     EntityQuery _deleteBuildingsQuery;
     EntityQuery _realizeBuildingsQuery;
+    
+    EntityQuery _IsPause;
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<BuildingMap>();
@@ -24,9 +26,14 @@ public partial struct CraftApplySystem : ISystem
             .WithAll<IsBlueprint>()
             .WithDisabled<ChangeBluePrintState,ForceDestroyTag,IsDemolition>()
             .Build(ref state);
+         _IsPause= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<IsPause,BuildingMap>()
+            .Build(ref state);
     }
     public void OnUpdate(ref SystemState state)
     {
+        
+        if(!_IsPause.IsEmpty) return;
         var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
         

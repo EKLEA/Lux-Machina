@@ -16,6 +16,8 @@ public partial struct   HealthSystem: ISystem
    
     EntityQuery _deadlyOBJs;
     EntityQuery _enemiesForDead;
+    
+    EntityQuery _IsPause;
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<BuildingMap>();
@@ -27,12 +29,17 @@ public partial struct   HealthSystem: ISystem
         _enemiesForDead= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<EnemyStats>()
             .Build(ref state);
+         _IsPause= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<IsPause,BuildingMap>()
+            .Build(ref state);
 
         
     }
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        
+        if(!_IsPause.IsEmpty) return;
         var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
         var parallelEcb = ecb.AsParallelWriter(); 

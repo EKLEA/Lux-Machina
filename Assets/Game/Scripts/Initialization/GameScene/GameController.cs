@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+
 using Cysharp.Threading.Tasks;
 using Unity.Collections;
 using Unity.Entities;
@@ -24,32 +21,24 @@ public class GameController : IInitializable
     [Inject] UIManager UIManager;
     [Inject] DiContainer _container;
     [Inject] ConfigToBlob configToBlob;
+    [Inject] SceneLoader _sceneLoader;
     Entity Map;
-    public float Timestep{get;private set;}
+    public bool IsInitialized{get;private set;}
+    public bool isPause{get;private set;}
     
     public GameController() 
     {
         World = DefaultWorldInitialization.Initialize("Game Scene World");
     }
+    public (WorldTime time,bool isPaused) GetCurrTime()
+    {
+        var time =World.EntityManager.GetComponentData<WorldTime>(Map);
+        return(time,World.EntityManager.IsComponentEnabled<IsPause>(Map));
+    }
     public void Initialize()
     {
-        Timestep=1 / gameFieldSettings.tickPerSecond;
-        //fixedStepSimulationSystemGroup.Timestep = Timestep;
-
-
+        IsInitialized=false;
         LoadGame();
-    }
-
-    public void SpeedUpTick()
-    {
-        Timestep/=2;
-        //.Timestep =Timestep;
-    }
-
-    public void SlowDownTick()
-    {
-        Timestep*=2;
-       // fixedStepSimulationSystemGroup.Timestep = Timestep;
     }
   
     public Vector2Int GetMapPos(Vector3 pos)
@@ -64,6 +53,14 @@ public class GameController : IInitializable
         await _loadingService.LoadWithProgressAsync(saveService.LoadGameState, LoadGameField);
          
     }
+    public void SetSpeedMul(float speed)
+    {
+        var ecb= World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
+               .CreateCommandBuffer();
+        var time =World.EntityManager.GetComponentData<WorldTime>(Map);
+        time.SpeedMultiplier=math.max(1,speed);
+        ecb.SetComponent(Map,time);
+    }
     public void SaveGame()
     {
         var ecb= World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
@@ -71,7 +68,26 @@ public class GameController : IInitializable
         ecb.SetComponentEnabled<SavingMapTag>(Map,true);
          
     }
+    public void SetPause(bool state)
+    {
+        
+        var ecb = World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>()
+                    .CreateCommandBuffer();
+        
+        ecb.SetComponentEnabled<IsPause>(Map, state);
+        isPause = state;
+    }
 
+    public void TogglePause() => SetPause(!isPause);
+    async UniTask GoToMenu()
+    {
+        
+        await _loadingService.ShowBlackScreenForce(false);
+        World.Dispose();
+        await _sceneLoader.LoadSceneAsync("MainMenu");
+        
+        await _loadingService.LoadWithProgressAsync();
+    }
     public bool GetEntity(int id,out Entity entity)
     {
        var buildingEntities= World.EntityManager.GetComponentData<EntitiesDictionary>(Map);
@@ -87,7 +103,7 @@ public class GameController : IInitializable
     {
         await configToBlob.LoadConfigs(World.EntityManager);
         var save = saveService.GameState;
-
+        UIManager.Initialize();
         await CreateMap(save);
         await CreateSystems(World);
         await LoadSavedEntities(save);
@@ -97,11 +113,11 @@ public class GameController : IInitializable
 
         cameraController.SetUp(save.camData);
         cameraController.enabled = true;
-        UIManager.Initialize();
-
+        
+        IsInitialized=true;
         await UniTask.Yield();
     }
-
+    
     async UniTask CreateSystems(World world)
     {
         var simGroup = world.GetOrCreateSystemManaged<SimulationSystemGroup>();
@@ -146,9 +162,13 @@ public class GameController : IInitializable
         RegisterManagedSystem<BuildingChangeVisualSystem>(presGroup);
         RegisterManagedSystem<ProccessDeletePointsSystem>(presGroup);
         RegisterManagedSystem<BuildingLoadSystem>(presGroup);
-        RegisterManagedSystem<BuildingSaveSystem>(presGroup);
+        var save = RegisterManagedSystem<BuildingSaveSystem>(presGroup);
         RegisterManagedSystem<SunUpdateSystem>(presGroup);
 
+        save.OnGameOver+=()=>UIManager.ShowPauseMenu(PauseMenuType.gameOver);
+
+        UIManager.onReturnToMenu+=() => GoToMenu().Forget(); 
+        
         var BuildSystem=RegisterManagedSystem<PlayerPlaceBuildingSystem>(presGroup);
         var RoadSystem= RegisterManagedSystem<PlayerPlaceRoadSystem>(presGroup);
         var deleteSystem= RegisterManagedSystem<PlayerDeleteBuildingsSystem>(presGroup);
@@ -220,12 +240,14 @@ public class GameController : IInitializable
          World.EntityManager.AddComponentData(Map, new WorldTime
         {
             CurrentTick=gameStateData.CurrTick,
-            TicksPerDay=400,
+            TicksPerDay=1200,
             SpeedMultiplier=1,
             baseTick=0.05f,
             dayLength=0.7f
         });
         World.EntityManager.AddComponent<IsTickFrame>(Map);
+        World.EntityManager.AddComponent<IsPause>(Map);
+        World.EntityManager.AddComponent<IsGameOver>(Map);
          World.EntityManager.AddComponentData(Map, new ProductionTable
         {
             produced=new(1000,Allocator.Persistent),
@@ -234,6 +256,8 @@ public class GameController : IInitializable
         World.EntityManager.AddComponent<LoadingMapTag>(Map);
         World.EntityManager.AddComponent<SavingMapTag>(Map);
         World.EntityManager.SetComponentEnabled<SavingMapTag>(Map,false);
+        World.EntityManager.SetComponentEnabled<IsPause>(Map,false);
+        World.EntityManager.SetComponentEnabled<IsGameOver>(Map,false);
 
 
         
@@ -303,7 +327,6 @@ public class GameController : IInitializable
                     buff.Add(new LinkNetworkEnergyTo{LinkFromBuilding=link.from,LinkToBuilding=link.to,});
                 }
                 World.EntityManager.AddComponentData(entity,new SwitchIsOffCreateData{SwitchIsOff=gameStateData.buildingEnergyNetvorkLinkSaveData[id].isSwitchOff});
-                Debug.Log(id);
             }
             World.EntityManager.SetComponentEnabled<IsBlueprint>(entity,pair.Value.isBlueprint);
             World.EntityManager.SetComponentEnabled<IsDemolition>(entity,pair.Value.IsDemolition);

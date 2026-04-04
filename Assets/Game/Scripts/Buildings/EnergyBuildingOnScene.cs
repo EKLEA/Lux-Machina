@@ -6,6 +6,7 @@ public class EnergyBuildingOnScene : BuildingOnScene
 {
     
     [SerializeField] EnergyNode[] energyNodes;
+    public LuxBall luxBall;
     public Dictionary<int,EnergyNode> nodes{get;private set;}
     public void SetUpNodes()
     {

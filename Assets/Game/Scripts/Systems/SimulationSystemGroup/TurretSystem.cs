@@ -14,8 +14,18 @@ using UnityEngine;
 [BurstCompile]
 public partial struct TurretSystem : ISystem
 {
+    
+    EntityQuery _IsPause;
+    public void OnCreate(ref SystemState state)
+    {
+         _IsPause= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<IsPause,BuildingMap>()
+            .Build(ref state);
+    }
     public void OnUpdate(ref SystemState state)
     {
+        
+        if(!_IsPause.IsEmpty) return;
         var grid = SystemAPI.GetSingleton<TurretGrid>();
         var itemsConfigReference = SystemAPI.GetSingleton<ItemsConfigReference>();
         var ecbSingleton = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>();

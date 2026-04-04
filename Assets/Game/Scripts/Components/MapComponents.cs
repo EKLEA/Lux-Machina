@@ -213,6 +213,8 @@ public struct WorldTime : IComponentData
     }
 }
 public struct IsTickFrame :IComponentData,IEnableableComponent{}
+public struct IsPause:IComponentData,IEnableableComponent{}
+public struct IsGameOver:IComponentData,IEnableableComponent{}
 public struct LoadingMapTag : IComponentData, IEnableableComponent { }
 public struct SavingMapTag : IComponentData, IEnableableComponent { }
 public struct ProductionTable : IComponentData, IDisposable

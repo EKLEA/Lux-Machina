@@ -76,24 +76,33 @@ public partial class BuildingChangeVisualSystem : SystemBase
             }
             _visualBuildingFactory.SetProgress(reference.buildingOnScene.gameObject,(float)currItem/maxItems);
         }
-        foreach(var (energyData,reference,connect,entity)in SystemAPI.Query<EnergyBuildingData, BuildingOnSceneReference,EnabledRefRW<UpdateConnectStatus>>().WithDisabled<MarkOnMap>().WithEntityAccess())
+        foreach(var (data,energyData, reference, connect, entity) in SystemAPI.Query<BuildingData,EnergyBuildingData, BuildingOnSceneReference, EnabledRefRW<UpdateConnectStatus>>().WithDisabled<MarkOnMap>().WithEntityAccess())
         {
-            if (!connect.ValueRO) continue;
-            var en=reference.buildingOnScene as EnergyBuildingOnScene;
-            bool isConnected=EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity)&&!EntityManager.IsComponentEnabled<SwitchIsOff>(entity);
+            var en = reference.buildingOnScene as EnergyBuildingOnScene;
             foreach(var c in energyData.connections)
             {
-                var nodefrom=en.nodes[c.Item1];
-                if(c.Item2.y!=-1)
+                if(c.Item2.y != -1 && entitiesDictionary.Entities.TryGetValue(c.Item2.y, out Entity targetEntity))
                 {
-                    var tobuilding = EntityManager.GetComponentData<BuildingOnSceneReference>(entitiesDictionary.Entities[c.Item2.y]).buildingOnScene as EnergyBuildingOnScene;
+                    bool selfHasPower = EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity) 
+                                        && !EntityManager.IsComponentEnabled<SwitchIsOff>(entity);
+                    
+                    bool targetHasPower = EntityManager.IsComponentEnabled<IsConnectedToEnergy>(targetEntity) 
+                                        && !EntityManager.IsComponentEnabled<SwitchIsOff>(targetEntity);
+
+                    bool finalLineStatus = selfHasPower && targetHasPower;
+
+                    var nodefrom = en.nodes[c.Item1];
+                    var tobuilding = EntityManager.GetComponentData<BuildingOnSceneReference>(targetEntity).buildingOnScene as EnergyBuildingOnScene;
                     var nodeto = tobuilding.nodes[c.Item2.x];
-                    _energyFactory.UpdateConnect(nodefrom,nodeto,isConnected);
+
+                    _energyFactory.UpdateConnect(nodefrom, nodeto, finalLineStatus);
                 }
             }
-            connect.ValueRW=false;
-
+            connect.ValueRW = false;
+            Debug.Log(data.BuildingUniqueID+"               "+EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity));     
+            _energyFactory.UpdateLuxBall(en.luxBall,EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity));
         }
+        
         
 
         ecb.Playback(EntityManager);

@@ -20,6 +20,7 @@ public class MainMenuController : MonoBehaviour
 
     [Inject]
     ILoadingService loadingService;
+    [SerializeField] SaveMenuController saveMenuController;
     private bool isTransitioning = false;
 
     void Awake()
@@ -35,13 +36,20 @@ public class MainMenuController : MonoBehaviour
                 screen.gameObject.SetActive(false);
             }
         }
+        saveMenuController.Dispose();
+        saveMenuController.onSlotSelected+=LoadGameAsync;
+        saveMenuController.onSlotDelete+=DeleteSlot;
     }
 
-    public async void LoadGameAsync(int index)
+    async void LoadGameAsync(int index)
     {
         await loadingService.ShowBlackScreenForce(false);
         saveService.saveIndex = index;
         await _sceneLoader.LoadSceneAsync("GameScene");
+    }
+    void DeleteSlot(int index)
+    {
+        saveService.DeleteSave(index);
     }
 
     public async void ChangeScreenTo(CanvasGroup nextScreen)

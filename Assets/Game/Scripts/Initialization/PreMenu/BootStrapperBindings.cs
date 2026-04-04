@@ -12,11 +12,22 @@ public class BootStrapperBindings : MonoInstaller
 
     public override void InstallBindings()
     {
-
+         ApplyGlobalSettings();
         BindServices();
         BindСonfigsPoint();
     }
+    private void ApplyGlobalSettings()
+    {
+        // Загружаем громкость (по умолчанию 1.0)
+        float savedVolume = PlayerPrefs.GetFloat("MasterVolume", 1f);
+        AudioListener.volume = savedVolume;
 
+        // Загружаем полноэкранный режим (по умолчанию true/1)
+        bool isFull = PlayerPrefs.GetInt("IsFullscreen", 1) == 1;
+        Screen.fullScreen = isFull;
+        
+        Debug.Log($"[Settings] Applied: Volume {savedVolume}, Fullscreen {isFull}");
+}
     void BindServices()
     {
         Container .Bind<LoadingSettings>().FromMethod(f =>

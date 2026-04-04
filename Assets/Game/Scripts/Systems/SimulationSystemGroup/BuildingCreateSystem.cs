@@ -385,6 +385,8 @@ public partial struct BuildingCreateSystem : ISystem
         _coreBuildingArchetype=state.EntityManager.CreateArchetype(
             typeof(BuildingTag),
             typeof(BuildingData),
+            typeof(CoreBuildingTag),
+            typeof(ForceDestroyTag),
             typeof(BuildingStateData),
             typeof(BuildingPosData),
             typeof(BuildingOnSceneReference),
@@ -702,7 +704,10 @@ public partial struct BuildingCreateSystem : ISystem
                             connections.Add((i,-1));
                     if (LinkNetworkEnergyToLookup.HasBuffer(entity) && LinkNetworkEnergyToLookup[entity].Length > 0)
                     {
+                        var connectEntity=ECB.CreateEntity();
                         var buff=LinkNetworkEnergyToLookup[entity];
+                        
+                        ECB.AddBuffer<LinkNetworkEnergyTo>(connectEntity).CopyFrom(buff);
                         foreach(var b in buff)
                         {
                             for(int i = 0; i < enConfig.maxConnections; i++)
@@ -720,7 +725,7 @@ public partial struct BuildingCreateSystem : ISystem
                     
                 }
                 
-                ECB.SetComponentEnabled<IsConnectedToEnergy>(building, buildingID==config.CoreID);
+               // ECB.SetComponentEnabled<IsConnectedToEnergy>(building, buildingID==config.CoreID);
             }
             if (HasType(types, ComponentType.ReadWrite<SwitchIsOff>()))
             {
@@ -728,8 +733,8 @@ public partial struct BuildingCreateSystem : ISystem
             }
             if (HasType(types, ComponentType.ReadWrite<IsConnectedToEnergy>()))
             {
-                ECB.SetComponentEnabled<IsConnectedToEnergy>(building, buildingID==config.CoreID);
-                ECB.SetComponentEnabled<UpdateConnectStatus>(building, true);
+                ECB.SetComponentEnabled<IsConnectedToEnergy>(building,true );//buildingID==config.CoreID
+                //ECB.SetComponentEnabled<UpdateConnectStatus>(building, true);
             }
         }
 

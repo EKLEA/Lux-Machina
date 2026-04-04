@@ -5,7 +5,7 @@
             "title": "железная руда",
             "description": "ыфвывф",
             "iconPath": "iron_ore",
-            "ItemClass": 0,
+            "ItemClass": 1,
             "ItemType": 1
         },
         {
@@ -13,7 +13,7 @@
             "title": "медная руда",
             "description": "ывффывфв",
             "iconPath": "copper_ore",
-            "ItemClass": 0,
+            "ItemClass": 1,
             "ItemType": 1
         },
         {
@@ -21,7 +21,7 @@
             "title": "оловянная руда",
             "description": "ывффывфв",
             "iconPath": "tin_ore",
-            "ItemClass": 0,
+            "ItemClass": 1,
             "ItemType": 1
         },
         {
@@ -29,7 +29,7 @@
             "title": "уголь",
             "description": "фывыфв",
             "iconPath": "coal",
-            "ItemClass": 0,
+            "ItemClass": 1,
             "ItemType": 1
         },
         {
@@ -37,7 +37,7 @@
             "title": "камень",
             "description": "вфыфвывф",
             "iconPath": "rock",
-            "ItemClass": 0,
+            "ItemClass": 1,
             "ItemType": 1
         },
         {
@@ -45,7 +45,7 @@
             "title": "дерево",
             "description": "фывыфв",
             "iconPath": "wood",
-            "ItemClass": 0,
+            "ItemClass": 1,
             "ItemType": 1
         },
         {

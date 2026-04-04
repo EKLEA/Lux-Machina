@@ -225,7 +225,7 @@ public partial class BuildingLoadSystem : SystemBase
         {
             if(saveService.GameState.recipeBuildingSaveData.TryGetValue(buildingData.BuildingUniqueID,out var recipeData)&&recipeData.RecipeID!=-1)
             {
-                if (recipeData.InputCrafttems != null)
+                if (recipeData.InputCrafttems != null&&recipeData.InputCrafttems.Length>0)
                 {
                     var inputCraftBuff=ecb.SetBuffer<InputSlotData>(building);
                     ecb.SetComponentEnabled<IsInputCraftEnabled>(building,recipeData.isInputEnabled);
@@ -234,7 +234,7 @@ public partial class BuildingLoadSystem : SystemBase
                         inputCraftBuff.Add(iC);
                     }
                 }
-                if (recipeData.OutputCrafttems != null)
+                if (recipeData.OutputCrafttems != null&&recipeData.OutputCrafttems.Length>0)
                 {
                     var outputCraftBuff=ecb.SetBuffer<OutputSlotData>(building);
                     ecb.SetComponentEnabled<IsOutputCraftEnabled>(building,recipeData.isOutputEnabled);
