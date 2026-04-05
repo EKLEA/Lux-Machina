@@ -102,6 +102,7 @@ public partial struct EnemyAISystem : ISystem
                 TurretTargets = turretMap.ValueRW.EnemyGridMap.AsParallelWriter(),
                 
                 DamageLookUp = SystemAPI.GetBufferLookup<TakeDamage>(false),
+                CheckForDestroyLookUp = SystemAPI.GetComponentLookup<CheckForDestroy>(false),
                 DeltaTime = SystemAPI.Time.DeltaTime*tickData.SpeedMultiplier,
                 ElapsedTime = (float)SystemAPI.Time.ElapsedTime
             }.ScheduleParallel(clearHandle); 
@@ -126,7 +127,7 @@ public struct IntegratedSpawnJob : IJob
         var config = SpawnMobsDataLookup[SpawnManagerEntity];
 
         config.playerProgress = config.totalWeights / EnemyConfigs.ProgressThreshold;
-        float powerIncome = math.sqrt(config.totalWeights) * EnemyConfigs.PowerMultiplier;
+        float powerIncome = math.sqrt(math.max(0f, config.totalWeights)) * EnemyConfigs.PowerMultiplier;
         float timeMultiplier = 1f + (config.CountOfCicle * EnemyConfigs.TimeDifficultyFactor);
         
         config.pointsPerCicle = (EnemyConfigs.BaseIncome + powerIncome) * timeMultiplier;
@@ -283,6 +284,7 @@ public partial struct EnemyLogicJob : IJobEntity
     [ReadOnly] public NativeParallelMultiHashMap<int2, int> TurretCells;
 
     [ReadOnly] public BufferLookup<TakeDamage> DamageLookUp;
+    [ReadOnly] public ComponentLookup<CheckForDestroy> CheckForDestroyLookUp;
     public EntityCommandBuffer.ParallelWriter ECB;   
     public NativeParallelMultiHashMap<int, Entity>.ParallelWriter TurretTargets;
     public NativeParallelMultiHashMap<Entity, int>.ParallelWriter TargetsToTurrets;
@@ -315,7 +317,7 @@ public partial struct EnemyLogicJob : IJobEntity
                 if (ElapsedTime > stats.LastAttackTime + stats.AttackInterval)
                 {
                     
-                    if (DamageLookUp.HasBuffer(targetBuilding))
+                    if (DamageLookUp.HasBuffer(targetBuilding)&&!CheckForDestroyLookUp.IsComponentEnabled(targetBuilding))
                     {
                         ECB.AppendToBuffer(chunkIndex, targetBuilding, new TakeDamage { Damage = stats.AttackDamage,pos=nextCell });
                         stats.LastAttackTime = ElapsedTime;

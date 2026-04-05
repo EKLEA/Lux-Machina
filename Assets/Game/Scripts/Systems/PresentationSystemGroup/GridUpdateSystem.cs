@@ -9,14 +9,16 @@ public partial class GridUpdateSystem : SystemBase
 {
      GridVisualizer _visualizer;
      FlowFieldVisualizer flowFieldVisualizer;
+     AttackZoneVisualizer _attackZoneVisualizer;
      IPlayerData _playerData;
      
     EntityQuery _buildQuery;
-    public void SetUpGrid(GridVisualizer visualizer,IPlayerData playerData,FlowFieldVisualizer flowFieldVisualizer)
+    public void SetUpGrid(GridVisualizer visualizer,IPlayerData playerData,FlowFieldVisualizer flowFieldVisualizer)//, AttackZoneVisualizer attackZoneVisualizer
     {
         _visualizer=visualizer;
         _playerData =playerData;
         this.flowFieldVisualizer=flowFieldVisualizer;
+       // _attackZoneVisualizer=attackZoneVisualizer;
 
     }
      protected override void OnCreate()
@@ -31,11 +33,14 @@ public partial class GridUpdateSystem : SystemBase
     protected override void OnUpdate()
     {
         if (!SystemAPI.TryGetSingleton<BuildingMap>(out var map)) return;
+
         // flowFieldVisualizer.DrawFlowField(
         //       new Vector2Int(0,0), 
         //         100, 
         //         map
         // );
+
+        //_attackZoneVisualizer.DrawAttackZones(SystemAPI.GetComponent<TurretGrid>(SystemAPI.GetSingletonEntity<BuildingMap>()));
         if (!_buildQuery.IsEmpty)
         {
              _visualizer.DrawGrid(

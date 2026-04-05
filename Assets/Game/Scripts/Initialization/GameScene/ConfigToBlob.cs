@@ -176,6 +176,7 @@ public class ConfigToBlob : IInitializable
             var str = new ProjectileStructConfig
             {
                 id=cfg.Key,
+                AmmoCount=cfg.Value.AmmoCount,
                 Damage=cfg.Value.Damage,
                 Radius=cfg.Value.Radius,
                 Speed=cfg.Value.Speed,

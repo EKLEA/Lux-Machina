@@ -48,6 +48,7 @@ public partial struct   HealthSystem: ISystem
         var road=SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(true);
         var roadHealth=SystemAPI.GetBufferLookup<RoadPointHealthData>(true);
         var ForceDestroyTagLookup=SystemAPI.GetComponentLookup<ForceDestroyTag>(true);
+        var CheckForDestroyLookup=SystemAPI.GetComponentLookup<CheckForDestroy>(true);
         if (!_deadlyOBJs.IsEmpty)
         {
             state.Dependency =new TakeDamageJob
@@ -57,6 +58,7 @@ public partial struct   HealthSystem: ISystem
                 HealthDataLookup= health,
                 RoadLookUP=road,
                 ForceDestroyTagLookup = ForceDestroyTagLookup,
+                CheckForDestroyLookup=CheckForDestroyLookup,
                 RoadPointHealthDataLookup=roadHealth
             }.ScheduleParallel(state.Dependency);
         }
@@ -92,6 +94,7 @@ public partial struct   HealthSystem: ISystem
         [ReadOnly] public ComponentLookup<HealthData> HealthDataLookup;
         [ReadOnly] public BufferLookup<RoadPointHealthData> RoadPointHealthDataLookup;
         [ReadOnly] public ComponentLookup<ForceDestroyTag> ForceDestroyTagLookup;
+        [ReadOnly] public ComponentLookup<CheckForDestroy> CheckForDestroyLookup;
         public void Execute([ChunkIndexInQuery] int sortKey,Entity entity,ref DynamicBuffer<TakeDamage> takeDamage)
         {
             var buff=takeDamage;
@@ -156,7 +159,18 @@ public partial struct   HealthSystem: ISystem
                             health.CurrHealth=0;
                             if (ForceDestroyTagLookup.HasComponent(entity))
                             {
-                                ECB.SetComponentEnabled<ForceDestroyTag>(sortKey,entity,true);
+                                if (CheckForDestroyLookup.HasComponent(entity))
+                                {
+                                        
+                                    Entity Command=ECB.CreateEntity(sortKey);
+                                    ECB.AddComponent(sortKey,Command,new ChangeBuildingData{targetEntity=entity});
+                                    ECB.AddComponent(sortKey,Command,new MarkAsForceDestoroyData());
+                                }
+                                else
+                                {
+                                    
+                                    ECB.SetComponentEnabled<ForceDestroyTag>(sortKey,entity,true);
+                                }
                             }
                             break;
                         }

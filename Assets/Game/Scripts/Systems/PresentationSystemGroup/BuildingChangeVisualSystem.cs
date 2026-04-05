@@ -24,26 +24,29 @@ public partial class BuildingChangeVisualSystem : SystemBase
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
         EntitiesDictionary entitiesDictionary = SystemAPI.GetSingleton<EntitiesDictionary>();
 
-        foreach (var (turretData, reference) in SystemAPI.Query<RefRO<TurretTranform>, BuildingOnSceneReference>())
+       foreach (var (turretData, reference) in SystemAPI.Query<RefRW<TurretTranform>, BuildingOnSceneReference>())
         { 
-            if(!(reference.buildingOnScene is TurretOnScene view)) return;
+            if (!(reference.buildingOnScene is TurretOnScene view)) continue;
             if (view == null || view.TurretHead == null || view.TurretBarrel == null) continue;
+
             float deltaTime = SystemAPI.Time.DeltaTime;
-            float lerpSpeed = 10f; 
+            float lerpSpeed = 10f;
 
             view.TurretHead.localRotation = math.slerp(
-                view.TurretHead.localRotation, 
+                view.TurretHead.localRotation,
                 quaternion.Euler(0, turretData.ValueRO.rotation.y, 0),
                 deltaTime * lerpSpeed
             );
 
             view.TurretBarrel.localRotation = math.slerp(
-                view.TurretBarrel.localRotation, 
-                quaternion.Euler(turretData.ValueRO.rotation.x, 0, 0), 
+                view.TurretBarrel.localRotation,
+                quaternion.Euler(turretData.ValueRO.rotation.x, 0, 0),
                 deltaTime * lerpSpeed
+                
             );
+            turretData.ValueRW.projectTyleSpawn=view.TurretSpawn[0].position;
         }
-        foreach (var (reference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ChangeBluePrintState>().WithEntityAccess())
+                foreach (var (reference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ChangeBluePrintState>().WithEntityAccess())
         {
             ChangeBluePrintState(reference,entity,ecb);
             ecb.SetComponentEnabled<UpdateClusterSlots>(mapEntity,true);
@@ -76,7 +79,8 @@ public partial class BuildingChangeVisualSystem : SystemBase
             }
             _visualBuildingFactory.SetProgress(reference.buildingOnScene.gameObject,(float)currItem/maxItems);
         }
-        foreach(var (data,energyData, reference, connect, entity) in SystemAPI.Query<BuildingData,EnergyBuildingData, BuildingOnSceneReference, EnabledRefRW<UpdateConnectStatus>>().WithDisabled<MarkOnMap>().WithEntityAccess())
+       
+        foreach(var (energyData, reference, connect, entity) in SystemAPI.Query<EnergyBuildingData, BuildingOnSceneReference, EnabledRefRW<UpdateConnectStatus>>().WithDisabled<MarkOnMap,ForceDestroyTag>().WithEntityAccess())
         {
             var en = reference.buildingOnScene as EnergyBuildingOnScene;
             foreach(var c in energyData.connections)
@@ -98,8 +102,7 @@ public partial class BuildingChangeVisualSystem : SystemBase
                     _energyFactory.UpdateConnect(nodefrom, nodeto, finalLineStatus);
                 }
             }
-            connect.ValueRW = false;
-            Debug.Log(data.BuildingUniqueID+"               "+EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity));     
+            connect.ValueRW = false; 
             _energyFactory.UpdateLuxBall(en.luxBall,EntityManager.IsComponentEnabled<IsConnectedToEnergy>(entity));
         }
         

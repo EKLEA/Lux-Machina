@@ -96,7 +96,7 @@ public class BuildingManagementWindowView:DragableUIWindow
     ReactiveProperty<int> priority;
     ReactiveProperty<ConstructionViewData> constructionViewData;
     (bool,BuildingCraftViewData) recipeViewData;
-    ReactiveProperty<StorageSlotViewData[]> storageSlots;
+    (ReactiveProperty<StorageSlotViewData[]>,int)storageSlots;
     bool windowChanged;
     bool CanDestory;
     ReactiveProperty<bool> SwitchData;
@@ -125,7 +125,7 @@ public class BuildingManagementWindowView:DragableUIWindow
         ShowCraftArea();
         ShowStorageArea();
 
-        if(distribuitionViewData!=null||storageSlots!=null)
+        if(distribuitionViewData!=null||storageSlots.Item1!=null)
         {
             PriorityBT.Bind(priority);
             allDisposables.Add(PriorityBT);
@@ -250,7 +250,7 @@ public class BuildingManagementWindowView:DragableUIWindow
     }
     void ShowStorageArea()
     { 
-        if (storageSlots != null&&storageSlots.Value!=null&&distribuitionViewData==null)
+        if (storageSlots.Item1 != null&&storageSlots.Item1 .Value!=null&&distribuitionViewData==null)
         {
             AddSlotBT.onClick.AddListener(()=>
             {
@@ -277,11 +277,12 @@ public class BuildingManagementWindowView:DragableUIWindow
             StorageArea.gameObject.SetActive(true);
             StorageHead.gameObject.SetActive(true);
             StorageSlotsHead.gameObject.SetActive(true);
-            storageSlots.Subscribe(value =>
+            storageSlots.Item1 .Subscribe(value =>
             {
-                UpdateStorageSlots(value);
+                UpdateStorageSlots(value,storageSlots.Item2);
             }).AddTo(StorageAreaDispose);
-            UpdateStorageSlots(storageSlots.Value);
+            Debug.Log(storageSlots.Item2);
+            UpdateStorageSlots(storageSlots.Item1.Value,storageSlots.Item2);
             allDisposables.Add(StorageAreaDispose);
         }
     }
@@ -426,14 +427,14 @@ public class BuildingManagementWindowView:DragableUIWindow
         }
         
     }
-    void UpdateStorageSlots(StorageSlotViewData[] slots)
+    void UpdateStorageSlots(StorageSlotViewData[] slots,int maxLength)
     {
         foreach(var s in StorageSlots)
         {
             StorageAreaDispose.Remove(s);
             s.Dispose();
         }
-        if (slots.Length == 20)
+        if (slots.Length == maxLength)
         {
             AddSlotBT.interactable=false;
             AddSlotBT.gameObject.SetActive(false);

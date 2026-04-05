@@ -119,7 +119,6 @@ public partial struct EnergySystem : ISystem
         {
             foreach (var b in Buff)
             {
-                
                 if (!entitiesDictionary.Entities.ContainsKey(b.UnLinkFromBuilding.y) || 
                     !entitiesDictionary.Entities.ContainsKey(b.UnLinkToBuilding.y)) continue;
                 if (!energyMap.EnergyLinks.ContainsKey(b.UnLinkFromBuilding)||!energyMap.EnergyLinks.ContainsKey(b.UnLinkToBuilding)) continue;
@@ -165,7 +164,8 @@ public partial struct EnergySystem : ISystem
 
                 energyMap.EnergyLinks.Remove(b.UnLinkFromBuilding);
                 energyMap.EnergyLinks.Remove(b.UnLinkToBuilding);
-
+                
+                Debug.Log("b");
                 ECB.SetComponentEnabled<UpdateConnectStatus>(enFrom, true);
                 ECB.SetComponentEnabled<UpdateConnectStatus>(enTo, true);
                 ECB.SetComponentEnabled<UpdateConnectionsTag>(mapEntity, true);
@@ -296,7 +296,7 @@ public partial struct EnergySystem : ISystem
         public void Execute()
         {
             NativeHashSet<int> ConnectedSet = new(1000, Allocator.Temp);
-            
+            Debug.Log("sddssd");
             if (!AllEntities.ContainsKey(CoreID)) return;
 
             Entity coreEntity = AllEntities[CoreID];

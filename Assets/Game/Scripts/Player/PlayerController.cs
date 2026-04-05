@@ -24,6 +24,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     [SerializeField] LayerMask EnergyNodeMask;
     [SerializeField] GridVisualizer gridVisualizer;
     [SerializeField] FlowFieldVisualizer FlowFieldVisualizer;
+    [SerializeField] AttackZoneVisualizer attackZoneVisualizer;
 
     [SerializeField] CameraController cameraController;
     [Inject] GameController gameController;
@@ -159,7 +160,7 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
         
         Pause.performed += OnPauseNormal;
         Escape.performed += OnPauseEscape;
-        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);
+        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);//,attackZoneVisualizer
         menuSub = manager.pauseMenu.isOpened.Subscribe(value =>
         {
             if(value)
@@ -255,7 +256,7 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
     public void SetUpAction(string info)
     {
         
-        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);
+        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);//,attackZoneVisualizer
         ClearAction();
         if(info.Contains("Delete"))
         {
@@ -448,7 +449,7 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
             else
             {
                 rotation++;
-                rotation%=8;
+                rotation%=4;
             }
         }
     }

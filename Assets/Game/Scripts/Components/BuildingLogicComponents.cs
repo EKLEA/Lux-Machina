@@ -33,6 +33,7 @@ public struct BuildingTag : IComponentData{}
     }
     public struct CreateVisualTag : IComponentData, IEnableableComponent{}
     public struct ForceDestroyTag: IComponentData, IEnableableComponent{}
+    public struct CheckForDestroy: IComponentData, IEnableableComponent{}
     public struct MarkOnMap: IComponentData, IEnableableComponent{}
     public struct UpdateRoad: IComponentData, IEnableableComponent{}
     
@@ -64,7 +65,11 @@ public struct BuildingTag : IComponentData{}
     {
         public int ConstructionPriority;
     }
-    
+    [Serializable]
+    public struct StorageBuildingData : IComponentData, IEnableableComponent
+    {
+        public int MaxSlots;
+    }
     public interface ISlot
     {
         public int ItemId{get;set;}
@@ -224,13 +229,19 @@ public struct BuildingTag : IComponentData{}
         public float CoolDown;
         public float TimeToCoolDown;
         public int ProjectilePrefabID;
+        public int CurrAmmo;
+        public int AmmoID;
     }
     public struct TurretTranform : IComponentData
     {
         public int AttacMode;
         public float3 projectTyleSpawn;
         public float2 rotation; 
+        public float baseRotation;
+        
+        
     }
+    
     public struct ProjectileData : IComponentData
     {
         public float3 StartPos;

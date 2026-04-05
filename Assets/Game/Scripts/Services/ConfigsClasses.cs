@@ -165,6 +165,7 @@ public class ProjectileConfig
 {
     public int itemID;
     //колор
+    public int AmmoCount;
     public float Speed;
     public float Damage;   
     public float Radius;   

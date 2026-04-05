@@ -80,13 +80,11 @@ public class ConnectEnergyFactory
         if(IsConnecting)
         {
             
-            Debug.Log(1);
             luxBall.ChangeColor(energyLineConfig.ConnectionColor,energyLineConfig.ConnectionPulseColor);
         }
         else
         {
             
-            Debug.Log(2);
             luxBall.ChangeColor(energyLineConfig.DisconnectColor,energyLineConfig.DisconnectPulseColor);
         }
     }

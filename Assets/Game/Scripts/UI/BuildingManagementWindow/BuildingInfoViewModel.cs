@@ -25,7 +25,7 @@ public class BuildingInfoViewModel
     
     ReactiveProperty<SlotViewData[]> _excessSlotsRP;   
 
-    ReactiveProperty< StorageSlotViewData[]> _storageSlots;
+    (ReactiveProperty<StorageSlotViewData[]>,int) _storageSlots;
 
     ReactiveProperty<ConstructionViewData> _constructionViewDataRP;
     SlotViewData[] _inputConstructionSlots; 
@@ -79,8 +79,8 @@ public class BuildingInfoViewModel
         _workState=null;
         _workState?.Dispose();
         
-        _storageSlots?.Dispose(); 
-        _storageSlots=null;  
+        _storageSlots.Item1?.Dispose(); 
+        _storageSlots=(null,-1);  
 
         _timeToCraft?.Dispose();
         _timeToCraft=null;
@@ -96,7 +96,7 @@ public class BuildingInfoViewModel
                                 out DistribuitionViewData distribuitionViewData,
                                 out ReactiveProperty<int> priority, 
                                 out (bool,BuildingCraftViewData) recipeViewData,
-                                out ReactiveProperty<StorageSlotViewData[]>StorageSlots,
+                                out  (ReactiveProperty<StorageSlotViewData[]>,int)StorageSlots,
                                 out bool CanDestory,
                                 out ReactiveProperty<bool> SwitchData)
     { 
@@ -190,6 +190,7 @@ public class BuildingInfoViewModel
         {
             if (entityManager.HasBuffer<StorageSlotData>(building))
             {
+                var sData=entityManager.GetComponentData<StorageBuildingData>(building);
                 var buff = entityManager.GetBuffer<StorageSlotData>(building);
                 var slots = new StorageSlotViewData[buff.Length];
                 storageDisposables?.Dispose();
@@ -215,13 +216,13 @@ public class BuildingInfoViewModel
                         IsActiveInput=IsActiveSlotInput,
                         IsActiveOutput=IsActiveSlotOutput};
                 }
-                _storageSlots=new(slots);
+                _storageSlots=(new(slots),sData.MaxSlots);
                 StorageSlots=_storageSlots;
                 storageDisposables.AddTo(disposables);
             }
-            else StorageSlots=null;
+            else StorageSlots=(null,-1);
         }
-        else StorageSlots=null;
+        else StorageSlots=(null,-1);
 
     }
     
@@ -319,7 +320,7 @@ public class BuildingInfoViewModel
 
         var buff = entityManager.GetBuffer<StorageSlotData>(entity);
         
-        if (_storageSlots.Value == null || _storageSlots.Value.Length != buff.Length)
+        if (_storageSlots.Item1.Value == null || _storageSlots.Item1.Value.Length != buff.Length)
         {
             var newSlots = new StorageSlotViewData[buff.Length];
             storageDisposables?.Dispose();
@@ -344,13 +345,13 @@ public class BuildingInfoViewModel
                             IsActiveInput=IsActiveSlotInput,
                             IsActiveOutput=IsActiveSlotOutput};
             }
-            _storageSlots.Value = newSlots; 
+            _storageSlots.Item1.Value = newSlots; 
             
             storageDisposables.AddTo(disposables);
         }
         else
         {
-            var currentSlots = _storageSlots.Value;
+            var currentSlots = _storageSlots.Item1.Value;
             for (int i = 0; i < buff.Length; i++)
             {
                 var data = buff[i];

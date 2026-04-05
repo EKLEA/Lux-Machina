@@ -47,7 +47,6 @@ public class TimeManagerUI : UIScreen
 
     public void SetTimeState(bool pause, float speedMul)
     {
-        Debug.Log(pause);
         gameController.SetPause(pause);
         if (!pause) 
         {

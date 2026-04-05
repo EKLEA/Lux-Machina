@@ -16,6 +16,7 @@ using UnityEngine.Splines.ExtrusionShapes;
 public partial struct DestroyBuildingsSystem : ISystem
 {
     EntityQuery _destroyBuildingQuery;
+    EntityQuery _checkForDestroyBuildingQuery;
     EntityQuery _destroyRoadQuery;
     public void OnCreate(ref SystemState state)
     {
@@ -26,6 +27,10 @@ public partial struct DestroyBuildingsSystem : ISystem
          _destroyRoadQuery= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<ForceDestroyTag,RoadTypeBuildingTag,MapPoint>()
             .Build(ref state);
+        _checkForDestroyBuildingQuery= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<CheckForDestroy>()
+            .WithNone<ForceDestroyTag>()
+            .Build(ref state);
         
     }
     public void OnUpdate(ref SystemState state)
@@ -35,17 +40,24 @@ public partial struct DestroyBuildingsSystem : ISystem
         
         var entitiesRW = SystemAPI.GetSingletonRW<EntitiesDictionary>();
         var buildingMapRW = SystemAPI.GetSingletonRW<BuildingMap>();
+        var turretMapRW = SystemAPI.GetSingletonRW<TurretGrid>();
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
+        if (!_checkForDestroyBuildingQuery.IsEmpty)
+        {
+            state.Dependency=new CheckForDestoryJob{ECB=ecb}.Schedule(state.Dependency);
+        }
         if (!_destroyBuildingQuery.IsEmpty)
         {
             var deleteBJoB=new DestroyBuildingJob
             {
                 MapData=buildingMapRW.ValueRW,
                 Map=mapEntity,
+                turretGrid=turretMapRW.ValueRW,
                 EntityDictionary=entitiesRW.ValueRW,
                 ECB=ecb,
                 RoadLookup=SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(true),
-                CoreBuildingTagLookup=SystemAPI.GetComponentLookup<CoreBuildingTag>(true)
+                CoreBuildingTagLookup=SystemAPI.GetComponentLookup<CoreBuildingTag>(true),
+                TurretStatsLookup=SystemAPI.GetComponentLookup<TurretStats>(true)
             };
             state.Dependency=deleteBJoB.Schedule(state.Dependency);
         }
@@ -64,16 +76,30 @@ public partial struct DestroyBuildingsSystem : ISystem
         }
     }
     [BurstCompile]
+    [WithAll(typeof( CheckForDestroy))]
+    [WithNone(typeof(ForceDestroyTag))]
+    public partial struct CheckForDestoryJob : IJobEntity
+    {
+        public EntityCommandBuffer ECB;
+        public void Execute(Entity entity,in BuildingTag tag)
+        {
+            ECB.SetComponentEnabled<CheckForDestroy>(entity,false);
+            ECB.SetComponentEnabled<ForceDestroyTag>(entity,true);
+        }
+    }
+    [BurstCompile]
     [WithAll(typeof(ForceDestroyTag))]
-    [WithNone(typeof(RoadTypeBuildingTag))]
+    [WithNone(typeof(RoadTypeBuildingTag),typeof(CheckForDestroy))]
     public partial struct DestroyBuildingJob : IJobEntity
     {
         public BuildingMap MapData; 
+        public TurretGrid turretGrid;
         public EntitiesDictionary EntityDictionary; 
         public Entity Map;
         public EntityCommandBuffer ECB;
         [ReadOnly] public ComponentLookup<RoadTypeBuildingTag> RoadLookup;
         [ReadOnly] public ComponentLookup<CoreBuildingTag> CoreBuildingTagLookup;
+        [ReadOnly] public ComponentLookup<TurretStats> TurretStatsLookup;
         public void Execute(Entity entity, in BuildingData buildingData,in BuildingPosData posData)
         {
             if (MapData.CellEntityMultiMap.ContainsKey(entity))
@@ -89,7 +115,30 @@ public partial struct DestroyBuildingsSystem : ISystem
                     
                     }
                 }
-                
+                if (TurretStatsLookup.HasComponent (entity))
+                {
+                    turretGrid.EnemyGridMap.Remove(buildingData.BuildingUniqueID);
+
+                    var enemyData = turretGrid.EnemyToTurret.GetKeyValueArrays(Allocator.Temp);
+                    for (int i = 0; i < enemyData.Values.Length; i++)
+                    {
+                        if (enemyData.Values[i] == buildingData.BuildingUniqueID)
+                        {
+                            turretGrid.EnemyToTurret.Remove(enemyData.Keys[i], buildingData.BuildingUniqueID);
+                        }
+                    }
+                    enemyData.Dispose();
+
+                    var cellData = turretGrid.TurretGridClaim.GetKeyValueArrays(Allocator.Temp);
+                    for (int i = 0; i < cellData.Values.Length; i++)
+                    {
+                        if (cellData.Values[i] == buildingData.BuildingUniqueID)
+                        {
+                            turretGrid.TurretGridClaim.Remove(cellData.Keys[i], buildingData.BuildingUniqueID);
+                        }
+                    }
+                    cellData.Dispose();
+                }
                 MapData.CellEntityMultiMap.Remove(entity);
                 EntityDictionary.Entities.Remove(buildingData.BuildingUniqueID);
                 if (CoreBuildingTagLookup.HasComponent(entity))
@@ -97,7 +146,7 @@ public partial struct DestroyBuildingsSystem : ISystem
                     ECB.SetComponentEnabled<IsPause>(Map,true);
                     ECB.SetComponentEnabled<IsGameOver>(Map,true);
                     ECB.SetComponentEnabled<SavingMapTag>(Map,true);
-                } 
+                }
                 ECB.DestroyEntity(entity);
                 ECB.SetComponentEnabled<UpdateClusterSlots>(Map,true);
                 ECB.SetComponentEnabled<UpdateMapTag>(Map,true);

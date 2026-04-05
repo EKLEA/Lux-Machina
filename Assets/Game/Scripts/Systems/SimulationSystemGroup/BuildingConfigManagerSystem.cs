@@ -7,7 +7,7 @@ using UnityEngine;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 
-[UpdateAfter(typeof(ClusterAssignSystem))]
+[UpdateAfter(typeof(ProcessRoadPointsSystem))]
 [BurstCompile]
 
 public partial struct BuildingConfigManagerSystem : ISystem
@@ -104,6 +104,7 @@ public partial struct BuildingConfigManagerSystem : ISystem
         var CountOfPackBuildingDataLookup= SystemAPI.GetComponentLookup<CountOfPackInBuildingData>(false);
         var RecipeBuildingDataLookup= SystemAPI.GetComponentLookup<RecipeBuildingData>(false);
         var MapPointLookup= SystemAPI.GetBufferLookup<MapPoint>(false);
+        var EnergyBuildingDataLookup= SystemAPI.GetComponentLookup<EnergyBuildingData>(false);
 
         
         var IsDemolitionLookup= SystemAPI.GetComponentLookup<IsDemolition>(false);
@@ -143,13 +144,13 @@ public partial struct BuildingConfigManagerSystem : ISystem
 
 
         if(!_markAsForceDestoryQuery.IsEmpty)
-            state.Dependency= new MarkAsForceDestoryJob{ECB=ecbParallel}.Schedule(state.Dependency);
+            state.Dependency= new MarkAsForceDestoryJob{ECB=ecbParallel,
+            EnergyBuildingDataLookup=EnergyBuildingDataLookup,BuildingDataLookup=BuildingDataLookup}.Schedule(state.Dependency);
 
         if (!_addStorageSlotQuery.IsEmpty)
         {
             
          var count = _addStorageSlotQuery.CalculateEntityCount();
-    Debug.Log($"Джоб запускается! Найдено сущностей-команд: {count}");
             state.Dependency= new AddStorageSlotJob{ECB=ecbParallel,StorageSlotDataLookup= StorageSlotDataLookup,mapEntity=mapEntity,
                                                     ExcessSlotDataLookup=ExceessBufferLookup}.Schedule(state.Dependency);
         }
@@ -503,11 +504,28 @@ public partial struct BuildingConfigManagerSystem : ISystem
     public partial struct MarkAsForceDestoryJob : IJobEntity
     {
         public EntityCommandBuffer.ParallelWriter ECB; 
-
+        [ReadOnly] public ComponentLookup<EnergyBuildingData> EnergyBuildingDataLookup;
+        [ReadOnly] public ComponentLookup<BuildingData> BuildingDataLookup;
         public void Execute(Entity entity, [EntityIndexInQuery] int sortKey, in ChangeBuildingData changeBuildingData, in MarkAsForceDestoroyData markAsForceDestoroyData)
         {
-            ECB.SetComponentEnabled<ForceDestroyTag>(sortKey,changeBuildingData.targetEntity,true);
-            
+            if(BuildingDataLookup.HasComponent(changeBuildingData.targetEntity))
+            {
+                 ECB.SetComponentEnabled<CheckForDestroy>(sortKey,changeBuildingData.targetEntity,true);
+                var bData=BuildingDataLookup[changeBuildingData.targetEntity];
+                if (EnergyBuildingDataLookup.HasComponent(changeBuildingData.targetEntity))
+                {
+                    var command= ECB.CreateEntity(sortKey);
+                    var buff = ECB.AddBuffer<UnLinkNetworkEnergyTo>(sortKey,command);
+                    var data = EnergyBuildingDataLookup[changeBuildingData.targetEntity];
+                    foreach(var c in data.connections)
+                    {
+                        if (c.Item2.y != -1)
+                        {
+                            buff.Add(new UnLinkNetworkEnergyTo{UnLinkFromBuilding=new int2(c.Item1,bData.BuildingUniqueID),UnLinkToBuilding=c.Item2});
+                        }
+                    }
+                }
+            }
             ECB.DestroyEntity(sortKey, entity);
         }
     }

@@ -96,42 +96,27 @@ public partial struct TurretSystem : ISystem
             }
             if (targetFound)
             {
-                float2 c = posData.center * turretGrid.CellSize;    
-                float3 dir = bestTargetPos - new float3(c.x, 1, c.y);
-                
-                // 1. Считаем угол на цель в мировых координатах
-                float targetAngle = math.atan2(dir.x, dir.z);
+                float2 c = posData.center * turretGrid.CellSize;
+                float3 turretPos = new float3(c.x, 1, c.y);
+                float3 dir = bestTargetPos - turretPos;
 
-                // 2. Определяем центр сектора атаки на основе поворота здания (как в сетке)
-                // 1: Z+, 2: X+, 3: Z-, 4: X-
-                Debug.Log(posData.Rotation );
-                float baseAngle = posData.Rotation switch
-                {
-                    1 => 0f,
-                    2 => math.PI * 0.5f,
-                    3 => math.PI,
-                    4 => -math.PI * 0.5f,
-                    _ => 0f
-                };
+                float targetWorldAngle = math.atan2(dir.x, dir.z); 
 
-                // 3. Вычисляем разницу и нормализуем её в диапазон -PI...PI
-                float angleDiff = targetAngle - baseAngle;
-                angleDiff = math.atan2(math.sin(angleDiff), math.cos(angleDiff));
+                targetWorldAngle -= math.PI * 0.5f; 
 
-                // 4. Ограничиваем поворот головы половиной угла из статов (stats.Angle)
-                float halfAngleRad = math.radians(stats.Angle * 0.5f);
-                float clampedDiff = math.clamp(angleDiff, -halfAngleRad, halfAngleRad);
+                float diff = targetWorldAngle - trans.baseRotation;
 
-                // 5. Сохраняем финальный угол (в радианах)
-                // Если модель в префабе смотрит боком, добавьте смещение здесь (напр. + math.PI * 0.5f)
-                trans.rotation.y = baseAngle + clampedDiff;
+                diff = math.atan2(math.sin(diff), math.cos(diff));
 
+                float halfAngle = math.radians(stats.Angle * 0.5f);
+                diff = math.clamp(diff, -halfAngle, halfAngle);
+
+                trans.rotation.y = trans.baseRotation + diff;
                 if (stats.TimeToCoolDown <= 0)
                 {
-                    if (storageSlots.Length > 0)
+                    if (stats.CurrAmmo > 0)
                     {
-                        var slot = storageSlots[0];
-                        if(itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(slot.ItemId, out var cfg))
+                        if(itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
                         {
                             if (!ProjectilePrefabElementLookUp.HasBuffer(ConfigEntity)) return;
                             var enemyPrefabs = ProjectilePrefabElementLookUp[ConfigEntity];
@@ -151,16 +136,11 @@ public partial struct TurretSystem : ISystem
                             bool isArt = stats.projectileType == ProjectileType.Arch; 
                             
                             var pos = posData.center * turretGrid.CellSize;
-                            // Дистанция в мировых метрах (без повторного умножения на CellSize)
                             float dist = math.distance(pos, bestTargetPos.xz);
 
-                            // Поворот турели для расчета точки вылета снаряда
-                            quaternion turretRot = quaternion.Euler(0, trans.rotation.y, 0);
-                            // Точка спавна (база + смещение дула из конфига)
-                            float3 spawnPos = new float3(pos.x, 1f, pos.y) + math.rotate(turretRot, trans.projectTyleSpawn);
                             
                             ECB.SetComponent(chunkIndex, proj, new ProjectileData { 
-                                StartPos = spawnPos, 
+                                StartPos = trans.projectTyleSpawn, 
                                 TargetPos = bestTargetPos, 
                                 Speed = cfg.Speed, 
                                 Damage = cfg.Damage,
@@ -170,8 +150,30 @@ public partial struct TurretSystem : ISystem
                             });
 
                             stats.TimeToCoolDown = stats.CoolDown;
+                            stats.CurrAmmo-=1;
                         }
                     }
+                    else
+                    {
+                        if (storageSlots.Length > 0)
+                        {
+                            var slot = storageSlots[0];
+                            if (slot.Amount > 0)
+                            {
+                                stats.AmmoID=slot.ItemId;
+                                if(itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
+                                {
+                                    
+                                    stats.CurrAmmo=cfg.AmmoCount;
+                                }
+                                else stats.CurrAmmo=20;
+                                
+                            }
+
+                        }
+                    }
+
+                    
                 }
             }  
         }

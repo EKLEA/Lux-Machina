@@ -124,6 +124,7 @@ public struct ProjectileStructConfig : IConfigBase
 {
     public int id{get;set;}
     //колор
+    public int AmmoCount;
     public float Speed;
     public float Damage;   
     public float Radius;   

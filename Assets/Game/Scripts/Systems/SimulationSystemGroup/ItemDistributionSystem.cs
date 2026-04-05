@@ -8,7 +8,7 @@ using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
 using Unity.Mathematics;
 [UpdateInGroup(typeof(SimulationSystemGroup))]
-[UpdateAfter(typeof(BuildingConfigManagerSystem))]
+[UpdateAfter(typeof(ClusterAssignSystem))]
 [DisableAutoCreation]
 public partial struct ItemDistributionSystem : ISystem
 {

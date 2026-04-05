@@ -209,10 +209,10 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 var stats= TurretStatsLookup[entity];
                 float2 forward = buildingPosData.Rotation switch
                 {
-                    1 => new float2(0, 1),  
-                    2 => new float2(1, 0), 
-                    3 => new float2(0, -1), 
-                    4 => new float2(-1, 0), 
+                    3 => new float2(0, 1),  
+                    0 => new float2(1, 0), 
+                    1 => new float2(0, -1), 
+                    2 => new float2(-1, 0), 
                     _ => new float2(0, 1)
                 };
 

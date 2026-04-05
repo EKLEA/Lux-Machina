@@ -1413,7 +1413,7 @@
     "m_ObjectId": "1e9551abce9842169655b0c0bf7bd583",
     "m_Title": "Base Map",
     "m_Position": {
-        "x": 123.99986267089844,
+        "x": 124.00015258789063,
         "y": -122.99998474121094
     }
 }
@@ -2651,7 +2651,7 @@
     "m_ObjectId": "5d9a345e60594feeb5c10882e94e6d32",
     "m_Title": "Edge Glow",
     "m_Position": {
-        "x": -730.0001220703125,
+        "x": -729.9998779296875,
         "y": -450.9999694824219
     }
 }
@@ -5146,7 +5146,7 @@
     "m_RenderFace": 2,
     "m_AlphaClip": false,
     "m_CastShadows": true,
-    "m_ReceiveShadows": false,
+    "m_ReceiveShadows": true,
     "m_DisableTint": false,
     "m_AdditionalMotionVectorMode": 0,
     "m_AlembicMotionVectors": false,

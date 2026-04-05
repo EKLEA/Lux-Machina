@@ -6,5 +6,5 @@ public class  TurretOnScene : BuildingOnScene
 {
    public Transform TurretBarrel;
    public Transform TurretHead;
-   public Transform TurretSpawn;
+   public Transform[] TurretSpawn;
 }

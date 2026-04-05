@@ -15,10 +15,22 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
 {
     [Inject] BuildingObjectFactory _factorty;
     [Inject] EnemyFactory _enemyFactory;
+    [Inject] ConnectEnergyFactory _energyFactory;
     
     protected override void OnUpdate()
     {
         var ecb = new EntityCommandBuffer(Allocator.Temp);
+         foreach(var (energyData, reference, entity) in SystemAPI.Query<EnergyBuildingData, BuildingOnSceneReference>()
+            .WithAll<ForceDestroyTag>()
+            .WithEntityAccess())
+        {
+            var en = reference.buildingOnScene as EnergyBuildingOnScene;
+            foreach(var c in energyData.connections)
+            {
+                _energyFactory.Disconnect(en.nodes[c.Item1]);
+            }
+            // После этого здание можно окончательно удалять
+        }
         foreach (var (buildingData,posData,entity) in SystemAPI.Query<BuildingData,BuildingPosData>().WithAll<CreateVisualTag>().WithEntityAccess())
         {
             SpawnBuilding(buildingData,posData,entity,ecb);
@@ -54,9 +66,20 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
     {
         var buildingOnScene=_factorty.CreateBuilding(buildingData.BuildingIDHash,
                                                     new Vector2Int(posData.LeftCornerPos.x,posData.LeftCornerPos.y),
-                                                    posData.Rotation);
+                                                    EntityManager.HasComponent<TurretStats>(building)?0:posData.Rotation);
         buildingOnScene.id=buildingData.BuildingUniqueID;
-        
+        if(EntityManager.HasComponent<TurretStats>(building))
+        {
+            var data=EntityManager.GetComponentData<TurretTranform>(building);
+            Debug.Log(posData.Rotation );
+              float baseAngleRad = math.radians(posData.Rotation * 90f);
+            data.baseRotation = baseAngleRad;
+            
+            data.rotation.y = baseAngleRad; 
+            (buildingOnScene as TurretOnScene).TurretHead.transform.localRotation = quaternion.Euler(0, baseAngleRad, 0);
+
+            ecb.SetComponent(building, data);
+        }
         if(buildingOnScene is EnergyBuildingOnScene)  (buildingOnScene as EnergyBuildingOnScene).SetUpNodes();
         ecb.SetComponent(building,new BuildingOnSceneReference{buildingOnScene=buildingOnScene});
         ecb.SetComponentEnabled<CreateVisualTag>(building,false);

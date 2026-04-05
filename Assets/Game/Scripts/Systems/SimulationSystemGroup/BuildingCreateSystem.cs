@@ -7,7 +7,7 @@ using Unity.Mathematics;
 using UnityEngine;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
-[UpdateAfter(typeof(ProcessRoadPointsSystem))]
+[UpdateAfter(typeof(BuildingConfigManagerSystem))]
  [BurstCompile]
 public partial struct BuildingCreateSystem : ISystem
 {
@@ -75,7 +75,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(RoadPointHealthData),
             
             
-            typeof(ForceDestroyTag));
+           typeof(ForceDestroyTag),
+            typeof(CheckForDestroy));
         
         _simpleBuildingArchetype=state.EntityManager.CreateArchetype(
             typeof(BuildingTag),
@@ -103,7 +104,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(TakeDamage),
             typeof(HealthData),
             
-            typeof(ForceDestroyTag));
+           typeof(ForceDestroyTag),
+            typeof(CheckForDestroy));
         _simpleBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_simpleBuildingArchetype,Types=_simpleBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
         _energyBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -137,7 +139,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(TakeDamage),
             typeof(HealthData),
             
-            typeof(ForceDestroyTag));
+          typeof(ForceDestroyTag),
+            typeof(CheckForDestroy));
         _energyBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_energyBuildingArchetype,Types=_energyBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
         _propBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -166,7 +169,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(TakeDamage),
             typeof(HealthData),
             
-            typeof(ForceDestroyTag));
+           typeof(ForceDestroyTag),
+            typeof(CheckForDestroy));
         _propBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_propBuildingArchetype,Types=_propBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
         _processorBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -211,7 +215,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(TakeDamage),
             typeof(HealthData),
             
-            typeof(ForceDestroyTag));
+           typeof(ForceDestroyTag),
+            typeof(CheckForDestroy));
         _processorBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_processorBuildingArchetype,Types=_processorBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
         _prodecerBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -254,7 +259,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(LoadInfo),
             typeof(TakeDamage),
             typeof(HealthData),
-            typeof(ForceDestroyTag));
+           typeof(ForceDestroyTag),
+            typeof(CheckForDestroy));
         _prodecerBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_prodecerBuildingArchetype,Types=_prodecerBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
          _consumerBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -298,7 +304,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(TakeDamage),
             typeof(HealthData),
             
-            typeof(ForceDestroyTag));
+           typeof(ForceDestroyTag),
+            typeof(CheckForDestroy));
        _consumerBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_consumerBuildingArchetype,Types=_consumerBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
         _storageBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -319,6 +326,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(OutputConstructionSlotData),
             typeof(CraftingPriorityData),
             typeof(StorageSlotData),
+            typeof(StorageBuildingData),
             typeof(ExcessSlotData),
             typeof(BuildingRequiredStorageGroupData),
             typeof(ClusterLink),
@@ -333,7 +341,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(TakeDamage),
             typeof(HealthData),
             
-            typeof(ForceDestroyTag) );
+           typeof(ForceDestroyTag),
+            typeof(CheckForDestroy)); 
        _storageBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_storageBuildingArchetype,Types=_storageBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
        
         _defenceBuildingArchetype=state.EntityManager.CreateArchetype(
@@ -353,7 +362,9 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(ConstructionPriorityData),
             typeof(InputConstructionSlotData),
             typeof(OutputConstructionSlotData),
+            
             typeof(StorageSlotData),
+            typeof(StorageBuildingData),
             typeof(StorageTypeBuildingTag),
             typeof(CraftingPriorityData),
              typeof(IsConnectedToEnergy),
@@ -378,7 +389,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(TakeDamage),
             typeof(HealthData),
             
-            typeof(ForceDestroyTag));
+           typeof(ForceDestroyTag),
+            typeof(CheckForDestroy));
        _defenceBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_defenceBuildingArchetype,Types=_defenceBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
         
 
@@ -386,7 +398,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(BuildingTag),
             typeof(BuildingData),
             typeof(CoreBuildingTag),
-            typeof(ForceDestroyTag),
+          typeof(ForceDestroyTag),
+            typeof(CheckForDestroy),
             typeof(BuildingStateData),
             typeof(BuildingPosData),
             typeof(BuildingOnSceneReference),
@@ -400,7 +413,9 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(TakeDamage),
             typeof(HealthData),
             typeof(CraftingPriorityData),
+            typeof(BuildingRequiredStorageGroupData),
             typeof(StorageSlotData),
+            typeof(StorageBuildingData),
             typeof(LogisticTag),
             typeof(StorageTypeBuildingTag),
             typeof(EnergyTypeBuildingTag),
@@ -657,6 +672,7 @@ public partial struct BuildingCreateSystem : ISystem
             if (HasType(types, ComponentType.ReadWrite<ForceDestroyTag>()))
             {
                 ECB.SetComponentEnabled<ForceDestroyTag>(building, false);
+                ECB.SetComponentEnabled<CheckForDestroy>(building, false);
             }
             if(HasType(types, ComponentType.ReadWrite<IsBlueprint>()))
             {
@@ -733,8 +749,8 @@ public partial struct BuildingCreateSystem : ISystem
             }
             if (HasType(types, ComponentType.ReadWrite<IsConnectedToEnergy>()))
             {
-                ECB.SetComponentEnabled<IsConnectedToEnergy>(building,true );//buildingID==config.CoreID
-                //ECB.SetComponentEnabled<UpdateConnectStatus>(building, true);
+                ECB.SetComponentEnabled<IsConnectedToEnergy>(building,buildingID==config.CoreID );
+                ECB.SetComponentEnabled<UpdateConnectStatus>(building, true);
             }
         }
 
@@ -757,6 +773,7 @@ public partial struct BuildingCreateSystem : ISystem
             else if (HasType(types, ComponentType.ReadWrite<BuildingRequiredStorageGroupData>()))
             {
                 config.BuildingStorageStructConfigs.Value.TryGetConfig(buildingID,out var storageConfig);
+                ECB.SetComponent(building,new StorageBuildingData{MaxSlots=storageConfig.maxSlots});
                 ECB.SetComponent(building,
                     new BuildingRequiredStorageGroupData
                     { RequiredStorageGroup = storageConfig.requiredItemTypesGroups });

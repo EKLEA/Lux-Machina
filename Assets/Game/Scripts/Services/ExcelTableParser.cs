@@ -184,7 +184,7 @@ public class CsvTableParserEditor : EditorWindow
         for (int i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            if (row.Length < 4)
+            if (row.Length < 5)
             {
                 Debug.LogWarning(
                     $"Skipping row {i} in Projectile CSV: not enough columns ({row.Length})"
@@ -198,9 +198,10 @@ public class CsvTableParserEditor : EditorWindow
                     new ProjectileConfig
                     {
                         itemID = int.Parse(row[0]),
-                        Speed =float.Parse(row[1]),
-                        Damage =float.Parse(row[2]),
-                        Radius = float.Parse(row[3])
+                        AmmoCount = int.Parse(row[1]),
+                        Speed =float.Parse(row[2]),
+                        Damage =float.Parse(row[3]),
+                        Radius = float.Parse(row[4])
                     }
                 );
             }

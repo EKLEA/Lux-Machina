@@ -240,7 +240,7 @@ public class GameController : IInitializable
          World.EntityManager.AddComponentData(Map, new WorldTime
         {
             CurrentTick=gameStateData.CurrTick,
-            TicksPerDay=1200,
+            TicksPerDay=400,
             SpeedMultiplier=1,
             baseTick=0.05f,
             dayLength=0.7f
