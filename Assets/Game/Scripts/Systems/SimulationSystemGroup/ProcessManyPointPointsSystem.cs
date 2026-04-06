@@ -9,14 +9,14 @@ using UnityEngine;
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 [UpdateAfter(typeof(MarkBuildingOnMapSystem))]
 [BurstCompile]
-public partial struct ProcessRoadPointsSystem : ISystem
+public partial struct ProcessManyPointPointsSystem : ISystem
 {
-    EntityQuery _processCreateRoadPointsCommandQuery;
+    EntityQuery _processCreateManyPointPointsCommandQuery;
     public void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<BuildingMap>();
-        _processCreateRoadPointsCommandQuery= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<ProcessRoadPointsEventTag,MapPoint>()
+        _processCreateManyPointPointsCommandQuery= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<ProcessManyPointPointsEventTag,MapPoint>()
             .Build(ref state);
     }
     public void OnUpdate(ref SystemState state)
@@ -25,15 +25,15 @@ public partial struct ProcessRoadPointsSystem : ISystem
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
         
         var buildingMapRO= SystemAPI.GetSingleton<BuildingMap>();
-        if (!_processCreateRoadPointsCommandQuery.IsEmpty)
+        if (!_processCreateManyPointPointsCommandQuery.IsEmpty)
         {
-            state.Dependency= new ProcessRoadPoints
+            state.Dependency= new ProcessManyPointPoints
             {
                 CellMapBuildingsIDs=buildingMapRO.CellMapBuildingsIDs,
                 IsBluePrintLookUp=SystemAPI.GetComponentLookup<IsBlueprint>(false),
                 IsDemolitionLookUp=SystemAPI.GetComponentLookup<IsDemolition>(false),
                 TransitionSlotDataLookUp=SystemAPI.GetBufferLookup<TransitionSlotData>(false),
-                SecondBufferLookUp=SystemAPI.GetBufferLookup<RoadPointHealthData>(true),
+                SecondBufferLookUp=SystemAPI.GetBufferLookup<ManyPointPointHealthData>(true),
                 ECB=ecb
 
             }.Schedule(state.Dependency);
@@ -41,27 +41,27 @@ public partial struct ProcessRoadPointsSystem : ISystem
     }
 
     [BurstCompile]
-    [WithAll(typeof(ProcessRoadPointsEventTag))]
-    public partial struct ProcessRoadPoints : IJobEntity
+    public partial struct ProcessManyPointPoints : IJobEntity
     {
         [ReadOnly] public NativeParallelHashMap<int2, int> CellMapBuildingsIDs;
         
         public ComponentLookup<IsBlueprint> IsBluePrintLookUp;
         public ComponentLookup<IsDemolition> IsDemolitionLookUp;
         public BufferLookup<TransitionSlotData> TransitionSlotDataLookUp;
-        [ReadOnly] public BufferLookup<RoadPointHealthData> SecondBufferLookUp; 
+        [ReadOnly] public BufferLookup<ManyPointPointHealthData> SecondBufferLookUp; 
         public EntityCommandBuffer ECB;
         int pointCountInCommand;
         
         public void Execute( Entity entity, 
-                        in DynamicBuffer<MapPoint> points)
+                        in DynamicBuffer<MapPoint> points,in ProcessManyPointPointsEventTag data)
         {
             if (points.IsEmpty) 
             {
                 ECB.DestroyEntity(entity);
                 return;
             }
-             NativeParallelHashMap<int2, RoadPointHealthData> extraDataMap = new(points.Length, Allocator.Temp);
+            
+            NativeParallelHashMap<int2, ManyPointPointHealthData> extraDataMap = new(points.Length, Allocator.Temp);
             if (SecondBufferLookUp.HasBuffer(entity))
             {
                 var extraBuff = SecondBufferLookUp[entity];
@@ -95,7 +95,8 @@ public partial struct ProcessRoadPointsSystem : ISystem
                     items[i]=(buff[i].amount,buff[i]);
                 }
             }
-            ClusterPoints(filteredPoints, IsBluePrint,IsDemolition,hasTransitSlots,ref items,extraDataMap);
+            
+            ClusterPoints(data.buildingID,filteredPoints, IsBluePrint,IsDemolition,hasTransitSlots,ref items,extraDataMap);
 
             extraDataMap.Dispose();
             filteredPoints.Dispose();
@@ -103,7 +104,7 @@ public partial struct ProcessRoadPointsSystem : ISystem
             ECB.DestroyEntity(entity);
         }
         
-        private void ClusterPoints(NativeList<int2> points, bool IsBluePrint, bool IsDemolition, bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items, NativeParallelHashMap<int2, RoadPointHealthData> extraDataMap)
+        private void ClusterPoints(int buildingID,NativeList<int2> points, bool IsBluePrint, bool IsDemolition, bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items, NativeParallelHashMap<int2, ManyPointPointHealthData> extraDataMap)
         {
             int pointCount = points.Length;
             pointCountInCommand = pointCount;
@@ -150,8 +151,9 @@ public partial struct ProcessRoadPointsSystem : ISystem
             var enumerator = clusters.GetEnumerator();
             while (enumerator.MoveNext())
             {
+                
                 var clusterList = enumerator.Current.Value;
-                ProcessCluster(clusterList, IsBluePrint, IsDemolition, hasTransitSlots,ref items,extraDataMap);
+                ProcessCluster(buildingID,clusterList, IsBluePrint, IsDemolition, hasTransitSlots,ref items,extraDataMap);
                 clusterList.Dispose(); 
             }
             
@@ -170,22 +172,22 @@ public partial struct ProcessRoadPointsSystem : ISystem
             return root;
         }
         
-        private void ProcessCluster(NativeList<int2> clusterPoints,bool IsBluePrint,bool IsDemolition,bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items, NativeParallelHashMap<int2, RoadPointHealthData> extraDataMap)
+        private void ProcessCluster(int buildingID,NativeList<int2> clusterPoints,bool IsBluePrint,bool IsDemolition,bool hasTransitSlots,ref NativeArray<(int, TransitionSlotData)> items, NativeParallelHashMap<int2, ManyPointPointHealthData> extraDataMap)
         {
             if (clusterPoints.Length == 0) return;
            
-            Entity createRoadCommand = ECB.CreateEntity();
+            Entity createManyPointCommand = ECB.CreateEntity();
             
             uint hash = math.hash(clusterPoints[0]);
             hash = math.hash(new int3((int)hash, clusterPoints[clusterPoints.Length - 1].x, clusterPoints[clusterPoints.Length - 1].y));
-            ECB.AddComponent(createRoadCommand,new CreateRoadEventTag{UniqueBuildingID=(int)hash});
+            ECB.AddComponent(createManyPointCommand,new CreateManyPointEventTag{buildingID=buildingID,UniqueBuildingID=(int)hash});
 
             
-            var buff = ECB.AddBuffer<MapPoint>(createRoadCommand);
-            DynamicBuffer<RoadPointHealthData> extraBuff = default;
-            if (!extraDataMap.IsEmpty) extraBuff = ECB.AddBuffer<RoadPointHealthData>(createRoadCommand);
-            if(IsBluePrint) ECB.AddComponent<IsBlueprint>(createRoadCommand);
-            if(IsDemolition) ECB.AddComponent<IsDemolition>(createRoadCommand);
+            var buff = ECB.AddBuffer<MapPoint>(createManyPointCommand);
+            DynamicBuffer<ManyPointPointHealthData> extraBuff = default;
+            if (!extraDataMap.IsEmpty) extraBuff = ECB.AddBuffer<ManyPointPointHealthData>(createManyPointCommand);
+            if(IsBluePrint) ECB.AddComponent<IsBlueprint>(createManyPointCommand);
+            if(IsDemolition) ECB.AddComponent<IsDemolition>(createManyPointCommand);
             foreach(var p in clusterPoints)
             {
                 buff.Add(new MapPoint{pos=p});
@@ -196,7 +198,7 @@ public partial struct ProcessRoadPointsSystem : ISystem
             }
             if (hasTransitSlots)
             {
-                var itemBuff=ECB.AddBuffer<TransitionSlotData>(createRoadCommand);
+                var itemBuff=ECB.AddBuffer<TransitionSlotData>(createManyPointCommand);
                 float procent=(float)clusterPoints.Length / pointCountInCommand;
                 for(int i=0;i<items.Length;i++)
                 {

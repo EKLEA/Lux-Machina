@@ -85,10 +85,15 @@ public partial struct CraftSystem : ISystem
         [ReadOnly] public  BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
         [ReadOnly] public  NativeParallelHashMap<int2,int2> ResouecesMap;
         public ComponentLookup<CanCraft> CanCraftLookup;
-        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<OutputSlotData> outputs, in ResourcesLink resourcesLink)
+        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<OutputSlotData> outputs, in ResourcesLink resourcesLink,ref BuildingStateData buildingStateData)
         {
             RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var res);
-            CanCraftLookup.SetComponentEnabled(entity,CanCraft(outputs,res,resourcesLink));
+            
+            bool b= CanCraft(outputs,res,resourcesLink);
+            CanCraftLookup.SetComponentEnabled(entity,b);
+            buildingStateData.State=(int)(b?WorkStateEnum.Work:WorkStateEnum.Await);
+            
+            
         }
         
         bool CanCraft(in DynamicBuffer<OutputSlotData> slots,RecipeStructConfig recipe,ResourcesLink resourcesLink)
@@ -120,10 +125,13 @@ public partial struct CraftSystem : ISystem
         [ReadOnly] public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
         
         public ComponentLookup<CanCraft> CanCraftLookup;
-        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<InputSlotData> inputs)
+        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<InputSlotData> inputs,ref BuildingStateData buildingStateData)
         {
+            
             RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var res);
-            CanCraftLookup.SetComponentEnabled(entity,CanCraft(inputs,res));
+            bool b=CanCraft(inputs,res);
+            CanCraftLookup.SetComponentEnabled(entity,b);
+            buildingStateData.State=(int)(b?WorkStateEnum.Work:WorkStateEnum.Await);
         }
         
         bool CanCraft(in DynamicBuffer<InputSlotData> slots,RecipeStructConfig recipe)
@@ -142,10 +150,12 @@ public partial struct CraftSystem : ISystem
         [ReadOnly] public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
         
         public ComponentLookup<CanCraft> CanCraftLookup;
-        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<InputSlotData> inputs,in DynamicBuffer<OutputSlotData> outputs)
+        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<InputSlotData> inputs,in DynamicBuffer<OutputSlotData> outputs,ref BuildingStateData buildingStateData)
         {
             RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var res);
-             CanCraftLookup.SetComponentEnabled(entity,CanCraft(inputs,outputs,res));
+            bool b=CanCraft(inputs,outputs,res);
+            CanCraftLookup.SetComponentEnabled(entity,b);
+            buildingStateData.State=(int)(b?WorkStateEnum.Work:WorkStateEnum.Await);
         }
         
      bool CanCraft(in DynamicBuffer<InputSlotData> inSlots,in DynamicBuffer<OutputSlotData> outSlots,RecipeStructConfig recipe)
@@ -182,7 +192,7 @@ public partial struct CraftSystem : ISystem
         public NativeParallelMultiHashMap<int, RecipeIngredientStruct>.ParallelWriter produced; 
         [NativeDisableParallelForRestriction] public NativeParallelHashMap<int2,int2> ResouecesMap;
         public float timeStep;
-        public void Execute(ref RecipeBuildingData recipeData, ref DynamicBuffer<OutputSlotData> slots,EnabledRefRW<CanCraft> canCraft,ref ResourcesLink resourcesLink)
+        public void Execute(ref RecipeBuildingData recipeData, ref DynamicBuffer<OutputSlotData> slots,EnabledRefRW<CanCraft> canCraft,ref ResourcesLink resourcesLink,ref BuildingStateData buildingStateData)
         {
             if(recipeData.CurrTime>=recipeData.TimeToCraft)
             {
@@ -202,7 +212,10 @@ public partial struct CraftSystem : ISystem
                     }
                     
                     recipeData.CurrTime=0;
-                    canCraft.ValueRW=CanCraft(slots,recipe,resourcesLink);
+                    bool b=CanCraft(slots,recipe,resourcesLink);
+                    canCraft.ValueRW=b;
+                    
+                    buildingStateData.State=(int)(b?WorkStateEnum.Work:WorkStateEnum.Await);
                 }
                 
             }
@@ -238,7 +251,7 @@ public partial struct CraftSystem : ISystem
         [ReadOnly] public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
         public NativeParallelMultiHashMap<int, RecipeIngredientStruct>.ParallelWriter consumed; 
         public float timeStep;
-        public void Execute(ref RecipeBuildingData recipeData, ref DynamicBuffer<InputSlotData> slots)
+        public void Execute(ref RecipeBuildingData recipeData,EnabledRefRW<CanCraft> canCraft, ref DynamicBuffer<InputSlotData> slots,ref BuildingStateData buildingStateData)
         {
             if(recipeData.CurrTime>=recipeData.TimeToCraft)
             {
@@ -252,9 +265,23 @@ public partial struct CraftSystem : ISystem
                         slots[i]=data;
                     }
                     recipeData.CurrTime=0;
+                    
                 }
+                bool b=CanCraft(slots,recipe);
+                canCraft.ValueRW=b;
+                
+                    buildingStateData.State=(int)(b?WorkStateEnum.Work:WorkStateEnum.Await);
+
             }
             else recipeData.CurrTime+=timeStep;
+        }
+         bool CanCraft(in DynamicBuffer<InputSlotData> slots,RecipeStructConfig recipe)
+        {
+            for(int i=0;i<slots.Length;i++)
+            {
+                if (slots[i].Amount <recipe.InputItems[i].Amount) return false;
+            }
+            return true;
         }
     }
 
@@ -268,7 +295,7 @@ public partial struct CraftSystem : ISystem
         public NativeParallelMultiHashMap<int, RecipeIngredientStruct>.ParallelWriter consumed; 
         public NativeParallelMultiHashMap<int, RecipeIngredientStruct>.ParallelWriter produced; 
         public float timeStep;
-        public void Execute(ref RecipeBuildingData recipeData, DynamicBuffer<InputSlotData> inSlots, DynamicBuffer<OutputSlotData> outSlots,EnabledRefRW<CanCraft> canCraft)
+        public void Execute(ref RecipeBuildingData recipeData, DynamicBuffer<InputSlotData> inSlots, DynamicBuffer<OutputSlotData> outSlots,EnabledRefRW<CanCraft> canCraft,ref BuildingStateData buildingStateData)
         {
             if(recipeData.CurrTime>=recipeData.TimeToCraft)
             {
@@ -291,7 +318,10 @@ public partial struct CraftSystem : ISystem
                         outSlots[i]=data;
                     }
                     recipeData.CurrTime=0;
-                    canCraft.ValueRW=CanCraft(inSlots,outSlots,recipe);
+                    bool b=CanCraft(inSlots,outSlots,recipe);
+                    canCraft.ValueRW=b;
+                    
+                    buildingStateData.State=(int)(b?WorkStateEnum.Work:WorkStateEnum.Await);
                 }
             }
             else recipeData.CurrTime+=timeStep;

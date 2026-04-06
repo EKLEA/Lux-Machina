@@ -54,8 +54,8 @@ public class GameSceneBindings : MonoInstaller
             ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerPlaceBuildingSystem>()
         ).AsSingle();
         
-        Container.Bind<PlayerPlaceRoadSystem>().FromMethod(ctx => 
-            ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerPlaceRoadSystem>()
+        Container.Bind<PlayerPlaceManyPointSystem>().FromMethod(ctx => 
+            ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerPlaceManyPointSystem>()
         ).AsSingle();
         Container.Bind<PlayerDeleteBuildingsSystem>().FromMethod(ctx => 
             ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerDeleteBuildingsSystem>()

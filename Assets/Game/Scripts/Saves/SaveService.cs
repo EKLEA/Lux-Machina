@@ -123,22 +123,11 @@ public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
         save.storageSlotsSaveData=new();
         save.buildingEnergyNetvorkLinkSaveData=new();
         save.ResourcesCellsList=new();
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(5,5),val=new int2(1,2)});
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(5,6),val=new int2(1,2)});
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(6,5),val=new int2(1,2)});
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(6,6),val=new int2(1,2)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(5,5),val=new int2(1,20)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(5,6),val=new int2(1,20)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(6,5),val=new int2(1,20)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(6,6),val=new int2(1,20)});
 
-        // save.buildingDatas = new();
-        // save.roadPoints = new();
-        // save.phantomPoints = new();
-        // save.buildingPosDatas = new();
-        // save.healthDatas = new();
-        // save.slotDatas = new();
-        // save.inputSlots = new();
-        // save.outputSlots = new();
-        // save.buildingsPriorityDatas = new();
-        // save.processBuildingDatas = new();
-        // save.phantomBuildings = new();
         save.camData = new PlayerCamData()
         {
             lookPointPosition = new Vector3(0, 0, 0),

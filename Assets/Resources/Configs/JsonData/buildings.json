@@ -14,14 +14,14 @@
                 "z": 1
             },
             "typeOfLogic": 0,
-            "maxHealth": 100.0,
-            "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
+            "maxHealth": 20.0,
+            "timeToStartRestore": 2.0,
+            "restoreHealthPerSecond": 2.0
         },
         {
             "id": "Core",
             "title": "Ядро",
-            "description": "выфывф",
+            "description": "Главная постройка игрока и главная цель для враго. Производит энергию и выполняет функцию хранилища",
             "iconPath": "core",
             "prefabPath": "corePrefab",
             "buildingType": 1,
@@ -33,13 +33,13 @@
             },
             "typeOfLogic": 0,
             "maxHealth": 1000.0,
-            "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
+            "timeToStartRestore": 10.0,
+            "restoreHealthPerSecond": 100.0
         },
         {
             "id": "Drill",
             "title": "Дрель",
-            "description": "выфывф",
+            "description": "Добывает ресурсы",
             "iconPath": "drill",
             "prefabPath": "drillPrefab",
             "buildingType": 2,
@@ -52,12 +52,12 @@
             "typeOfLogic": 1,
             "maxHealth": 100.0,
             "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
+            "restoreHealthPerSecond": 10.0
         },
         {
             "id": "FurnaceFT",
             "title": "Печь первого уровня",
-            "description": "выфывф",
+            "description": "Производит простые сплавы",
             "iconPath": "furnaceFT",
             "prefabPath": "furnaceFTPrefab",
             "buildingType": 2,
@@ -70,12 +70,30 @@
             "typeOfLogic": 1,
             "maxHealth": 100.0,
             "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
+            "restoreHealthPerSecond": 10.0
+        },
+        {
+            "id": "FurnaceST",
+            "title": "Печь второго уровня",
+            "description": "Производит простые и сложные сплавы",
+            "iconPath": "furnaceST",
+            "prefabPath": "furnaceSTPrefab",
+            "buildingType": 2,
+            "actionType": 0,
+            "size": {
+                "x": 5,
+                "y": 5,
+                "z": 5
+            },
+            "typeOfLogic": 1,
+            "maxHealth": 500.0,
+            "timeToStartRestore": 10.0,
+            "restoreHealthPerSecond": 50.0
         },
         {
             "id": "ConstructionFT",
             "title": "Сборщик первого уровня",
-            "description": "выфывф",
+            "description": "Собирает простые предметы и компоненты",
             "iconPath": "constructionFT",
             "prefabPath": "constructionFTPrefab",
             "buildingType": 2,
@@ -88,12 +106,30 @@
             "typeOfLogic": 1,
             "maxHealth": 100.0,
             "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
+            "restoreHealthPerSecond": 10.0
+        },
+        {
+            "id": "ConstructionST",
+            "title": "Сборщик второго уровня",
+            "description": "Собирает простые и сложные предметы и компоненты",
+            "iconPath": "constructionST",
+            "prefabPath": "constructionSTPrefab",
+            "buildingType": 2,
+            "actionType": 0,
+            "size": {
+                "x": 5,
+                "y": 5,
+                "z": 5
+            },
+            "typeOfLogic": 1,
+            "maxHealth": 500.0,
+            "timeToStartRestore": 10.0,
+            "restoreHealthPerSecond": 50.0
         },
         {
             "id": "StorageFT",
             "title": "Хранилищие первого уровня",
-            "description": "ывыфвыф",
+            "description": "Хранит предметы",
             "iconPath": "storageFT",
             "prefabPath": "storageFTPrefab",
             "buildingType": 4,
@@ -106,97 +142,97 @@
             "typeOfLogic": 1,
             "maxHealth": 100.0,
             "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
+            "restoreHealthPerSecond": 10.0
         },
         {
             "id": "Lep",
             "title": "Линия электро предач",
-            "description": "saddsa",
+            "description": "Передает энергию",
             "iconPath": "lep",
             "prefabPath": "lepPrefab",
             "buildingType": 3,
             "actionType": 0,
             "size": {
                 "x": 1,
-                "y": 8,
+                "y": 10,
                 "z": 1
             },
             "typeOfLogic": 0,
             "maxHealth": 50.0,
             "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
+            "restoreHealthPerSecond": 5.0
         },
         {
             "id": "Concentrator",
             "title": "Распределитель",
-            "description": "sadsadsda",
+            "description": "Передает и распространяет энергию",
             "iconPath": "Concentrator",
             "prefabPath": "concentratorPrefab",
             "buildingType": 3,
             "actionType": 0,
             "size": {
                 "x": 2,
-                "y": 8,
+                "y": 10,
                 "z": 2
             },
             "typeOfLogic": 0,
             "maxHealth": 50.0,
-            "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 20.0
+            "timeToStartRestore": 10.0,
+            "restoreHealthPerSecond": 5.0
         },
         {
             "id": "Turret",
             "title": "туррель",
-            "description": "asdsadsda",
+            "description": "Быстро наносит урон пулями",
             "iconPath": "turret",
             "prefabPath": "turretPrefab",
             "buildingType": 5,
             "actionType": 0,
             "size": {
                 "x": 3,
-                "y": 6,
+                "y": 3,
                 "z": 3
             },
             "typeOfLogic": 1,
             "maxHealth": 100.0,
-            "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 50.0
+            "timeToStartRestore": 15.0,
+            "restoreHealthPerSecond": 10.0
         },
         {
             "id": "Artillery",
             "title": "артилерия",
-            "description": "фыввыффыв",
+            "description": "Бьёт по площади",
             "iconPath": "artillery",
             "prefabPath": "artilleryPrefab",
             "buildingType": 5,
             "actionType": 0,
             "size": {
                 "x": 3,
-                "y": 6,
+                "y": 3,
                 "z": 3
             },
             "typeOfLogic": 1,
             "maxHealth": 100.0,
-            "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 100.0
+            "timeToStartRestore": 15.0,
+            "restoreHealthPerSecond": 10.0
         },
         {
-            "id": "FurnaceST",
-            "title": "Печь второго уровня",
-            "description": "вфывфвы",
-            "iconPath": "furnaceST",
-            "prefabPath": "furnaceSTPrefab",
-            "buildingType": 2,
-            "actionType": 0,
+            "id": "Wall",
+            "title": "Стена",
+            "description": "Крепкая стена",
+            "iconPath": "wall",
+            "prefabPath": "wallPrefab",
+            "buildingType": 5,
+            "actionType": 1,
             "size": {
-                "x": 5,
-                "y": 5,
-                "z": 5
+                "x": 1,
+                "y": 1,
+                "z": 1
             },
-            "typeOfLogic": 1,
-            "maxHealth": 500.0,
-            "timeToStartRestore": 5.0,
-            "restoreHealthPerSecond": 100.0
+            "typeOfLogic": 0,
+            "maxHealth": 100.0,
+            "timeToStartRestore": 15.0,
+            "restoreHealthPerSecond": 10.0
         }
     ]
 }

@@ -8,7 +8,7 @@ using Unity.Mathematics;
 public struct BuildingTag : IComponentData{}
     
     public struct CoreBuildingTag : IComponentData{}
-    public struct RoadTypeBuildingTag : IComponentData{}
+    public struct ManyPointTypeBuildingTag : IComponentData{}
     public struct ProcessorTypeBuildingTag:IComponentData{}
     public struct ProducerTypeBuildingTag:IComponentData{}
     public struct ConsumerTypeBuildingTag:IComponentData{}
@@ -35,7 +35,7 @@ public struct BuildingTag : IComponentData{}
     public struct ForceDestroyTag: IComponentData, IEnableableComponent{}
     public struct CheckForDestroy: IComponentData, IEnableableComponent{}
     public struct MarkOnMap: IComponentData, IEnableableComponent{}
-    public struct UpdateRoad: IComponentData, IEnableableComponent{}
+    public struct UpdateManyPoint: IComponentData, IEnableableComponent{}
     
    
 
@@ -207,7 +207,7 @@ public struct BuildingTag : IComponentData{}
         public float Damage;
     }
     
-    public struct RoadPointHealthData: IBufferElementData
+    public struct ManyPointPointHealthData: IBufferElementData
     {
         public int2 pos;
         public float CurrHealth;
@@ -279,7 +279,8 @@ public struct BuildingTag : IComponentData{}
     {
         Phantom=0,
         Demolition=1,
-        DisconnectedEnergy=2,
-        Await=3,
-        Work=4,
+        AwaitConntionToCluster=2,
+        DisconnectedEnergy=3,
+        Await=4,
+        Work=5,
     }

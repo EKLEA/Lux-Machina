@@ -4,14 +4,23 @@ using UnityEngine;
 
 public class PhantomObject : MonoBehaviour
 {
-   private static readonly int IsPhantomID = Shader.PropertyToID("_IsPhantom");
+    private static readonly int IsPhantomID = Shader.PropertyToID("_IsPhantom");
     private static readonly int MainColorID = Shader.PropertyToID("_PhantomColor");
     private static readonly int LineColorID = Shader.PropertyToID("_LineColor");
     private static readonly int ProgressID = Shader.PropertyToID("_PhantomProcent");
 
     private List<Renderer> _renderers = new();
     private MaterialPropertyBlock _propBlock;       
-     private IReadOnlyPhantomConfig _config;
+    private IReadOnlyPhantomConfig _config;
+
+    // Ссылка на инстанс-билдинг
+    private ManyPointsBuildingInstanced _instancedBuilding;
+
+    // Текущие значения для синхронизации
+    private bool _isPhantom;
+    private Color _mainColor;
+    private Color _lineColor;
+    private float _progress;
 
     public void SetUp(IReadOnlyPhantomConfig config)
     {
@@ -19,19 +28,32 @@ public class PhantomObject : MonoBehaviour
         _renderers.Clear();
         _renderers.AddRange(GetComponentsInChildren<Renderer>(true));
         _propBlock = new MaterialPropertyBlock();
+        
+        // Пытаемся найти компонент инстансинга на этом же объекте
+        _instancedBuilding = GetComponent<ManyPointsBuildingInstanced>();
     }
+
     public void SetPhantomMode(bool isPhantom, bool isBlueprint)
     {
         var activeConfig = isBlueprint ? _config.BluePrintPhantomConfig : _config.DemolitionAndFalsePhantomConfig;
         
+        _isPhantom = isPhantom;
+        if (isPhantom)
+        {
+            _mainColor = activeConfig.MainColor;
+            _lineColor = activeConfig.LineColor;
+        }
+
         UpdateVisuals(block => {
             block.SetFloat(IsPhantomID, isPhantom ? 1f : 0f);
             if (isPhantom)
             {
-                block.SetColor(MainColorID, activeConfig.MainColor);
-                block.SetColor(LineColorID, activeConfig.LineColor);
+                block.SetColor(MainColorID, _mainColor);
+                block.SetColor(LineColorID, _lineColor);
             }
         });
+
+        SyncInstanced();
     }
 
     public void CanBuild(bool canBuild, bool force)
@@ -43,16 +65,34 @@ public class PhantomObject : MonoBehaviour
         else
             targetConfig = canBuild ? _config.BluePrintPhantomConfig : _config.DemolitionAndFalsePhantomConfig;
 
+        _mainColor = targetConfig.MainColor;
+        _lineColor = targetConfig.LineColor;
+
         UpdateVisuals(block => {
-            block.SetColor(MainColorID, targetConfig.MainColor);
-            block.SetColor(LineColorID, targetConfig.LineColor);
+            block.SetColor(MainColorID, _mainColor);
+            block.SetColor(LineColorID, _lineColor);
         });
+
+        SyncInstanced();
     }
+
     public void SetProgress(float value)
     {
+        _progress = value;
         UpdateVisuals(block => {
             block.SetFloat(ProgressID, value); 
         });
+
+        SyncInstanced();
+    }
+
+    // Тот самый метод синхронизации с вашим ManyPointsBuildingInstanced
+    private void SyncInstanced()
+    {
+        if (_instancedBuilding != null)
+        {
+            _instancedBuilding.UpdatePhantomParams(_isPhantom, _mainColor, _lineColor, _progress);
+        }
     }
 
     private void UpdateVisuals(Action<MaterialPropertyBlock> action)
@@ -68,7 +108,10 @@ public class PhantomObject : MonoBehaviour
 
     public void UnPhantom()
     {
+        _isPhantom = false;
         UpdateVisuals(block => block.SetFloat(IsPhantomID, 0f));
+        SyncInstanced();
+        
         _renderers.Clear();
         Destroy(this);
     }

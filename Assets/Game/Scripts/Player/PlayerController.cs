@@ -29,8 +29,9 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     [SerializeField] CameraController cameraController;
     [Inject] GameController gameController;
     [Inject] GameFieldSettings GameFieldSettings;
+    [Inject] IReadOnlyBuildingInfo buildingInfo;
     [Inject] PlayerPlaceBuildingSystem playerPlaceBuildingSystem;
-    [Inject] PlayerPlaceRoadSystem playerPlaceRoadSystem; 
+    [Inject] PlayerPlaceManyPointSystem playerPlaceRoadSystem; 
     [Inject] PlayerDeleteBuildingsSystem playerDeleteBuildingsSystem; 
     [Inject] PlayerConnectionEnergySystem playerConnectionEnergySystem; 
     [Inject] GridUpdateSystem gridUpdateSystem; 
@@ -82,7 +83,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     private void OnPauseNormal(InputAction.CallbackContext context) => OnPausePerformed(context, false);
 private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerformed(context, true);
 
-    public void Initialize(PlayerPlaceBuildingSystem buildSystem, PlayerPlaceRoadSystem roadSystem,PlayerDeleteBuildingsSystem deleteBuildingsSystem,PlayerConnectionEnergySystem connSystem,GridUpdateSystem gridSystem)
+    public void Initialize(PlayerPlaceBuildingSystem buildSystem, PlayerPlaceManyPointSystem roadSystem,PlayerDeleteBuildingsSystem deleteBuildingsSystem,PlayerConnectionEnergySystem connSystem,GridUpdateSystem gridSystem)
     {
         playerPlaceBuildingSystem = buildSystem;
         playerPlaceRoadSystem = roadSystem;
@@ -97,14 +98,14 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
 
         entityManager.AddComponent<PlayerCommand>(PlaceCommand);
         entityManager.AddComponent<PlayerPlacingBuilding>(PlaceCommand);
-        entityManager.AddComponent<PlayerPlacingRoad>(PlaceCommand);
+        entityManager.AddComponent<PlayerPlacingManyPointBuilding>(PlaceCommand);
         entityManager.AddComponent<PlayerDeletePoints>(PlaceCommand);
         entityManager.AddComponent<PathfindingRequest>(PlaceCommand);
         entityManager.AddComponent<PlayerConnectBuildings>(PlaceCommand);
         
 
         entityManager.SetComponentEnabled<PathfindingRequest>(PlaceCommand,false);
-        entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
+        entityManager.SetComponentEnabled<PlayerPlacingManyPointBuilding>(PlaceCommand,false);
         entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,false);
         entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,false);
         entityManager.SetComponentEnabled<PlayerConnectBuildings>(PlaceCommand,false);
@@ -266,9 +267,10 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
             playerDeleteBuildingsSystem.onBuildingDone += SwitchToUIMode;
             PlaceDelegate=playerDeleteBuildingsSystem.DeletePoints;
             BackDelegate=playerDeleteBuildingsSystem.Back;
-            if (info == DeleteType.DeleteRoadPoints.ToString())
+            if (info == DeleteType.DeleteManyPointBuilding.ToString())
             {
-                playerDeleteBuildingsSystem.SetUpDelete(DeleteType.DeleteRoadPoints,this,PlaceCommand);
+                playerDeleteBuildingsSystem.SetUpDelete(DeleteType.DeleteManyPointBuilding,this,PlaceCommand);
+                RotateDelegate=playerDeleteBuildingsSystem.Rotate;
             }
             else
             {
@@ -276,7 +278,7 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
                 DeleteType.DeleteManyPoints:DeleteType.DeleteBuilding,this,PlaceCommand);
             }
             
-            entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
+            entityManager.SetComponentEnabled<PlayerPlacingManyPointBuilding>(PlaceCommand,false);
             entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,false);
             entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,true);
         }
@@ -294,14 +296,14 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
         {
             
             playerState=PlayerState.Building;
-            if (info == "Road")
+            if (buildingInfo.BuildingInfos.TryGetValue(info.GetStableHashCode(),out var val)&&val.actionType==ActionType.TwoPointBuilding)
             {
                 playerPlaceRoadSystem.onBuildingDone -= SwitchToUIMode;
                 playerPlaceRoadSystem.onBuildingDone += SwitchToUIMode;
-                PlaceDelegate=playerPlaceRoadSystem.PlaceRoad;
+                PlaceDelegate=playerPlaceRoadSystem.PlaceManyPoint;
                 BackDelegate=playerPlaceRoadSystem.Back;
                 playerPlaceRoadSystem.SetUpBuilding(info.GetStableHashCode(),this,PlaceCommand);
-                entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,true);
+                entityManager.SetComponentEnabled<PlayerPlacingManyPointBuilding>(PlaceCommand,true);
                 entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,false);
                 entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,false);
                 
@@ -314,7 +316,7 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
                 BackDelegate=playerPlaceBuildingSystem.Back;
                 //неучитываыет коннектед
                 playerPlaceBuildingSystem.SetUpBuilding(info.GetStableHashCode(),this,PlaceCommand);
-                entityManager.SetComponentEnabled<PlayerPlacingRoad>(PlaceCommand,false);
+                entityManager.SetComponentEnabled<PlayerPlacingManyPointBuilding>(PlaceCommand,false);
                 entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,true);
                 entityManager.SetComponentEnabled<PlayerDeletePoints>(PlaceCommand,false);
                 
@@ -351,6 +353,7 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
         playerPlaceBuildingSystem.onBuildingDone -= SwitchToUIMode;
         PlaceDelegate=null;
         BackDelegate=null;
+        RotateDelegate=null;
         UI.Enable();
         UIClick.performed += OnUIClickPerformed;
     }

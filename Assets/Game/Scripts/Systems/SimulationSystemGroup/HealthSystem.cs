@@ -45,10 +45,11 @@ public partial struct   HealthSystem: ISystem
         var parallelEcb = ecb.AsParallelWriter(); 
         var buildingConfig=SystemAPI.GetSingleton<BuildingConfigReference>();
         var health=SystemAPI.GetComponentLookup<HealthData>(true);
-        var road=SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(true);
-        var roadHealth=SystemAPI.GetBufferLookup<RoadPointHealthData>(true);
+        var road=SystemAPI.GetComponentLookup<ManyPointTypeBuildingTag>(true);
+        var roadHealth=SystemAPI.GetBufferLookup<ManyPointPointHealthData>(true);
         var ForceDestroyTagLookup=SystemAPI.GetComponentLookup<ForceDestroyTag>(true);
         var CheckForDestroyLookup=SystemAPI.GetComponentLookup<CheckForDestroy>(true);
+        var buildingDataLookup=SystemAPI.GetComponentLookup<BuildingData>(true);
         if (!_deadlyOBJs.IsEmpty)
         {
             state.Dependency =new TakeDamageJob
@@ -56,10 +57,11 @@ public partial struct   HealthSystem: ISystem
                 ECB=parallelEcb,
                 buildingBaseConfig=buildingConfig,
                 HealthDataLookup= health,
-                RoadLookUP=road,
+                ManyPointLookUP=road,
                 ForceDestroyTagLookup = ForceDestroyTagLookup,
                 CheckForDestroyLookup=CheckForDestroyLookup,
-                RoadPointHealthDataLookup=roadHealth
+                ManyPointPointHealthDataLookup=roadHealth,
+                buildingDataLookup=buildingDataLookup,
             }.ScheduleParallel(state.Dependency);
         }
         if (!_enemiesForDead.IsEmpty)
@@ -89,27 +91,28 @@ public partial struct   HealthSystem: ISystem
     partial struct TakeDamageJob : IJobEntity
     {
         public EntityCommandBuffer.ParallelWriter ECB;
-        [ReadOnly] public ComponentLookup<RoadTypeBuildingTag> RoadLookUP;
+        [ReadOnly] public ComponentLookup<ManyPointTypeBuildingTag> ManyPointLookUP;
         public BuildingConfigReference buildingBaseConfig;
         [ReadOnly] public ComponentLookup<HealthData> HealthDataLookup;
-        [ReadOnly] public BufferLookup<RoadPointHealthData> RoadPointHealthDataLookup;
+        [ReadOnly] public BufferLookup<ManyPointPointHealthData> ManyPointPointHealthDataLookup;
         [ReadOnly] public ComponentLookup<ForceDestroyTag> ForceDestroyTagLookup;
         [ReadOnly] public ComponentLookup<CheckForDestroy> CheckForDestroyLookup;
+        [ReadOnly] public ComponentLookup<BuildingData> buildingDataLookup;
         public void Execute([ChunkIndexInQuery] int sortKey,Entity entity,ref DynamicBuffer<TakeDamage> takeDamage)
         {
             var buff=takeDamage;
             if (takeDamage.Length == 0) return;
-            if(RoadLookUP.HasComponent(entity))
+            if(ManyPointLookUP.HasComponent(entity))
             {
                 if(buildingBaseConfig.BuildingsBaseConfigs.Value.TryGetConfig(buildingBaseConfig.roadID,out var cfg))
                 {
                     var destroyCellCommand=ECB.CreateEntity(sortKey);
-                    ECB.AddComponent(sortKey,destroyCellCommand,new DeleteRoadPointsFromMap{isForce=true});
+                    ECB.AddComponent(sortKey,destroyCellCommand,new DeleteManyPointsBuildingFromMap{isForce=true,buildingID=buildingDataLookup[entity].BuildingIDHash});
                     var cellToDelete=ECB.AddBuffer<MapPoint>(sortKey,destroyCellCommand);
                     var damagePerCell=new NativeHashMap<int2, float>(takeDamage.Length, Allocator.Temp);
                     var healthCell=new NativeHashMap<int2, float>(takeDamage.Length, Allocator.Temp);
-                    var healthList = new NativeList<RoadPointHealthData>(RoadPointHealthDataLookup[entity].Length, Allocator.Temp);
-                    healthList.AddRange(RoadPointHealthDataLookup[entity].AsNativeArray());
+                    var healthList = new NativeList<ManyPointPointHealthData>(ManyPointPointHealthDataLookup[entity].Length, Allocator.Temp);
+                    healthList.AddRange(ManyPointPointHealthDataLookup[entity].AsNativeArray());
                     foreach (var h in healthList)
                     {
                         healthCell.Add(h.pos,h.CurrHealth);
@@ -138,10 +141,10 @@ public partial struct   HealthSystem: ISystem
                                 healthCell.Add(c,cfg.MaxHealth-damagePerCell[c]);
                         }
                     }
-                    var b=ECB.SetBuffer<RoadPointHealthData>(sortKey,entity);
+                    var b=ECB.SetBuffer<ManyPointPointHealthData>(sortKey,entity);
                     foreach(var h in healthCell)
                     {
-                        b.Add(new RoadPointHealthData{pos=h.Key,CurrHealth=h.Value,MaxHealth=cfg.MaxHealth,RestoreHpPerTick=cfg.RestoreHpPerTick,TimeToRestore=cfg.TimeToRestore,CurrTimeToRestore=cfg.TimeToRestore});
+                        b.Add(new ManyPointPointHealthData{pos=h.Key,CurrHealth=h.Value,MaxHealth=cfg.MaxHealth,RestoreHpPerTick=cfg.RestoreHpPerTick,TimeToRestore=cfg.TimeToRestore,CurrTimeToRestore=cfg.TimeToRestore});
                     }
                 }
               

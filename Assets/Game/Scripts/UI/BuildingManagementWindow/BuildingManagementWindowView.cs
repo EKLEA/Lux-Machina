@@ -120,6 +120,7 @@ public class BuildingManagementWindowView:DragableUIWindow
             return;
         }
         
+        base.Open();
         ResetWindow();
         ShowBaseWindow();
         ShowCraftArea();
@@ -141,12 +142,46 @@ public class BuildingManagementWindowView:DragableUIWindow
             });
         }
         fC=0;
-        base.Open();
         
-        StartCoroutine(DeferredResize());
+        if (gameObject.activeInHierarchy) 
+        {
+            StartCoroutine(DeferredResize());
+        }
     }
     void UpdateState(int state)
     {
+        switch ((WorkStateEnum)state)
+        {
+            case WorkStateEnum.Phantom:
+                workIndicatorOrb.color=Color.cyan;
+                workIndicatorText.text="Чертёж";
+                break;
+            case WorkStateEnum.Demolition:
+                workIndicatorOrb.color= new Color(1f, 0.5f, 0f);
+                workIndicatorText.text="План сноса";
+                break;
+            case WorkStateEnum.DisconnectedEnergy:
+                workIndicatorOrb.color=Color.magenta;
+                workIndicatorText.text="Неподключено к энергии";
+                break;
+            case WorkStateEnum.AwaitConntionToCluster:
+                workIndicatorOrb.color= new Color(0.4f, 0.25f, 0.15f);;
+                workIndicatorText.text="Неподключено к дороге";
+                break;
+            case WorkStateEnum.Await:
+                workIndicatorOrb.color=Color.yellow;
+                workIndicatorText.text="Ждет";
+                break;
+            case WorkStateEnum.Work:
+                workIndicatorOrb.color=Color.green;
+                workIndicatorText.text="Работает";
+                break;
+            default:
+                workIndicatorOrb.color=Color.grey;
+                workIndicatorText.text="Ошибка";
+                break;
+
+        }
         //model.GetStateInfo(state);
     }
     void ShowBaseWindow()
@@ -156,7 +191,7 @@ public class BuildingManagementWindowView:DragableUIWindow
         allDisposables=new();
         addOne.onClick.RemoveAllListeners();
         removeOne.onClick.RemoveAllListeners();
-        model.tempUpdate+=()=>{Close();SetUpData(buildingViewData.buildingEntity);};
+        model.tempUpdate+=()=>{SetUpData(buildingViewData.buildingEntity);};
         addOne.onClick.AddListener(()=>model.AddAmount(1));
         removeOne.onClick.AddListener(()=>model.AddAmount(-1));
         BuildingSprite.sprite=buildingInfo.GetBuildingSprite(buildingViewData.buildingID);
@@ -281,7 +316,6 @@ public class BuildingManagementWindowView:DragableUIWindow
             {
                 UpdateStorageSlots(value,storageSlots.Item2);
             }).AddTo(StorageAreaDispose);
-            Debug.Log(storageSlots.Item2);
             UpdateStorageSlots(storageSlots.Item1.Value,storageSlots.Item2);
             allDisposables.Add(StorageAreaDispose);
         }
@@ -451,7 +485,6 @@ public class BuildingManagementWindowView:DragableUIWindow
                 int indexForLambda = i; 
                 var slotUI = StorageSlots[i];
 
-                // ВАЖНО: Сначала Bind, который внутри себя ВЫЗЫВАЕТ Clear() и обнуляет onSlotDeleted
                 slotUI.Bind((
                     slots[i].ItemID.Value,
                     slots[i].Amount,
@@ -461,7 +494,6 @@ public class BuildingManagementWindowView:DragableUIWindow
                 ),5,100);
                 
 
-                // Теперь подписываемся на ЧИСТОЕ событие. На кнопке будет ровно ОДИН обработчик.
                 slotUI.onSlotDeleted += () =>
                 {
                     model.RemoveStorageSlot(indexForLambda);
@@ -531,6 +563,8 @@ public class BuildingManagementWindowView:DragableUIWindow
     }
     public override void Close()
     {
+        
+        if (!isOpened.Value) return;
         ResetWindow();
         base.Close();
     }

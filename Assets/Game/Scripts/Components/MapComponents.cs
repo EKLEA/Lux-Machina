@@ -234,9 +234,10 @@ public struct MapPoint : IBufferElementData
 }
 public struct PathfindingRequest : IComponentData, IEnableableComponent
 {
+    public int BuildingID;
     public int2 Start;
     public int2 End;
-    public bool RoadPerfer;
+    public bool SamePerfer;
 }
 public struct DisablePathfindingTag : IComponentData, IEnableableComponent { }
 public struct MapUpdateRequest : IBufferElementData

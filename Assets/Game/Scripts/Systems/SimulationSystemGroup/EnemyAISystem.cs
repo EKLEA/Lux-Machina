@@ -95,6 +95,7 @@ public partial struct EnemyAISystem : ISystem
                 ECB = logicEcb.AsParallelWriter(),
                 FlowDirections = map.CellDirections,
                 CellEntities = map.CellMapEntites,
+                IsBluePrintOrDemolition=map.IsBluePrintOrDemolitionPoints,
                 TurretCells = turretMap.ValueRW.TurretGridClaim,
                 EnemyInCellsMap= turretMap.ValueRW.EnemyInCellsMap.AsParallelWriter(),
                 
@@ -285,11 +286,13 @@ public partial struct EnemyLogicJob : IJobEntity
 
     [ReadOnly] public BufferLookup<TakeDamage> DamageLookUp;
     [ReadOnly] public ComponentLookup<CheckForDestroy> CheckForDestroyLookUp;
+    [ReadOnly] public NativeParallelHashMap<int2, bool> IsBluePrintOrDemolition;
     public EntityCommandBuffer.ParallelWriter ECB;   
     public NativeParallelMultiHashMap<int, Entity>.ParallelWriter TurretTargets;
     public NativeParallelMultiHashMap<Entity, int>.ParallelWriter TargetsToTurrets;
     
-     public NativeParallelMultiHashMap<int2, Entity>.ParallelWriter  EnemyInCellsMap;
+    public NativeParallelMultiHashMap<int2, Entity>.ParallelWriter  EnemyInCellsMap;
+     
     public float DeltaTime;
     public float ElapsedTime;
 
@@ -314,20 +317,22 @@ public partial struct EnemyLogicJob : IJobEntity
 
             if (CellEntities.TryGetValue(nextCell, out Entity targetBuilding) && !nextCell.Equals(cellPos))
             {
-                if (ElapsedTime > stats.LastAttackTime + stats.AttackInterval)
+                bool isBlueprint = IsBluePrintOrDemolition.ContainsKey(nextCell) && IsBluePrintOrDemolition[nextCell];
+
+                if (!isBlueprint) 
                 {
-                    
-                    if (DamageLookUp.HasBuffer(targetBuilding)&&!CheckForDestroyLookUp.IsComponentEnabled(targetBuilding))
+                    if (ElapsedTime > stats.LastAttackTime + stats.AttackInterval)
                     {
-                        ECB.AppendToBuffer(chunkIndex, targetBuilding, new TakeDamage { Damage = stats.AttackDamage,pos=nextCell });
+                        if (DamageLookUp.HasBuffer(targetBuilding) && !CheckForDestroyLookUp.IsComponentEnabled(targetBuilding))
+                        {
+                            ECB.AppendToBuffer(chunkIndex, targetBuilding, new TakeDamage { Damage = stats.AttackDamage, pos = nextCell });
+                        }
                         stats.LastAttackTime = ElapsedTime;
                     }
                     
-                    stats.LastAttackTime = ElapsedTime;
+                    transform.Rotation = quaternion.LookRotation(new float3(moveDir.x, 0, moveDir.y), math.up());
+                    return; 
                 }
-                
-                transform.Rotation = quaternion.LookRotation(new float3(moveDir.x, 0, moveDir.y), math.up());
-                return; 
             }
 
             transform.Position += new float3(moveDir.x, 0, moveDir.y) * stats.Speed * DeltaTime;

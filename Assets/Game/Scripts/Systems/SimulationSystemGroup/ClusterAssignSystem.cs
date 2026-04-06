@@ -95,7 +95,7 @@ public partial struct ClusterAssignSystem : ISystem
     }
     [BurstCompile]
     [WithAll(typeof(ClusterLink))]
-    [WithNone(typeof(RoadTypeBuildingTag))]
+    [WithNone(typeof(ManyPointTypeBuildingTag))]
     public partial struct PingBuildingClusterID : IJobEntity
     {
         public ComponentLookup<NeedsClusterAssign> NeedsClusterAssignLookup;
@@ -230,7 +230,7 @@ public partial struct ClusterAssignSystem : ISystem
         [ReadOnly] public ComponentLookup<LogisticTag> RoadLookup;
         void Execute(
             Entity entity, 
-            in BuildingPosData buildingPosData,ref ClusterLink clusterLink)
+            in BuildingPosData buildingPosData,ref ClusterLink clusterLink,ref BuildingStateData buildingStateData)
         {
              var neighborClusters = new FixedList128Bytes<int>(); 
 
@@ -244,7 +244,7 @@ public partial struct ClusterAssignSystem : ISystem
                 CheckPoint(new int2(buildingPosData.LeftCornerPos.x-1,y),ref neighborClusters);
                 CheckPoint(new int2(buildingPosData.LeftCornerPos.x+buildingPosData.size.x,y),ref neighborClusters);
             }
-             if (IsLogicEnabledLookup.HasComponent(entity))
+            if (IsLogicEnabledLookup.HasComponent(entity))
             {
                 IsLogicEnabledLookup.SetComponentEnabled(entity, neighborClusters.Length>0);
             }
@@ -253,6 +253,14 @@ public partial struct ClusterAssignSystem : ISystem
             {
                 clusterLink.ClusterIds.Add(n);
             }
+            if (clusterLink.ClusterIds.Length <= 0)
+            {
+                if(buildingStateData.State>(int) WorkStateEnum.AwaitConntionToCluster) buildingStateData.State=(int)WorkStateEnum.AwaitConntionToCluster;
+            }
+            // else
+            // {
+            //      if(buildingStateData.State<=(int) WorkStateEnum.AwaitConntionToCluster)buildingStateData.State=(int)WorkStateEnum.Work;
+            // }
             NeedsClusterAssignLookup.SetComponentEnabled(entity, false);
         }
 

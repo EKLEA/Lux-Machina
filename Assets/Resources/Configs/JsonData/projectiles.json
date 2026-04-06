@@ -1,28 +1,28 @@
 ﻿{
     "ProjectileConfigs": [
         {
-            "itemID": 35,
+            "itemID": 34,
             "AmmoCount": 20,
             "Speed": 20.0,
             "Damage": 5.0,
             "Radius": 1.0
         },
         {
-            "itemID": 36,
+            "itemID": 35,
             "AmmoCount": 15,
             "Speed": 30.0,
             "Damage": 10.0,
             "Radius": 2.0
         },
         {
-            "itemID": 37,
+            "itemID": 36,
             "AmmoCount": 8,
             "Speed": 10.0,
             "Damage": 10.0,
             "Radius": 5.0
         },
         {
-            "itemID": 38,
+            "itemID": 37,
             "AmmoCount": 4,
             "Speed": 20.0,
             "Damage": 20.0,

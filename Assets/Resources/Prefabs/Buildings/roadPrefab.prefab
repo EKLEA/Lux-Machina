@@ -118,7 +118,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6067951555211254825}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 838d1c9560883014b9993f16b094ee0a, type: 3}
   m_Name: 
@@ -126,9 +126,20 @@ MonoBehaviour:
   id: 0
   clusterID: 
   clusterIndicator: {fileID: 0}
-  outlineScript: {fileID: 5076338796290987020}
-  roadHeight: 0.6666667
-  roadMaterial: {fileID: 2100000, guid: 99d6e782ee528ee40821bd4208833d1a, type: 2}
+  outline: {fileID: 5076338796290987020}
+  useConnections: 1
+  spawnTop: 1
+  spawnFoundation: 1
+  generateColliders: 1
+  topMeshCorrection: {x: -90, y: 0, z: 0}
+  straightMesh: {fileID: -5957172401143510573, guid: 64fb4b72ea5c83e4a801a9e07148fc42, type: 3}
+  cornerMesh: {fileID: -5596202524400825144, guid: 70ad804c0386cf54cbbefbd2e21cb285, type: 3}
+  tMesh: {fileID: 534153089152536614, guid: a413c98b9113aa04798b7d5a8ff13260, type: 3}
+  crossMesh: {fileID: 4056572268465193048, guid: 8ac0a4262db3a1d41b1eac5331bb8325, type: 3}
+  singleMesh: {fileID: 4056572268465193048, guid: 8ac0a4262db3a1d41b1eac5331bb8325, type: 3}
+  foundationMesh: {fileID: 6549673948351473199, guid: 8151c3970e291b74b9c2d7abbb264a0d, type: 3}
+  material: {fileID: 2100000, guid: 99d6e782ee528ee40821bd4208833d1a, type: 2}
+  topMeshYOffset: 2
 --- !u!114 &5076338796290987020
 MonoBehaviour:
   m_ObjectHideFlags: 0

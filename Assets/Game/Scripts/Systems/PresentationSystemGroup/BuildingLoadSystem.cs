@@ -75,7 +75,7 @@ public partial class BuildingLoadSystem : SystemBase
                 {
                     
                     var k =1;
-                    if (EntityManager.HasComponent<RoadTypeBuildingTag>(building))
+                    if (EntityManager.HasComponent<ManyPointTypeBuildingTag>(building))
                     {
                         k=EntityManager.GetBuffer<MapPoint>(building).Length;
                     }

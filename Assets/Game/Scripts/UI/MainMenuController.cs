@@ -70,7 +70,10 @@ public class MainMenuController : MonoBehaviour
         to.gameObject.SetActive(true);
         await Fader(to);
     }
-
+    public void Exit()
+    {
+        Application.Quit();
+    }
     async Task Fader(CanvasGroup screen)
     {
         float duration = loadingSettings.TimeOfFade;

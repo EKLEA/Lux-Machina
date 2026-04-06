@@ -142,7 +142,7 @@ public class GameController : IInitializable
         world.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
         AddUnmanaged<DestroyBuildingsSystem>(simGroup);
         AddUnmanaged<MarkBuildingOnMapSystem>(simGroup);
-        AddUnmanaged<ProcessRoadPointsSystem>(simGroup);
+        AddUnmanaged<ProcessManyPointPointsSystem>(simGroup);
         AddUnmanaged<BuildingCreateSystem>(simGroup);
         AddUnmanaged<EnergySystem>(simGroup);
         AddUnmanaged<ClusterAssignSystem>(simGroup);
@@ -170,13 +170,13 @@ public class GameController : IInitializable
         UIManager.onReturnToMenu+=() => GoToMenu().Forget(); 
         
         var BuildSystem=RegisterManagedSystem<PlayerPlaceBuildingSystem>(presGroup);
-        var RoadSystem= RegisterManagedSystem<PlayerPlaceRoadSystem>(presGroup);
+        var ManyPointSystem= RegisterManagedSystem<PlayerPlaceManyPointSystem>(presGroup);
         var deleteSystem= RegisterManagedSystem<PlayerDeleteBuildingsSystem>(presGroup);
         var gridSystem= RegisterManagedSystem<GridUpdateSystem>(presGroup);
         var connSystem= RegisterManagedSystem<PlayerConnectionEnergySystem>(presGroup);
 
          var player = _container.Resolve<PlayerController>();
-        player.Initialize(BuildSystem, RoadSystem,deleteSystem,connSystem,gridSystem);
+        player.Initialize(BuildSystem, ManyPointSystem,deleteSystem,connSystem,gridSystem);
         simGroup.SortSystems();
         presGroup.SortSystems();
         await UniTask.Yield();
@@ -240,7 +240,7 @@ public class GameController : IInitializable
          World.EntityManager.AddComponentData(Map, new WorldTime
         {
             CurrentTick=gameStateData.CurrTick,
-            TicksPerDay=400,
+            TicksPerDay=400,//12000
             SpeedMultiplier=1,
             baseTick=0.05f,
             dayLength=0.7f
@@ -280,7 +280,7 @@ public class GameController : IInitializable
     {
         var buildingCommand = World.EntityManager.CreateArchetype(typeof(CreateBuildingEventData),typeof(IsBlueprint),typeof(IsDemolition),typeof(LinkNetworkEnergyTo));
 
-        var roadCommand = World.EntityManager.CreateArchetype(typeof(CreateRoadEventTag),typeof(MapPoint),typeof(IsBlueprint),typeof(IsDemolition));
+        var roadCommand = World.EntityManager.CreateArchetype(typeof(CreateManyPointEventTag),typeof(MapPoint),typeof(IsBlueprint),typeof(IsDemolition));
         CreateBuildingCommand(buildingCommand,gameStateData);
 
         using var entities = new NativeArray<Entity>(gameStateData.ManyPointsBuildings.Count, Allocator.TempJob);
@@ -294,7 +294,7 @@ public class GameController : IInitializable
             for(int i =0;i<pair.Value.points.Length;i++)
                 buff.Add(new MapPoint{pos=pair.Value.points[i]});
             
-            World.EntityManager.SetComponentData(entity,new CreateRoadEventTag{UniqueBuildingID=id});//тут изменить под стены
+            World.EntityManager.SetComponentData(entity,new CreateManyPointEventTag{UniqueBuildingID=id,buildingID=pair.Value.buildingID});//тут изменить под стены
             World.EntityManager.SetComponentEnabled<IsBlueprint>(entity,pair.Value.isBlueprint);
             World.EntityManager.SetComponentEnabled<IsDemolition>(entity,pair.Value.IsDemolition);
             index++;

@@ -7,19 +7,19 @@ public class BuildingOnScene : MonoBehaviour,IDisposable
     public int id;
     public int[] clusterID;
     public Renderer clusterIndicator;
-    [SerializeField] Outline outlineScript;
+    [SerializeField] protected Outline outline;
 
-    public void SetOutLine(Color? color)
+    public virtual void SetOutLine(Color? color)
     {
-        if(!outlineScript.SetUpded) outlineScript.SetUp();
+        if(!outline.SetUpded) outline.SetUp();
         if(color!=null)
         {
-            outlineScript.enabled=true;
+            outline.enabled=true;
 
-            outlineScript.OutlineColor=color.Value;
+            outline.OutlineColor=color.Value;
         }
         else 
-            outlineScript.enabled=false;
+            outline.enabled=false;
     }
    
     public void CreateClusterIndicator(float height = 2f)

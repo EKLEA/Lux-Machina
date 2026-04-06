@@ -83,7 +83,7 @@ public partial class BuildingSaveSystem : SystemBase
         var OutputSlotDataLookUp =SystemAPI.GetBufferLookup<OutputSlotData>();
 
        var handle= new BuildingSaveJob{buildings=buildings.AsParallelWriter(),IsBluePrintLookUp=IsBluePrintLookUp,IsDemolitionLookUp=IsDemolitionLookUp}.ScheduleParallel(this.Dependency);
-       handle= new RoadSaveJob{manyPointsBuildings=manyPointsBuildings.AsParallelWriter(),IsBluePrintLookUp=IsBluePrintLookUp,IsDemolitionLookUp=IsDemolitionLookUp}.ScheduleParallel(handle);
+       handle= new ManyPointSaveJob{manyPointsBuildings=manyPointsBuildings.AsParallelWriter(),IsBluePrintLookUp=IsBluePrintLookUp,IsDemolitionLookUp=IsDemolitionLookUp}.ScheduleParallel(handle);
        handle= new ConstructionSlotsSaveJob{
             constructionSlotsSaveData=constructionSlotsSaveData.AsParallelWriter(),
             InputConstructionSlotDataLookUp=InputConstructionSlotDataLookUp,
@@ -167,8 +167,8 @@ public partial class BuildingSaveSystem : SystemBase
             });
         }
     }
-    [WithAll(typeof(RoadTypeBuildingTag))]
-    partial struct RoadSaveJob : IJobEntity
+    [WithAll(typeof(ManyPointTypeBuildingTag))]
+    partial struct ManyPointSaveJob : IJobEntity
     {
         public NativeParallelHashMap<int,ManyPointsBuildingSaveData>.ParallelWriter manyPointsBuildings;        
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBluePrintLookUp;

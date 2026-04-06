@@ -220,7 +220,7 @@ MonoBehaviour:
   id: 0
   clusterID: 
   clusterIndicator: {fileID: 0}
-  outlineScript: {fileID: 6472314334170432611}
+  outline: {fileID: 6472314334170432611}
   TurretBarrel: {fileID: 6151121930232660333}
   TurretHead: {fileID: 6637523990759323993}
   TurretSpawn:

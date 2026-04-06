@@ -12,18 +12,18 @@ using UnityEngine;
 [UpdateAfter(typeof(DestroyBuildingsSystem))]
 public partial struct  MarkBuildingOnMapSystem: ISystem
 {
-    EntityQuery _markRoad;
+    EntityQuery _markManyPoint;
     EntityQuery _markBuilding;
     EntityQuery _mapUpdate;
     void OnCreate(ref SystemState state)
     {
         state.RequireForUpdate<BuildingMap>();
-        _markRoad= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<RoadTypeBuildingTag,BuildingData,BuildingTag,MapPoint,MarkOnMap>()
+        _markManyPoint= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<ManyPointTypeBuildingTag,BuildingData,BuildingTag,MapPoint,MarkOnMap>()
             .Build(ref state);
         _markBuilding= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<BuildingPosData,BuildingData,MarkOnMap>()
-            .WithNone<RoadTypeBuildingTag,MapPoint>()
+            .WithNone<ManyPointTypeBuildingTag,MapPoint>()
             .Build(ref state);
         _mapUpdate= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<BuildingMap,EntitiesDictionary,UpdateMapTag>()
@@ -32,10 +32,10 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
     void OnUpdate(ref SystemState state)
     {
         bool runBuilding = !_markBuilding.IsEmpty;
-        bool runRoad = !_markRoad.IsEmpty;
+        bool runManyPoint = !_markManyPoint.IsEmpty;
         bool runUpdate = !_mapUpdate.IsEmpty;
 
-        if (!runBuilding && !runRoad && !runUpdate) return;
+        if (!runBuilding && !runManyPoint && !runUpdate) return;
 
         var updateMapLookup = SystemAPI.GetComponentLookup<UpdateMapTag>(false);
         var updateClusterLookup = SystemAPI.GetComponentLookup<UpdateClustersTag>(false);
@@ -72,12 +72,12 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 TurretStatsLookup=TurretStatsLookup
             }.Schedule(state.Dependency);
         }
-        if (runRoad)
+        if (runManyPoint)
         {
             updateMapLookup = SystemAPI.GetComponentLookup<UpdateMapTag>(false);
             updateClusterLookup = SystemAPI.GetComponentLookup<UpdateClustersTag>(false);
 
-            state.Dependency = new MarkRoadJob
+            state.Dependency = new MarkManyPointJob
             {
                 MapData = buildingMapRW.ValueRW,
                 MapEntity = mapEntity,
@@ -91,15 +91,15 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             updateMapLookup = SystemAPI.GetComponentLookup<UpdateMapTag>(false);
             var HealthDataLookup = SystemAPI.GetComponentLookup<HealthData>(false);
             var SpawnMobsDataLookup = SystemAPI.GetComponentLookup<SpawnMobsData>(false);
-            var RoadPointHealthDataLookup = SystemAPI.GetBufferLookup<RoadPointHealthData>(false);
+            var ManyPointPointHealthDataLookup = SystemAPI.GetBufferLookup<ManyPointPointHealthData>(false);
              
             var weightJob = new CalculateDestructionWeightsJob {
                 BuildingsMap = buildingMapRW.ValueRW,
                 HealthDataLookup=HealthDataLookup,
-                RoadPointHealthDataLookup=RoadPointHealthDataLookup,
+                ManyPointPointHealthDataLookup=ManyPointPointHealthDataLookup,
                 buildingConfigReference=config,
                 SpawnManagerEntity=mapEntity,
-                SpawnMobsDataLookup=SpawnMobsDataLookup
+                SpawnMobsDataLookup=SpawnMobsDataLookup,
                 
             };
             state.Dependency = weightJob.Schedule(state.Dependency);
@@ -109,7 +109,8 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             {
                 Weights = buildingMapRW.ValueRO.CellWeights,
                 BuildingIDs = buildingMapRW.ValueRO.CellMapBuildingsIDs,
-                Directions = buildingMapRW.ValueRW.CellDirections
+                Directions = buildingMapRW.ValueRW.CellDirections,
+                IsBluePrintOrDemolition=buildingMapRW.ValueRO.IsBluePrintOrDemolitionPoints
             };
 
             state.Dependency = flowJob.Schedule(state.Dependency);
@@ -334,10 +335,11 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         }
     }
     [BurstCompile]
-    public partial struct MarkRoadJob : IJobEntity
+    public partial struct MarkManyPointJob : IJobEntity
     {
         public BuildingMap MapData; 
         public Entity MapEntity;
+
 
         public EntitiesDictionary EntityDictionary;         
         public ComponentLookup<UpdateMapTag> UpdateMapTagLookup;
@@ -399,7 +401,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         public Entity SpawnManagerEntity;        
         [ReadOnly] public BuildingConfigReference buildingConfigReference;
         [ReadOnly] public ComponentLookup<HealthData> HealthDataLookup;
-        [ReadOnly] public BufferLookup<RoadPointHealthData> RoadPointHealthDataLookup;
+        [ReadOnly] public BufferLookup<ManyPointPointHealthData> ManyPointPointHealthDataLookup;        
         public EntityCommandBuffer ECB;
 
         public void Execute()
@@ -413,7 +415,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             {
                 int2 bPos = building.Key;
                 int buildingID = building.Value;
-
+                if(BuildingsMap.IsBluePrintOrDemolitionPoints.ContainsKey(bPos)&&BuildingsMap.IsBluePrintOrDemolitionPoints[bPos])continue;
                 float startWeight = 0f;
                 if (buildingConfigReference.BuildingsBaseConfigs.Value.TryGetConfig(buildingID, out var config))
                 {
@@ -422,9 +424,9 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 }
                 var en=BuildingsMap.CellMapEntites[bPos];
                 float procent=1f;
-                if(RoadPointHealthDataLookup.HasBuffer(en))
+                if(ManyPointPointHealthDataLookup.HasBuffer(en))
                 {
-                    foreach(var b in RoadPointHealthDataLookup[en])
+                    foreach(var b in ManyPointPointHealthDataLookup[en])
                     {
                         if (bPos.x == b.pos.x && bPos.y == b.pos.y)
                         {
@@ -455,8 +457,13 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                         {
                             if (x == 0 && y == 0) continue;
                             int2 neighbor = curr + new int2(x, y);
-
-                            if (BuildingsMap.CellMapBuildingsIDs.ContainsKey(neighbor)) continue;
+                            if (BuildingsMap.CellMapBuildingsIDs.ContainsKey(neighbor)) 
+                            {
+                                bool isBlueprint = BuildingsMap.IsBluePrintOrDemolitionPoints.ContainsKey(neighbor) && 
+                                                BuildingsMap.IsBluePrintOrDemolitionPoints[neighbor];
+                                
+                                if (!isBlueprint) continue; // Пропускаем только настоящие здания
+                            }
 
                             float distMod = (x != 0 && y != 0) ? 1.41f : 1.0f;
                             
@@ -478,7 +485,6 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
 
         private float GetPriorityScore(BuildingsTypes type, TypeOfLogic logic)
         {
-            // Твои веса: Special (1) будет "тянуть" сильнее, чем Defence (20)
             switch (type)
             {
                 case BuildingsTypes.Special:    return 1f;   
@@ -495,19 +501,25 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
     {
         [ReadOnly] public NativeParallelHashMap<int2, float> Weights; 
         [ReadOnly] public NativeParallelHashMap<int2, int> BuildingIDs; 
+        [ReadOnly] public NativeParallelHashMap<int2, bool> IsBluePrintOrDemolition; 
         public NativeParallelHashMap<int2, float2> Directions;
 
-       public void Execute()
+        public void Execute()
         {
             Directions.Clear();
 
             foreach (var entry in Weights)
             {
                 int2 curr = entry.Key;
+
                 if (BuildingIDs.ContainsKey(curr))
                 {
-                    Directions.TryAdd(curr, float2.zero);
-                    continue;
+                    bool isBlueprint = IsBluePrintOrDemolition.ContainsKey(curr) && IsBluePrintOrDemolition[curr];
+                    if (!isBlueprint)
+                    {
+                        Directions.TryAdd(curr, float2.zero);
+                        continue;
+                    }
                 }
 
                 float currWeight = entry.Value;
@@ -546,4 +558,5 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             }
         }
     }
+
 }

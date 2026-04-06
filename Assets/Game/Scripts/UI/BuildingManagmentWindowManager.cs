@@ -2,80 +2,109 @@ using System;
 using System.Collections.Generic;
 using UniRx;
 using Unity.Entities;
-using Unity.Entities.UniversalDelegates;
 using UnityEngine;
 using Zenject;
 
-public class BuildingManagmentWindowManager : UIScreen,IInitializable
+public class BuildingManagmentWindowManager : UIScreen, IInitializable
 {
-    
-    [Inject] GameController gameController;
-    [SerializeField] BuildingManagementWindowView screen1;
-    [SerializeField] BuildingManagementWindowView screen2;
-    List<BuildingManagementWindowView > activeScreens;
-    Action UpdateAction;
-    Dictionary<BuildingManagementWindowView,IDisposable> disposables;
+    [Inject] private GameController gameController;
+    [SerializeField] private BuildingManagementWindowView screen1;
+    [SerializeField] private BuildingManagementWindowView screen2;
+
+    private List<BuildingManagementWindowView> activeScreens;
+    private Action UpdateAction;
+    private Dictionary<BuildingManagementWindowView, IDisposable> disposables;
+
     public override void Initialize()
     {
-        activeScreens=new();
-        disposables=new();
+        base.Initialize(); 
+        activeScreens = new List<BuildingManagementWindowView>();
+        disposables = new Dictionary<BuildingManagementWindowView, IDisposable>();
+
         screen1.Initialize();
         screen2.Initialize();
+        
+        
         screen1.BindModel(new BuildingInfoViewModel(gameController.World));
         screen2.BindModel(new BuildingInfoViewModel(gameController.World));
-        base.Initialize();
     }
-    public void Update()
+
+    private void Update()
     {
         UpdateAction?.Invoke();
     }
-    public void OpenBuilding(int id,bool secondWindow)
+
+    public void OpenBuilding(int id, bool secondWindow)
     {
-        
-        if(activeScreens.Count==0) 
-            base.Open();
-        BuildingManagementWindowView firstView;
-        BuildingManagementWindowView secondView;
-        if(gameController.GetEntity(id,out Entity entity))
+        if (gameController.GetEntity(id, out Entity entity))
         {
-            if (secondWindow)
-            {
-                firstView=screen2;
-                secondView=screen1;
-            }
-            else
-            {
-                firstView=screen1;
-                secondView=screen2;
-            }
+            BuildingManagementWindowView targetView = secondWindow ? screen2 : screen1;
+            BuildingManagementWindowView otherView = secondWindow ? screen1 : screen2;
+
             
-                
-            if(secondView.buildingViewData!=null&&secondView.buildingViewData.buildingEntity==entity)
+            if (otherView.buildingViewData != null && otherView.buildingViewData.buildingEntity == entity)
                 return;
-            if(!activeScreens.Contains(firstView))
+
+            
+            if (targetView.buildingViewData != null && targetView.buildingViewData.buildingEntity == entity && activeScreens.Contains(targetView))
             {
-                firstView.SetUpData(entity);
-                activeScreens.Add(firstView);
-                UpdateAction+=firstView.UpdateView;
-                disposables.Add(firstView,firstView.isOpened
-                .Where(isOpened=> isOpened==false)
-                .Subscribe(_ =>
-                {
-                    CloseWindow(firstView);
-                }));
+                targetView.SetUpData(entity);
+                return;
             }
-            else
-                firstView.SetUpData(entity);
+
+            
+            if (disposables.ContainsKey(targetView))
+            {
+                disposables[targetView]?.Dispose();
+                disposables.Remove(targetView);
+                UpdateAction -= targetView.UpdateView;
+            }
+
+            
+            if (activeScreens.Count == 0) 
+                base.Open();
+
+            
+            targetView.SetUpData(entity);
+
+            if (!activeScreens.Contains(targetView))
+                activeScreens.Add(targetView);
+
+            UpdateAction += targetView.UpdateView;
+
+            
+            var closeSubscription = targetView.isOpened
+                .SkipLatestValueOnSubscribe() 
+                .Where(isOpen => !isOpen)
+                .Subscribe(_ => CloseWindow(targetView));
+
+            disposables.Add(targetView, closeSubscription);
         }
     }
+
     public void CloseWindow(BuildingManagementWindowView view)
     {
-        disposables[view]?.Dispose();
-        disposables.Remove(view);
-        UpdateAction-=view.UpdateView;
-        activeScreens.Remove(view);
-        view.windowToMove.anchoredPosition=view.defaultPos;
+        
+        if (disposables.TryGetValue(view, out var subscription))
+        {
+            subscription?.Dispose();
+            disposables.Remove(view);
+        }
+
+        
+        UpdateAction -= view.UpdateView;
+        
+        if (activeScreens.Contains(view))
+            activeScreens.Remove(view);
+
+        
+        if (view.windowToMove != null)
+            view.windowToMove.anchoredPosition = view.defaultPos;
+
         view.Close();
-        if(activeScreens.Count==0) base.Close();
+
+        
+        if (activeScreens.Count == 0) 
+            base.Close();
     }
 }

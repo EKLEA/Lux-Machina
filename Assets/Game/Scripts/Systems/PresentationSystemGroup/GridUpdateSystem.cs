@@ -25,7 +25,7 @@ public partial class GridUpdateSystem : SystemBase
     {
         _buildQuery = new EntityQueryBuilder(Allocator.Temp)
         .WithAll<PlayerCommand>()
-        .WithAny<PlayerPlacingBuilding,PlayerDeletePoints,PlayerPlacingRoad>()
+        .WithAny<PlayerPlacingBuilding,PlayerDeletePoints,PlayerPlacingManyPointBuilding>()
         
         .Build(this);
         RequireForUpdate(_buildQuery);

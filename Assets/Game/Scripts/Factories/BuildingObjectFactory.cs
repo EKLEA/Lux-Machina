@@ -30,19 +30,16 @@ public class BuildingObjectFactory
     }
     public GameObject CreatePrimitive(Vector2Int pos,bool IsRemove=false)
     {
-        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        GameObject cube  = _instantiator.InstantiatePrefab(_buildingInfo.primitive);
         cube.transform.localScale=(Vector3.one+Vector3.up*2)*_gameFieldSettings.cellSize;
         cube.transform.position = CalculateWorldPosition(CenterGridPosition(pos, Vector3.one));
         if (IsRemove)
         {
-            int mask = _gameFieldSettings.removeLayer.value;
-            int layerIndex = 0;
-            while (mask > 1) { mask >>= 1; layerIndex++; }
-            
-            //cube.layer=layerIndex;
-        }
-            
-            
+            // Вместо цикла while:
+            int layerIndex = Mathf.RoundToInt(Mathf.Log(_gameFieldSettings.removeLayer.value, 2));
+            cube.layer = layerIndex;
+        } 
+                    
         return cube;
     }
     public BuildingOnScene CreateBuilding(int buidlingID, Vector2Int pos, int rotation,bool IsPlaceDestroy=false)
@@ -72,7 +69,7 @@ public class BuildingObjectFactory
         return buildingOnScene;
     }
 
-    public RoadOnScene CreateRoad(int buildingID, Vector2Int[] points,Dictionary<Vector2Int, bool> neighborsMap,bool IsPlaceDestroy=false)
+    public ManyPointsBuildingInstanced CreateManyPoint(int buildingID, Vector2Int[] points,Dictionary<Vector2Int, bool> neighborsMap,bool IsPlaceDestroy=false)
     {
 
         if (!_buildingInfo.BuildingInfos.TryGetValue(buildingID, out var info))
@@ -80,13 +77,13 @@ public class BuildingObjectFactory
             return null;
         }
 
-        var roadObject = GameObject.Instantiate(_buildingInfo.GetBuildingPrefab(buildingID));
-        var roadOnScene = roadObject.GetComponent<RoadOnScene>();
+        var manyPointBuildingObject = GameObject.Instantiate(_buildingInfo.GetBuildingPrefab(buildingID));
+        var manyPointBuildingOnScene = manyPointBuildingObject.GetComponent<ManyPointsBuildingInstanced>();
 
-        if (roadOnScene != null)
+        if (manyPointBuildingOnScene != null)
         {
-            roadOnScene.Init(_gameFieldSettings.cellSize);
-            roadOnScene.GenerateRoadMesh(points,neighborsMap);
+            manyPointBuildingOnScene.Init(_gameFieldSettings.cellSize);
+            manyPointBuildingOnScene.Generate(points,neighborsMap);
         }
         if(IsPlaceDestroy)
         {
@@ -94,9 +91,9 @@ public class BuildingObjectFactory
             int layerIndex = 0;
             while (mask > 1) { mask >>= 1; layerIndex++; }
             
-            roadOnScene.gameObject.layer = layerIndex;
+            manyPointBuildingOnScene.gameObject.layer = layerIndex;
         }
-        return roadOnScene;
+        return manyPointBuildingOnScene;
     }
     public void MoveBuilding(GameObject buildingOnScene, Vector2Int pos,int rotation=-1,int buidlingID=-1)
     {

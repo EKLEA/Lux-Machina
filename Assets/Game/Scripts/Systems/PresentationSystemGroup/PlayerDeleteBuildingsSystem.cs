@@ -30,7 +30,7 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
     Vector2Int _firstPos;
     EntityQuery _removeQuery;
     IPlayerData _playerData;
-    RoadOnScene _road;
+    ManyPointsBuildingInstanced _manyPointBuilding;
     GameObject _destoryArea;
     PhantomObject _preview;
     
@@ -38,20 +38,27 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
     bool _isProcessing = false;
     Action CollectPoints;
     Action BackAction;
-    
+    int _buildingID;
+    Dictionary<int, BuildingBaseConfig> _availableDeleteBuildings;
+    int _currentType;
     Vector3 _baseSize;
     public void SetUpDelete(DeleteType deleteType,IPlayerData playerData,Entity playerState)
     {
-        if(_isProcessing||EntityManager.IsComponentEnabled<PlayerPlacingBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerPlacingRoad>(playerState)) return;
-        
+        if(_isProcessing||EntityManager.IsComponentEnabled<PlayerPlacingBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerPlacingManyPointBuilding>(playerState)) return;
+         _availableDeleteBuildings = info.BuildingInfos
+        .Where(x => x.Value.actionType==ActionType.TwoPointBuilding)
+        .ToDictionary(x => x.Key, x => x.Value);
+
+    _currentType = 0;
+    _buildingID = _availableDeleteBuildings.Keys.ElementAt(_currentType);
         _playerData=playerData;
         switch (deleteType)
         {
-            case DeleteType.DeleteRoadPoints:
-                CollectPoints=CollectPointsForRoad;
-                BackAction=BackForRoad;
-                _road = _factorty.CreateRoad("Road".GetStableHashCode(),new Vector2Int[]{_playerData.pos},null,true);
-                _preview=_visualBuildingFactory.PhantomizeObject(_road.gameObject);
+            case DeleteType.DeleteManyPointBuilding:
+                CollectPoints=CollectPointsForManyPoint;
+                BackAction=BackForManyPoint;
+                _manyPointBuilding = _factorty.CreateManyPoint("Road".GetStableHashCode(),new Vector2Int[]{_playerData.pos},null,true);
+                _preview=_visualBuildingFactory.PhantomizeObject(_manyPointBuilding.gameObject);
             break;
             case DeleteType.DeleteBuilding:
                 BackAction=BackForBuilding;
@@ -78,7 +85,7 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
         _removeQuery = new EntityQueryBuilder(Allocator.Temp)
         .WithAll<PlayerCommand>()
         .WithAll<PlayerDeletePoints>()
-        .WithDisabled<PlayerPlacingRoad>()
+        .WithDisabled<PlayerPlacingManyPointBuilding>()
         .WithDisabled<PlayerPlacingBuilding>()
         .Build(this);
         RequireForUpdate(_removeQuery);
@@ -93,6 +100,15 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
             Collect();
         }
     }
+    public void Rotate(bool isHold)
+    {
+        if (!isHold) return;
+
+        _currentType++;
+        _currentType %= _availableDeleteBuildings.Count;
+
+        _buildingID = _availableDeleteBuildings.Keys.ElementAt(_currentType);
+    }
     public void DeletePoints(bool isHold,bool IsForce)
     {
         
@@ -103,8 +119,9 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
             {
                 
                 var command=ecb.CreateEntity();
-                if(DeleteType==DeleteType.DeleteRoadPoints)
-                    ecb.AddComponent(command,new DeleteRoadPointsFromMap{isForce=IsForce});
+                Debug.Log("удалил "+IsForce);
+                if(DeleteType==DeleteType.DeleteManyPointBuilding)
+                    ecb.AddComponent(command,new DeleteManyPointsBuildingFromMap{isForce=IsForce,buildingID=_buildingID});
                 else if(DeleteType==DeleteType.DeleteManyPoints)
                     ecb.AddComponent(command,new DeleteManyPointsFromMap{isForce=IsForce});
                 var buff=ecb.AddBuffer<MapPoint>(command);
@@ -234,7 +251,7 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
        _isProcessing=false;
         onBuildingDone=null;
     }
-    void CollectPointsForRoad()
+    void CollectPointsForManyPoint()
     {
         
         _preview.CanBuild(false,_playerData.isForce);
@@ -242,14 +259,14 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
         if (!isSecondPoint)
         {
             _firstPos=_pos;
-            _road.GenerateRoadMesh(new Vector2Int[]{_firstPos},null);
+            _manyPointBuilding.Generate(new Vector2Int[]{_firstPos},null);
         }
         else
         {
              var playerCommand = SystemAPI.GetSingletonEntity<PlayerCommand>();
             if(_pos!=_cachedPos)
             {
-                ecb.SetComponent(playerCommand,new PathfindingRequest{Start=new int2(_firstPos.x,_firstPos.y),End=new int2(_pos.x,_pos.y),RoadPerfer=true});
+                ecb.SetComponent(playerCommand,new PathfindingRequest{BuildingID=_buildingID, Start=new int2(_firstPos.x,_firstPos.y),End=new int2(_pos.x,_pos.y),SamePerfer=true});
                 ecb.SetComponentEnabled<PathfindingRequest>(playerCommand,true);
                 _cachedPos=_pos;
             }
@@ -259,10 +276,10 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
             {
                 _points.Add(p);
             }
-            _road.GenerateRoadMesh(_points.Select(f=>new Vector2Int(f.pos.x,f.pos.y)).ToArray(),null);
+            _manyPointBuilding.Generate(_points.Select(f=>new Vector2Int(f.pos.x,f.pos.y)).ToArray(),null);
         }
     }
-    void BackForRoad()
+    void BackForManyPoint()
     {
         if(isSecondPoint)
         {
@@ -276,8 +293,8 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
         else
         {
             _points.Clear();
-            if(_road!=null)GameObject.DestroyImmediate(_road.gameObject);
-            _road=null;
+            if(_manyPointBuilding!=null)GameObject.DestroyImmediate(_manyPointBuilding.gameObject);
+            _manyPointBuilding=null;
             _preview=null;
             _pos=new Vector2Int(-1,-1);
             EntityManager.SetComponentEnabled<PlayerDeletePoints>(_playerState,false);
@@ -298,6 +315,6 @@ public partial class PlayerDeleteBuildingsSystem : SystemBase
 public enum DeleteType
 {
     DeleteBuilding=1,
-    DeleteRoadPoints=2,
+    DeleteManyPointBuilding=2,
     DeleteManyPoints=3
 }

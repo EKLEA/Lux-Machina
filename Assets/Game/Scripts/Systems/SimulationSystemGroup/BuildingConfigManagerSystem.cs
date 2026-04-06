@@ -7,7 +7,7 @@ using UnityEngine;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 
-[UpdateAfter(typeof(ProcessRoadPointsSystem))]
+[UpdateAfter(typeof(ProcessManyPointPointsSystem))]
 [BurstCompile]
 
 public partial struct BuildingConfigManagerSystem : ISystem
@@ -109,7 +109,7 @@ public partial struct BuildingConfigManagerSystem : ISystem
         
         var IsDemolitionLookup= SystemAPI.GetComponentLookup<IsDemolition>(false);
         var IsBlueprintLookup= SystemAPI.GetComponentLookup<IsBlueprint>(false);
-        var RoadTypeLookup= SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(false);
+        var ManyPointTypeLookup= SystemAPI.GetComponentLookup<ManyPointTypeBuildingTag>(false);
         var HealthLookup= SystemAPI.GetComponentLookup<HealthData>(false);
 
         var buildingCache = SystemAPI.GetSingleton<BuildingConfigReference>();
@@ -135,7 +135,7 @@ public partial struct BuildingConfigManagerSystem : ISystem
                                                         IsDemolitionLookup=IsDemolitionLookup,
                                                         IsBlueprintLookup=IsBlueprintLookup,
                                                         BuildingDataLookup=BuildingDataLookup,
-                                                        RoadTypeLookup=RoadTypeLookup,
+                                                        ManyPointTypeLookup=ManyPointTypeLookup,
                                                         HealthLookup=HealthLookup,
                                                         ItemRequestsConfig=itemRequestRef,
                                                         OutputConstLookup=OutputConstLookup,
@@ -408,7 +408,7 @@ public partial struct BuildingConfigManagerSystem : ISystem
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBlueprintLookup;
         [ReadOnly] public ComponentLookup<BuildingData> BuildingDataLookup;
-        [ReadOnly] public ComponentLookup<RoadTypeBuildingTag> RoadTypeLookup;
+        [ReadOnly] public ComponentLookup<ManyPointTypeBuildingTag> ManyPointTypeLookup;
         [ReadOnly] public ComponentLookup<HealthData> HealthLookup;
         [ReadOnly] public BlobAssetReference<BlobLibrary<BuildingItemRequestsStructConfig>> ItemRequestsConfig;
         [ReadOnly] public BufferLookup<OutputConstructionSlotData> OutputConstLookup;
@@ -463,7 +463,7 @@ public partial struct BuildingConfigManagerSystem : ISystem
                     if (healthData.CurrHealth != healthData.MaxHealth)
                         ak=healthData.CurrHealth / healthData.MaxHealth;
                 }
-                if (RoadTypeLookup.HasComponent(entity))
+                if (ManyPointTypeLookup.HasComponent(entity))
                 {
                     int l =MapPointLookup[entity].Length;
                     ak=ak*l;

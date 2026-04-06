@@ -412,6 +412,7 @@ public class BuildingInfoViewModel
         
         if (entityManager.HasComponent<IsDemolition>(viewData.buildingEntity)&&entityManager.IsComponentEnabled<IsDemolition>(viewData.buildingEntity))
         {
+            bool ShouldUpdate=true;
             var buff = entityManager.GetBuffer<OutputConstructionSlotData>(viewData.buildingEntity);
             if(buff.Length<1) return;
             for(int i =0; i < buff.Length; i++)
@@ -419,11 +420,15 @@ public class BuildingInfoViewModel
                 var b = buff[i];
                 b.Amount=math.clamp(b.Amount+amount,0,b.Capacity);
                 buff[i]=b;
-                if(b.Amount==b.Capacity) tempUpdate?.Invoke();
+                ShouldUpdate=ShouldUpdate&&(b.Amount==b.Capacity);
             }
+            
+            if(ShouldUpdate) tempUpdate?.Invoke();
         }
         if (entityManager.HasComponent<IsBlueprint>(viewData.buildingEntity)&&entityManager.IsComponentEnabled<IsBlueprint>(viewData.buildingEntity))
         {
+            
+            bool ShouldUpdate=true;
             var buff = entityManager.GetBuffer<InputConstructionSlotData>(viewData.buildingEntity);
             if(buff.Length<1) return;
             for(int i =0; i < buff.Length; i++)
@@ -431,9 +436,13 @@ public class BuildingInfoViewModel
                 var b = buff[i];
                 b.Amount=math.clamp(b.Amount+amount,0,b.Capacity);
                 buff[i]=b;
-                if(b.Amount==b.Capacity) tempUpdate?.Invoke();
+                
+                ShouldUpdate=ShouldUpdate&&(b.Amount==b.Capacity);
             }
+            
+            if(ShouldUpdate) tempUpdate?.Invoke();
         }
+        
     }
     public void SetRecipe(int RecipeID)
     {

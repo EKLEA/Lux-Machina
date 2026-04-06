@@ -3,7 +3,7 @@
         {
             "id": 1,
             "title": "железная руда",
-            "description": "ыфвывф",
+            "description": "",
             "iconPath": "iron_ore",
             "ItemClass": 1,
             "ItemType": 1
@@ -11,7 +11,7 @@
         {
             "id": 2,
             "title": "медная руда",
-            "description": "ывффывфв",
+            "description": "",
             "iconPath": "copper_ore",
             "ItemClass": 1,
             "ItemType": 1
@@ -19,7 +19,7 @@
         {
             "id": 3,
             "title": "оловянная руда",
-            "description": "ывффывфв",
+            "description": "",
             "iconPath": "tin_ore",
             "ItemClass": 1,
             "ItemType": 1
@@ -27,7 +27,7 @@
         {
             "id": 4,
             "title": "уголь",
-            "description": "фывыфв",
+            "description": "",
             "iconPath": "coal",
             "ItemClass": 1,
             "ItemType": 1
@@ -35,271 +35,263 @@
         {
             "id": 5,
             "title": "камень",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "rock",
             "ItemClass": 1,
             "ItemType": 1
         },
         {
             "id": 6,
-            "title": "дерево",
-            "description": "фывыфв",
-            "iconPath": "wood",
-            "ItemClass": 1,
-            "ItemType": 1
-        },
-        {
-            "id": 7,
             "title": "живая эссенция",
-            "description": "выфыв",
+            "description": "",
             "iconPath": "live_essence",
             "ItemClass": 1,
             "ItemType": 1
         },
         {
-            "id": 8,
+            "id": 7,
             "title": "железный слиток",
-            "description": "ывфыфв",
+            "description": "",
             "iconPath": "iron_ignot",
             "ItemClass": 1,
             "ItemType": 2
         },
         {
-            "id": 9,
+            "id": 8,
             "title": "медный слиток",
-            "description": "ыффыв",
+            "description": "",
             "iconPath": "copper_ignot",
             "ItemClass": 1,
             "ItemType": 2
         },
         {
-            "id": 10,
+            "id": 9,
             "title": "оловянный слиток",
-            "description": "ыфвывф",
+            "description": "",
             "iconPath": "tin_ignot",
             "ItemClass": 1,
             "ItemType": 2
         },
         {
-            "id": 11,
+            "id": 10,
             "title": "бронзовый слиток",
-            "description": "ывффывфв",
+            "description": "",
             "iconPath": "bronze_ignot",
             "ItemClass": 1,
             "ItemType": 3
         },
         {
-            "id": 12,
+            "id": 11,
             "title": "стальной слиток",
-            "description": "фывыфв",
+            "description": "",
             "iconPath": "steel_ignot",
             "ItemClass": 1,
             "ItemType": 3
         },
         {
-            "id": 13,
+            "id": 12,
             "title": "живой слиток",
-            "description": "ывффывфв",
+            "description": "",
             "iconPath": "live_ignot",
             "ItemClass": 1,
             "ItemType": 3
         },
         {
-            "id": 14,
+            "id": 13,
             "title": "железная шестерня",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "iron_cog",
             "ItemClass": 1,
             "ItemType": 4
         },
         {
-            "id": 15,
+            "id": 14,
             "title": "медная шестерня",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "copper_cog",
             "ItemClass": 1,
             "ItemType": 4
         },
         {
-            "id": 16,
+            "id": 15,
             "title": "бронзовая шестерня",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "bronze_cog",
             "ItemClass": 1,
             "ItemType": 4
         },
         {
-            "id": 17,
+            "id": 16,
             "title": "живая шестерня",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "live_cog",
             "ItemClass": 1,
             "ItemType": 4
         },
         {
-            "id": 18,
+            "id": 17,
             "title": "стальная шестерня",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "steel_cog",
             "ItemClass": 1,
             "ItemType": 4
         },
         {
-            "id": 19,
+            "id": 18,
             "title": "железная плита",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "iron_plate",
             "ItemClass": 1,
             "ItemType": 5
         },
         {
-            "id": 20,
+            "id": 19,
             "title": "медная плита",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "copper_plate",
             "ItemClass": 1,
             "ItemType": 5
         },
         {
-            "id": 21,
+            "id": 20,
             "title": "бронзовая плита",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "bronze_plate",
             "ItemClass": 1,
             "ItemType": 5
         },
         {
-            "id": 22,
+            "id": 21,
             "title": "живая плита",
-            "description": "ывффывфв",
+            "description": "",
             "iconPath": "live_plate",
             "ItemClass": 1,
             "ItemType": 5
         },
         {
-            "id": 23,
+            "id": 22,
             "title": "стальная плита",
-            "description": "ывффывфв",
+            "description": "",
             "iconPath": "steel_plate",
             "ItemClass": 1,
             "ItemType": 5
         },
         {
-            "id": 24,
+            "id": 23,
             "title": "строительные конструкции",
-            "description": "фывыфв",
+            "description": "",
             "iconPath": "building_structures",
             "ItemClass": 2,
             "ItemType": 6
         },
         {
-            "id": 25,
+            "id": 24,
             "title": "железобетонные конструкции",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "reinforced_construction",
             "ItemClass": 2,
             "ItemType": 6
         },
         {
-            "id": 26,
+            "id": 25,
             "title": "паровой механизм",
-            "description": "фывыфв",
+            "description": "",
             "iconPath": "steam_mechanism",
             "ItemClass": 2,
             "ItemType": 7
         },
         {
-            "id": 27,
+            "id": 26,
             "title": "поршень",
-            "description": "выфыв",
+            "description": "",
             "iconPath": "steam_piston",
             "ItemClass": 2,
             "ItemType": 7
         },
         {
-            "id": 28,
+            "id": 27,
             "title": "паровое ядро",
-            "description": "ывфыфв",
+            "description": "",
             "iconPath": "steam_core",
             "ItemClass": 2,
             "ItemType": 7
         },
         {
-            "id": 29,
+            "id": 28,
             "title": "паровой механизм высокой прочности",
-            "description": "ыффыв",
+            "description": "",
             "iconPath": "high_strength_steam_mechanism",
             "ItemClass": 2,
             "ItemType": 7
         },
         {
-            "id": 30,
+            "id": 29,
             "title": "поршень высокой прочности",
-            "description": "ыфвывф",
+            "description": "",
             "iconPath": "high_strength_steam_piston",
             "ItemClass": 2,
             "ItemType": 7
         },
         {
-            "id": 31,
+            "id": 30,
             "title": "паровое ядро высокой прочности",
-            "description": "ывффывфв",
+            "description": "",
             "iconPath": "high_strength_steam_core",
             "ItemClass": 2,
             "ItemType": 7
         },
         {
-            "id": 32,
+            "id": 31,
             "title": "живой механизм",
-            "description": "ывффывфв",
+            "description": "",
             "iconPath": "live_mechanism",
             "ItemClass": 2,
             "ItemType": 8
         },
         {
-            "id": 33,
+            "id": 32,
             "title": "живой поршень",
-            "description": "фывыфв",
+            "description": "",
             "iconPath": "live_piston",
             "ItemClass": 2,
             "ItemType": 8
         },
         {
-            "id": 34,
+            "id": 33,
             "title": "живое ядро",
-            "description": "вфыфвывф",
+            "description": "",
             "iconPath": "live_core",
             "ItemClass": 2,
             "ItemType": 8
         },
         {
-            "id": 35,
+            "id": 34,
             "title": "патроны",
-            "description": "фывыфв",
+            "description": "",
             "iconPath": "bullets",
             "ItemClass": 3,
             "ItemType": 9
         },
         {
-            "id": 36,
+            "id": 35,
             "title": "бронебойные патроны",
-            "description": "выфыв",
+            "description": "",
             "iconPath": "improved_bullets",
             "ItemClass": 3,
             "ItemType": 9
         },
         {
-            "id": 37,
+            "id": 36,
             "title": "артелиерийский снаряд",
-            "description": "ывфыфв",
+            "description": "",
             "iconPath": "artillery_shell",
             "ItemClass": 3,
             "ItemType": 10
         },
         {
-            "id": 38,
+            "id": 37,
             "title": "бронебойный артелиерийский снаряд",
-            "description": "ыффыв",
+            "description": "",
             "iconPath": "improved_artillery_shell",
             "ItemClass": 3,
             "ItemType": 10

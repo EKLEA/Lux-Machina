@@ -28,14 +28,16 @@ public struct UnLinkNetworkEnergyTo : IBufferElementData
     public int2 UnLinkToBuilding; //x=node , y entity
     public int2 UnLinkFromBuilding;
 }
-public struct ProcessRoadPointsEventTag: IComponentData
+public struct ProcessManyPointPointsEventTag: IComponentData
+{
+    public int buildingID;
+}
+public struct DeleteManyPointsBuildingFromMap: IComponentData{public bool isForce;public int buildingID;}
+public struct DeleteManyPointsFromMap: IComponentData{public bool isForce;}
+public struct CreateManyPointEventTag: IComponentData
 {
     
-}
-public struct DeleteRoadPointsFromMap: IComponentData{public bool isForce;}
-public struct DeleteManyPointsFromMap: IComponentData{public bool isForce;}
-public struct CreateRoadEventTag: IComponentData
-{
+    public int buildingID;    
     public int UniqueBuildingID;
 }
 

@@ -1,12 +1,14 @@
 ﻿id;title;description;iconPath;prefabPath;buildingType;actionType;size_x;size_y;size_z;typeOfLogic;maxHealth;timeToStartRestore;RestoreHealthPerSecond
-Road;Дорога;дорога;road;roadPrefab;4;1;1;1;1;0;100;5;20
-Core;Ядро;выфывф;core;corePrefab;1;0;5;5;5;0;100;5;20
-Drill;Дрель;выфывф;drill;drillPrefab;2;0;3;3;3;1;100;5;20
-FurnaceFT;Печь первого уровня;выфывф;furnaceFT;furnaceFTPrefab;2;0;3;3;3;1;100;5;20
-ConstructionFT;Сборщик первого уровня;выфывф;constructionFT;constructionFTPrefab;2;0;3;3;3;1;100;5;20
-StorageFT;Хранилищие первого уровня;ывыфвыф;storageFT;storageFTPrefab;4;0;2;2;2;1;100;5;20
-Lep;Линия электро предач;saddsa;lep;lepPrefab;3;0;1;10;1;0;50;5;20
-Concentrator;Распределитель;sadsadsda;Concentrator;concentratorPrefab;3;0;2;10;2;0;50;5;20
-Turret;туррель;asdsadsda;turret;turretPrefab;5;0;2;3;2;1;100;5;50
-Artillery;артилерия;фыввыффыв;artillery;artilleryPrefab;5;0;3;3;3;1;100;5;100
-FurnaceST;Печь второго уровня;вфывфвы;furnaceST;furnaceSTPrefab;2;0;5;5;5;1;500;5;100
+Road;Дорога;дорога;road;roadPrefab;4;1;1;1;1;0;20;2;2
+Core;Ядро;Главная постройка игрока и главная цель для враго. Производит энергию и выполняет функцию хранилища;core;corePrefab;1;0;5;5;5;0;1000;10;100
+Drill;Дрель;Добывает ресурсы;drill;drillPrefab;2;0;3;3;3;1;100;5;10
+FurnaceFT;Печь первого уровня;Производит простые сплавы;furnaceFT;furnaceFTPrefab;2;0;3;3;3;1;100;5;10
+FurnaceST;Печь второго уровня;Производит простые и сложные сплавы;furnaceST;furnaceSTPrefab;2;0;5;5;5;1;500;10;50
+ConstructionFT;Сборщик первого уровня;Собирает простые предметы и компоненты;constructionFT;constructionFTPrefab;2;0;3;3;3;1;100;5;10
+ConstructionST;Сборщик второго уровня;Собирает простые и сложные предметы и компоненты;constructionST;constructionSTPrefab;2;0;5;5;5;1;500;10;50
+StorageFT;Хранилищие первого уровня;Хранит предметы;storageFT;storageFTPrefab;4;0;3;3;3;1;100;5;10
+Lep;Линия электро предач;Передает энергию;lep;lepPrefab;3;0;1;10;1;0;50;5;5
+Concentrator;Распределитель;Передает и распространяет энергию;Concentrator;concentratorPrefab;3;0;2;10;2;0;50;10;5
+Turret;туррель;Быстро наносит урон пулями;turret;turretPrefab;5;0;2;3;2;1;100;15;10
+Artillery;артилерия;Бьёт по площади;artillery;artilleryPrefab;5;0;3;3;3;1;100;15;10
+Wall;Стена;Крепкая стена;wall;wallPrefab;5;1;1;1;1;0;100;15;10

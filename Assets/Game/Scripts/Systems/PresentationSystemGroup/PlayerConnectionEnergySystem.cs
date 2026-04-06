@@ -40,7 +40,7 @@ public partial class PlayerConnectionEnergySystem : SystemBase
     {
         if(energyLine==null) 
             energyLine=_connectFactory.CreateLine();
-        if(EntityManager.IsComponentEnabled<PlayerPlacingBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerPlacingRoad>(playerState)||EntityManager.IsComponentEnabled<PlayerDeletePoints>(playerState)) return;
+        if(EntityManager.IsComponentEnabled<PlayerPlacingBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerPlacingManyPointBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerDeletePoints>(playerState)) return;
         
         _playerConnectData=playerConnectData;
         _playerState=playerState;
@@ -64,7 +64,7 @@ public partial class PlayerConnectionEnergySystem : SystemBase
         _buildReadyQuery = new EntityQueryBuilder(Allocator.Temp)
         .WithAll<PlayerCommand>()
         .WithAll<PlayerConnectBuildings>()
-        .WithDisabled<PlayerPlacingRoad>()
+        .WithDisabled<PlayerPlacingManyPointBuilding>()
         .WithDisabled<PlayerDeletePoints>()
         .WithDisabled<PathfindingRequest>()
         

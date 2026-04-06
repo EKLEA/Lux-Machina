@@ -37,21 +37,21 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
         }
         foreach (var (buildingData,points,entity) in SystemAPI.Query<BuildingData,DynamicBuffer<MapPoint>>().WithAll<CreateVisualTag>().WithEntityAccess())
         {
-            SpawnRoad(buildingData,points,entity,ecb);
+            SpawnManyPoint(buildingData,points,entity,ecb);
         }
         foreach(var (enemyData,entity) in SystemAPI.Query<CreateEnemyEventData>().WithEntityAccess())
         {
             _enemyFactory.CreateEnemy(enemyData.EnemyID,enemyData.pos);
             ecb.DestroyEntity(entity);
         }
-        foreach (var (buildingRef,updateRoad,buff,entity) in SystemAPI.Query<BuildingOnSceneReference,EnabledRefRW<UpdateRoad>,DynamicBuffer<MapPoint>>().WithEntityAccess())
+        foreach (var (data,buildingRef,updateManyPoint,buff,entity) in SystemAPI.Query<BuildingData,BuildingOnSceneReference,EnabledRefRW<UpdateManyPoint>,DynamicBuffer<MapPoint>>().WithEntityAccess())
         {
             var nativeArray = buff.AsNativeArray();
             var managedArray = new MapPoint[nativeArray.Length];
             nativeArray.CopyTo(managedArray);
             nativeArray.Dispose();
-            UpdateRoad(buildingRef.buildingOnScene as RoadOnScene,managedArray);
-            updateRoad.ValueRW=false;
+            UpdateManyPoint(buildingRef.buildingOnScene as ManyPointsBuildingInstanced,managedArray,data.BuildingIDHash);
+            updateManyPoint.ValueRW=false;
         }
         foreach (var (buildingOnSceneReference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ForceDestroyTag>().WithEntityAccess())
         {
@@ -84,7 +84,7 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
         ecb.SetComponent(building,new BuildingOnSceneReference{buildingOnScene=buildingOnScene});
         ecb.SetComponentEnabled<CreateVisualTag>(building,false);
     }
-    void UpdateRoad(RoadOnScene roadOnScene,MapPoint[] managedArray)
+    void UpdateManyPoint(ManyPointsBuildingInstanced roadOnScene,MapPoint[] managedArray,int buildingID)
     {
         var _roadPoints =managedArray.Select(f=>new int2(f.pos.x,f.pos.y));
         Dictionary<Vector2Int, bool> neighborsMap=new();
@@ -105,24 +105,26 @@ public partial class BuildingCreateDestroyVisualSystem : SystemBase
                 {
                     if (mapData.CellMapBuildingsIDs.ContainsKey(pos))
                     {
-                        neighborsMap.TryAdd(new Vector2Int(pos.x,pos.y),mapData.CellMapBuildingsIDs[pos]==buildingConfig.roadID);
+                        neighborsMap.TryAdd(new Vector2Int(pos.x,pos.y),mapData.CellMapBuildingsIDs[pos]==buildingID);
                     }
                 }
             }
         }
-        roadOnScene.GenerateRoadMesh(_roadPoints.Select(f=>new Vector2Int(f.x,f.y)).ToArray(),neighborsMap);
+        roadOnScene.Generate(_roadPoints.Select(f=>new Vector2Int(f.x,f.y)).ToArray(),neighborsMap);
     }
-    void SpawnRoad(BuildingData buildingData,DynamicBuffer<MapPoint> points,Entity building,EntityCommandBuffer ecb)
+    void SpawnManyPoint(BuildingData buildingData,DynamicBuffer<MapPoint> points,Entity building,EntityCommandBuffer ecb)
     {
+        
         var nativeArray = points.AsNativeArray();
         var managedArray = new MapPoint[nativeArray.Length];
         nativeArray.CopyTo(managedArray);
         nativeArray.Dispose();
       
-        var  buildingOnScene=_factorty.CreateRoad(buildingData.BuildingIDHash, new Vector2Int[]{new Vector2Int(points[0].pos.x,points[0].pos.y)},null);
+        var  buildingOnScene=_factorty.CreateManyPoint(buildingData.BuildingIDHash, new Vector2Int[]{new Vector2Int(points[0].pos.x,points[0].pos.y)},null);
 
-        UpdateRoad(buildingOnScene,managedArray);
+        UpdateManyPoint(buildingOnScene,managedArray,buildingData.BuildingIDHash);
         buildingOnScene.id=buildingData.BuildingUniqueID; 
+        
         ecb.SetComponent(building,new BuildingOnSceneReference{buildingOnScene=buildingOnScene});
         ecb.SetComponentEnabled<CreateVisualTag>(building,false);
     }

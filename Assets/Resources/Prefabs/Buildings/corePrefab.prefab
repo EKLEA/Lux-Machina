@@ -95,7 +95,7 @@ MonoBehaviour:
   id: 0
   clusterID: 
   clusterIndicator: {fileID: 0}
-  outlineScript: {fileID: 4199764619085765301}
+  outline: {fileID: 4199764619085765301}
   energyNodes:
   - {fileID: 6579851570884132649}
   - {fileID: 3497097188107085497}

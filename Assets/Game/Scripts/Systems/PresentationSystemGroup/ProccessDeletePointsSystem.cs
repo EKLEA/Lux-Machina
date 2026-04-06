@@ -14,15 +14,16 @@ public partial class ProccessDeletePointsSystem : SystemBase
     {
          var ecb = new EntityCommandBuffer(Allocator.Temp);
         BuildingMap mapData= SystemAPI.GetSingleton<BuildingMap>();
-        foreach (var (buff,deleteData,entity) in SystemAPI.Query<DynamicBuffer<MapPoint>,DeleteRoadPointsFromMap>().WithEntityAccess())
+        foreach (var (buff,deleteData,entity) in SystemAPI.Query<DynamicBuffer<MapPoint>,DeleteManyPointsBuildingFromMap>().WithEntityAccess())
         {
-            ProcessDeleteRoadPoints(entity,mapData,buff,deleteData.isForce,ecb);
+            ProcessDeleteManyPointPoints(entity,mapData,buff,deleteData,ecb);
         }
 
         ecb.Playback(EntityManager);
         ecb.Dispose();
     }
-    void ProcessDeleteRoadPoints(Entity command, BuildingMap mapData, DynamicBuffer<MapPoint> points, bool isForce,EntityCommandBuffer ecb)
+    
+    void ProcessDeleteManyPointPoints(Entity command, BuildingMap mapData, DynamicBuffer<MapPoint> points, DeleteManyPointsBuildingFromMap deleteData,EntityCommandBuffer ecb)
     {
         NativeParallelMultiHashMap<Entity, MapPoint> entitiesToPoints = new(points.Length, Allocator.Temp);
         foreach (var p in points)
@@ -55,15 +56,16 @@ public partial class ProccessDeletePointsSystem : SystemBase
                 demolitionList.Add(p);
             }
 
-            Entity createDemolitonRoadCommand = Entity.Null;
-            if (!isForce && demolitionList.Length > 0)
+            Entity createDemolitonManyPointCommand = Entity.Null;
+            Debug.Log("Процесс  "+deleteData.isForce);
+            if (!deleteData.isForce && demolitionList.Length > 0)
             {
-                createDemolitonRoadCommand = ecb.CreateEntity();
+                createDemolitonManyPointCommand = ecb.CreateEntity();
                  uint hash = math.hash(demolitionList[0].pos);
                  hash = math.hash(new int3((int)hash, demolitionList[demolitionList.Length - 1].pos.x, demolitionList[demolitionList.Length - 1].pos.y));
-                ecb.AddComponent(createDemolitonRoadCommand,new CreateRoadEventTag{UniqueBuildingID=(int)hash });
-                ecb.AddComponent<IsDemolition>(createDemolitonRoadCommand);
-                var buff = ecb.AddBuffer<MapPoint>(createDemolitonRoadCommand);
+                ecb.AddComponent(createDemolitonManyPointCommand,new CreateManyPointEventTag{UniqueBuildingID=(int)hash ,buildingID=deleteData.buildingID});
+                ecb.AddComponent<IsDemolition>(createDemolitonManyPointCommand);
+                var buff = ecb.AddBuffer<MapPoint>(createDemolitonManyPointCommand);
                 foreach (var p in demolitionList) buff.Add(p);
             }
 
@@ -73,26 +75,26 @@ public partial class ProccessDeletePointsSystem : SystemBase
                 if (!demolitionSet.Contains(p.pos)) restPoints.Add(p);
             }
 
-            Entity createRestRoadsCommand = Entity.Null;
+            Entity createRestManyPointsCommand = Entity.Null;
             if (restPoints.Length > 0)
             {
-                createRestRoadsCommand = ecb.CreateEntity();
-                ecb.AddComponent<ProcessRoadPointsEventTag>(createRestRoadsCommand);
-                var buff = ecb.AddBuffer<MapPoint>(createRestRoadsCommand);
+                createRestManyPointsCommand = ecb.CreateEntity();
+                ecb.AddComponent(createRestManyPointsCommand,new ProcessManyPointPointsEventTag{buildingID=deleteData.buildingID});
+                var buff = ecb.AddBuffer<MapPoint>(createRestManyPointsCommand);
                 foreach (var p in restPoints) buff.Add(p);
             }
 
-            if (EntityManager.HasBuffer<RoadPointHealthData>(road)) 
+            if (EntityManager.HasBuffer<ManyPointPointHealthData>(road)) 
             {
-                var oldData=EntityManager.GetBuffer<RoadPointHealthData>(road);
+                var oldData=EntityManager.GetBuffer<ManyPointPointHealthData>(road);
                 // Подготавливаем буферы для новых сущностей
-                DynamicBuffer<RoadPointHealthData> restExtraBuff = default;
-                if (createRestRoadsCommand != Entity.Null) 
-                    restExtraBuff = ecb.AddBuffer<RoadPointHealthData>(createRestRoadsCommand);
+                DynamicBuffer<ManyPointPointHealthData> restExtraBuff = default;
+                if (createRestManyPointsCommand != Entity.Null) 
+                    restExtraBuff = ecb.AddBuffer<ManyPointPointHealthData>(createRestManyPointsCommand);
 
-                DynamicBuffer<RoadPointHealthData> demoExtraBuff = default;
-                if (createDemolitonRoadCommand != Entity.Null) 
-                    demoExtraBuff = ecb.AddBuffer<RoadPointHealthData>(createDemolitonRoadCommand);
+                DynamicBuffer<ManyPointPointHealthData> demoExtraBuff = default;
+                if (createDemolitonManyPointCommand != Entity.Null) 
+                    demoExtraBuff = ecb.AddBuffer<ManyPointPointHealthData>(createDemolitonManyPointCommand);
 
                 foreach (var data in oldData)
                 {
@@ -112,30 +114,30 @@ public partial class ProccessDeletePointsSystem : SystemBase
                 float procent = (float)demolitionList.Length / roadPoints.Length;
 
                 DynamicBuffer<TransitionSlotData> buffItemRest = default;
-                if (createRestRoadsCommand != Entity.Null)
+                if (createRestManyPointsCommand != Entity.Null)
                 {
-                    ecb.AddComponent<IsBlueprint>(createRestRoadsCommand);
-                    buffItemRest = ecb.AddBuffer<TransitionSlotData>(createRestRoadsCommand);
+                    ecb.AddComponent<IsBlueprint>(createRestManyPointsCommand);
+                    buffItemRest = ecb.AddBuffer<TransitionSlotData>(createRestManyPointsCommand);
                 }
 
                 DynamicBuffer<TransitionSlotData> buffItemDemo = default;
-                if (createDemolitonRoadCommand != Entity.Null)
+                if (createDemolitonManyPointCommand != Entity.Null)
                 {
-                    ecb.AddComponent<IsBlueprint>(createDemolitonRoadCommand);
-                    buffItemDemo = ecb.AddBuffer<TransitionSlotData>(createDemolitonRoadCommand);
+                    ecb.AddComponent<IsBlueprint>(createDemolitonManyPointCommand);
+                    buffItemDemo = ecb.AddBuffer<TransitionSlotData>(createDemolitonManyPointCommand);
                 }
 
                 for (int i = 0; i < items.Length; i++)
                 {
                     var item = items[i];
-                    int amountDemo = createDemolitonRoadCommand != Entity.Null?(int)(item.Amount * procent):0;
+                    int amountDemo = createDemolitonManyPointCommand != Entity.Null?(int)(item.Amount * procent):0;
                     int amountRest = item.Amount - amountDemo;
                     
 
-                    if (createDemolitonRoadCommand != Entity.Null)
+                    if (createDemolitonManyPointCommand != Entity.Null)
                         buffItemDemo.Add(new TransitionSlotData { itemID = item.ItemId, amount = amountDemo });
                     
-                    if (createRestRoadsCommand != Entity.Null)
+                    if (createRestManyPointsCommand != Entity.Null)
                         buffItemRest.Add(new TransitionSlotData { itemID = item.ItemId, amount = amountRest });
                 }
             }

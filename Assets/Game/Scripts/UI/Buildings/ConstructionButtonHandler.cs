@@ -17,7 +17,7 @@ public class ConstructionButtonHandler : UIScreen
         typeBts = new();
         foreach(var t in typeBuildingButtonInfo.TypeBuildingButtonConfig)
         {
-            if(t.Value=="Prop") continue;
+            if(t.Value=="Prop"||t.Value=="Special") continue;
             var bt = Instantiate(ButtonPrefab, buttonHolder);
             bt.image.sprite = typeBuildingButtonInfo.GetBuildingTypeBTSprite(t.Key);
             typeBts.Add(t.Key,bt );

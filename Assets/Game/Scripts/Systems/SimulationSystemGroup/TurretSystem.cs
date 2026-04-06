@@ -155,20 +155,23 @@ public partial struct TurretSystem : ISystem
                     }
                     else
                     {
+                       
                         if (storageSlots.Length > 0)
                         {
                             var slot = storageSlots[0];
-                            if (slot.Amount > 0)
+                            
+                            stats.AmmoID=slot.ItemId;
+                            if(itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
                             {
-                                stats.AmmoID=slot.ItemId;
-                                if(itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
-                                {
-                                    
-                                    stats.CurrAmmo=cfg.AmmoCount;
-                                }
-                                else stats.CurrAmmo=20;
                                 
+                                stats.CurrAmmo=cfg.AmmoCount;
                             }
+                            else stats.CurrAmmo=20;
+                            
+                            // if (slot.Amount > 0)
+                            // {
+                                
+                            // }
 
                         }
                     }

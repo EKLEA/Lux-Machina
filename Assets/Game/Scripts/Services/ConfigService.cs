@@ -28,6 +28,7 @@ public class ConfigService
 
     public Dictionary<int, ProjectileConfig> ProjectileConfigs { get; private set; }
 
+    public GameObject primitive  { get; private set; }
 
     Dictionary<int, Sprite> _spriteCache = new Dictionary<int, Sprite>();
     Dictionary<int, GameObject> _prefabCache = new Dictionary<int, GameObject>();
@@ -159,6 +160,7 @@ public class ConfigService
         {
             Debug.LogError("Failed to load buildings - wrapper or buildings list is null");
         }
+         primitive=GetOrLoadPrefab($"Prefabs/Primitive/Primitive");
     }
     void LoadBuildingsStorages()
     {
@@ -486,6 +488,7 @@ public interface IReadOnlyBuildingInfo
     Dictionary<int, BuildingItemRequestsConfig> BuildingItemRequestsInfos { get; }
     Dictionary<int, BuildingEnegryConfig> BuildingEnegryConfigs { get; }
     Dictionary<int, TurretConfig> TurretsConfigs{ get; }
+    GameObject primitive{get;}
     GameObject GetBuildingPrefab(int buildingId);
     Sprite GetBuildingSprite(int buildingId);
     Sprite GetEnumSprite<T>(int id)where T : struct, Enum;

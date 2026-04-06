@@ -17,15 +17,15 @@ public partial struct DestroyBuildingsSystem : ISystem
 {
     EntityQuery _destroyBuildingQuery;
     EntityQuery _checkForDestroyBuildingQuery;
-    EntityQuery _destroyRoadQuery;
+    EntityQuery _destroyManyPointQuery;
     public void OnCreate(ref SystemState state)
     {
         _destroyBuildingQuery= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<ForceDestroyTag,BuildingPosData>()
-            .WithNone<RoadTypeBuildingTag>()
+            .WithNone<ManyPointTypeBuildingTag>()
             .Build(ref state);
-         _destroyRoadQuery= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<ForceDestroyTag,RoadTypeBuildingTag,MapPoint>()
+         _destroyManyPointQuery= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<ForceDestroyTag,ManyPointTypeBuildingTag,MapPoint>()
             .Build(ref state);
         _checkForDestroyBuildingQuery= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<CheckForDestroy>()
@@ -55,21 +55,21 @@ public partial struct DestroyBuildingsSystem : ISystem
                 turretGrid=turretMapRW.ValueRW,
                 EntityDictionary=entitiesRW.ValueRW,
                 ECB=ecb,
-                RoadLookup=SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(true),
+                ManyPointLookup=SystemAPI.GetComponentLookup<ManyPointTypeBuildingTag>(true),
                 CoreBuildingTagLookup=SystemAPI.GetComponentLookup<CoreBuildingTag>(true),
                 TurretStatsLookup=SystemAPI.GetComponentLookup<TurretStats>(true)
             };
             state.Dependency=deleteBJoB.Schedule(state.Dependency);
         }
-        if (!_destroyRoadQuery.IsEmpty)
+        if (!_destroyManyPointQuery.IsEmpty)
         {
-            var deleteRJoB=new DestroyRoadJob
+            var deleteRJoB=new DestroyManyPointJob
             {
                 MapData=buildingMapRW.ValueRW,
                 Map=mapEntity,
                 EntityDictionary=entitiesRW.ValueRW,
                 ECB=ecb,
-                RoadLookup=SystemAPI.GetComponentLookup<RoadTypeBuildingTag>(true)
+                ManyPointLookup=SystemAPI.GetComponentLookup<ManyPointTypeBuildingTag>(true)
 
             };
             state.Dependency=deleteRJoB.Schedule(state.Dependency);
@@ -89,7 +89,7 @@ public partial struct DestroyBuildingsSystem : ISystem
     }
     [BurstCompile]
     [WithAll(typeof(ForceDestroyTag))]
-    [WithNone(typeof(RoadTypeBuildingTag),typeof(CheckForDestroy))]
+    [WithNone(typeof(ManyPointTypeBuildingTag),typeof(CheckForDestroy))]
     public partial struct DestroyBuildingJob : IJobEntity
     {
         public BuildingMap MapData; 
@@ -97,7 +97,7 @@ public partial struct DestroyBuildingsSystem : ISystem
         public EntitiesDictionary EntityDictionary; 
         public Entity Map;
         public EntityCommandBuffer ECB;
-        [ReadOnly] public ComponentLookup<RoadTypeBuildingTag> RoadLookup;
+        [ReadOnly] public ComponentLookup<ManyPointTypeBuildingTag> ManyPointLookup;
         [ReadOnly] public ComponentLookup<CoreBuildingTag> CoreBuildingTagLookup;
         [ReadOnly] public ComponentLookup<TurretStats> TurretStatsLookup;
         public void Execute(Entity entity, in BuildingData buildingData,in BuildingPosData posData)
@@ -164,7 +164,7 @@ public partial struct DestroyBuildingsSystem : ISystem
                 }
                 foreach(var road in roadsToUpdate)
                 {
-                    ECB.SetComponentEnabled<UpdateRoad>(road,true);
+                    ECB.SetComponentEnabled<UpdateManyPoint>(road,true);
                 }
                 roadsToUpdate.Dispose();
             }
@@ -173,20 +173,20 @@ public partial struct DestroyBuildingsSystem : ISystem
         {
             if (MapData.CellMapEntites.ContainsKey(pos))
             {
-                if(RoadLookup.HasComponent(MapData.CellMapEntites[pos])) roads.Add(MapData.CellMapEntites[pos]);
+                if(ManyPointLookup.HasComponent(MapData.CellMapEntites[pos])) roads.Add(MapData.CellMapEntites[pos]);
             }
         }
     }
     [BurstCompile]
-    [WithAll(typeof(ForceDestroyTag),typeof(RoadTypeBuildingTag))]
-    public partial struct DestroyRoadJob : IJobEntity
+    [WithAll(typeof(ForceDestroyTag),typeof(ManyPointTypeBuildingTag))]
+    public partial struct DestroyManyPointJob : IJobEntity
     {
         public BuildingMap MapData; 
         public EntitiesDictionary EntityDictionary; 
         public Entity Map;
         public EntityCommandBuffer ECB;
         Entity roadEn;
-        [ReadOnly] public ComponentLookup<RoadTypeBuildingTag> RoadLookup;
+        [ReadOnly] public ComponentLookup<ManyPointTypeBuildingTag> ManyPointLookup;
         public void Execute(Entity entity, in BuildingData buildingData,in DynamicBuffer<MapPoint> points)
         {
             if (MapData.CellEntityMultiMap.ContainsKey(entity))
@@ -219,7 +219,7 @@ public partial struct DestroyBuildingsSystem : ISystem
                 EntityDictionary.Entities.Remove(buildingData.BuildingUniqueID);
                 foreach(var road in roadsToUpdate)
                 {
-                    ECB.SetComponentEnabled<UpdateRoad>(road,true);
+                    ECB.SetComponentEnabled<UpdateManyPoint>(road,true);
                 }
                 roadsToUpdate.Dispose();
                 dirs.Dispose();
@@ -234,7 +234,7 @@ public partial struct DestroyBuildingsSystem : ISystem
         {
             if (MapData.CellMapEntites.ContainsKey(pos))
             {
-                if(RoadLookup.HasComponent(MapData.CellMapEntites[pos])&&MapData.CellMapEntites[pos]!=roadEn) roads.Add(MapData.CellMapEntites[pos]);
+                if(ManyPointLookup.HasComponent(MapData.CellMapEntites[pos])&&MapData.CellMapEntites[pos]!=roadEn) roads.Add(MapData.CellMapEntites[pos]);
             }
         }
     }

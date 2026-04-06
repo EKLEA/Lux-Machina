@@ -49,13 +49,14 @@ public partial struct TickGeneratorSystem : ISystem
                 {
                     // Сработает ровно в 0.15 (или вашу границу Sunrise)
                     //Debug.Log("Рассвет: Удаляем врагов");
+                    
+                    ecb.SetComponentEnabled<SavingMapTag>(mapEntity,true);
                 }
                 else 
                 {
                     // Сработает ровно в 0.85 (или вашу границу Sunset)
                      //Debug.Log("Закат: Спавним врагов");
                     ecb.SetComponentEnabled<SpawnMobsData>(mapEntity,true);
-                    ecb.SetComponentEnabled<SavingMapTag>(mapEntity,true);
                 }
 
                 wasDayLastTick = isNowDay;

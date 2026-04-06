@@ -15,6 +15,14 @@
             ]
         },
         {
+            "BuildingID": "FurnaceST",
+            "typeOfProcession": 1,
+            "requiredRecipesGroup": [
+                2,
+                3
+            ]
+        },
+        {
             "BuildingID": "ConstructionFT",
             "typeOfProcession": 1,
             "requiredRecipesGroup": [
@@ -22,11 +30,11 @@
             ]
         },
         {
-            "BuildingID": "FurnaceST",
+            "BuildingID": "ConstructionST",
             "typeOfProcession": 1,
             "requiredRecipesGroup": [
-                2,
-                3
+                4,
+                5
             ]
         }
     ]

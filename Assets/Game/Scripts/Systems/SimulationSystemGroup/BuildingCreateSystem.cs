@@ -12,9 +12,9 @@ using UnityEngine;
 public partial struct BuildingCreateSystem : ISystem
 {
     BuildingConfigReference _buildingConfigs;
-    EntityQuery _createRoadQuery;
+    EntityQuery _createManyPointQuery;
     EntityQuery _createBuildingQuery;
-    EntityArchetype _roadArchetype;
+    EntityArchetype _manyPointArchetype;
     EntityArchetype _simpleBuildingArchetype;
     EntityArchetype _energyBuildingArchetype;
     EntityArchetype _propBuildingArchetype;
@@ -45,10 +45,9 @@ public partial struct BuildingCreateSystem : ISystem
         {
             _buildingConfigs = lib;
         }
-        _roadArchetype=state.EntityManager.CreateArchetype(
+        _manyPointArchetype=state.EntityManager.CreateArchetype(
             typeof(BuildingTag),
-            typeof(LogisticTag),
-            typeof(RoadTypeBuildingTag),
+            typeof(ManyPointTypeBuildingTag),
             typeof(BuildingData),
             typeof(BuildingStateData),
             typeof(ChangeBluePrintState),
@@ -64,7 +63,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(IsConstuctionSlotsAssigned),
             typeof(BuildingOnSceneReference),
             typeof(MarkOnMap),
-            typeof(UpdateRoad),
+            typeof(UpdateManyPoint),
             typeof(ExcessSlotData),
             
             typeof(CreateVisualTag),
@@ -72,7 +71,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(SavableTag),
             typeof(LoadInfo),
             typeof(TakeDamage),
-            typeof(RoadPointHealthData),
+            typeof(ManyPointPointHealthData),
             
             
            typeof(ForceDestroyTag),
@@ -426,8 +425,8 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(UpdateConnectStatus));
        _coreBuildingArchetypeInfo= new ArchetypeInfo{Archetype=_coreBuildingArchetype,Types=_coreBuildingArchetype.GetComponentTypes(Allocator.Persistent)};
 
-        _createRoadQuery= new EntityQueryBuilder(Allocator.Temp)
-            .WithAll<CreateRoadEventTag,MapPoint>()
+        _createManyPointQuery= new EntityQueryBuilder(Allocator.Temp)
+            .WithAll<CreateManyPointEventTag,MapPoint>()
             .Build(ref state);
         _createBuildingQuery= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<CreateBuildingEventData>()
@@ -441,20 +440,20 @@ public partial struct BuildingCreateSystem : ISystem
         
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
        
-        if (!_createRoadQuery.IsEmpty)
+        if (!_createManyPointQuery.IsEmpty)
         {
-            var CreateRoadJob=new CreateRoad
+            var CreateManyPointJob=new CreateManyPoint
             {
                 ECB=ecb,
-                RoadArchetype=_roadArchetype,
+                ManyPointArchetype=_manyPointArchetype,
                 MapEntity=mapEntity,
                 config=_buildingConfigs,
                 IsBluePrintLookup=SystemAPI.GetComponentLookup<IsBlueprint>(false),
                 IsDemolitionLookup=SystemAPI.GetComponentLookup<IsDemolition>(false),
                 TransitionSlotDataLookup=SystemAPI.GetBufferLookup<TransitionSlotData>(false),
-                RoadPointHealthDataBufferLookUp=SystemAPI.GetBufferLookup<RoadPointHealthData>(false),
+                ManyPointPointHealthDataBufferLookUp=SystemAPI.GetBufferLookup<ManyPointPointHealthData>(false),
             };
-            state.Dependency=CreateRoadJob.Schedule(state.Dependency);
+            state.Dependency=CreateManyPointJob.Schedule(state.Dependency);
         }
         if (!_createBuildingQuery.IsEmpty)
         {
@@ -495,10 +494,10 @@ public partial struct BuildingCreateSystem : ISystem
     }
     
     [BurstCompile]
-    public partial struct CreateRoad : IJobEntity
+    public partial struct CreateManyPoint : IJobEntity
     {
         public EntityCommandBuffer ECB;
-        public EntityArchetype RoadArchetype;
+        public EntityArchetype ManyPointArchetype;
         
         public BuildingConfigReference config;
         public Entity MapEntity;
@@ -506,36 +505,44 @@ public partial struct BuildingCreateSystem : ISystem
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBluePrintLookup;
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
         [ReadOnly] public BufferLookup<TransitionSlotData> TransitionSlotDataLookup;
-        [ReadOnly] public BufferLookup<RoadPointHealthData> RoadPointHealthDataBufferLookUp;
+        [ReadOnly] public BufferLookup<ManyPointPointHealthData> ManyPointPointHealthDataBufferLookUp;
         [ReadOnly] public DynamicBuffer<ProjectilePrefabElement> projectilePrefabElements;
 
         public void Execute(
                     Entity entity,
-                    in CreateRoadEventTag roadData,
+                    in CreateManyPointEventTag manyPointData,
                     in DynamicBuffer<MapPoint> points
         )
         {
-            if(!config.BuildingsBaseConfigs.Value.TryGetConfig(config.roadID,out var rCFG)) return;
-            Entity road = ECB.CreateEntity(RoadArchetype);
-            var buffer = ECB.AddBuffer<MapPoint>(road);
+            if(!config.BuildingsBaseConfigs.Value.TryGetConfig(manyPointData.buildingID,out var rCFG)) return;
+            Entity manyPoint = ECB.CreateEntity(ManyPointArchetype);
+            var buffer = ECB.AddBuffer<MapPoint>(manyPoint);
             
+            if (rCFG.buildingType == BuildingsTypes.Logistic)
+            {
+                ECB.AddComponent<LogisticTag>(manyPoint);
+            }
+            else
+            {
+                ECB.AddComponent<DefenceTypeBuildingTag>(manyPoint);
+            }
             
             foreach(var p in points)
             {
                 buffer.Add(p);
             }
-            if (RoadPointHealthDataBufferLookUp.HasBuffer(entity))
+            if (ManyPointPointHealthDataBufferLookUp.HasBuffer(entity))
             {
                 
-                var healthBuffer = ECB.AddBuffer<RoadPointHealthData>(road);
-                 foreach(var p in RoadPointHealthDataBufferLookUp[entity])
+                var healthBuffer = ECB.AddBuffer<ManyPointPointHealthData>(manyPoint);
+                 foreach(var p in ManyPointPointHealthDataBufferLookUp[entity])
                 {
                     healthBuffer.Add(p);
                 }
             }
            
             
-            ECB.SetComponentEnabled<MarkOnMap>(road,true);
+            ECB.SetComponentEnabled<MarkOnMap>(manyPoint,true);
 
 
             if (IsBluePrintLookup.HasComponent(entity)&&IsBluePrintLookup.IsComponentEnabled(entity))
@@ -543,48 +550,50 @@ public partial struct BuildingCreateSystem : ISystem
                 if (TransitionSlotDataLookup.HasBuffer(entity))
                 {
                   
-                    var buff=ECB.AddBuffer<TransitionSlotData>(road);
+                    var buff=ECB.AddBuffer<TransitionSlotData>(manyPoint);
                     var slots=TransitionSlotDataLookup[entity];
                     foreach(var sl in slots)
                     {
                         buff.Add(sl);
                     }
-                    ECB.SetComponentEnabled<LoadInfo>(road, false);
+                    ECB.SetComponentEnabled<LoadInfo>(manyPoint, false);
                 }
-                ECB.SetComponentEnabled<ChangeBluePrintState>(road, true);
-                ECB.SetComponentEnabled<IsBlueprint>(road, false);
-                ECB.SetComponentEnabled<IsConstuctionSlotsAssigned>(road, false);
-                ECB.SetComponentEnabled<IsInputConstructionEnabled>(road, false);
-                ECB.SetComponentEnabled<IsOutputConstuctionEnabled>(road, false);
-                ECB.SetComponent(road, new ConstructionPriorityData { ConstructionPriority = 2 });
+                ECB.SetComponentEnabled<ChangeBluePrintState>(manyPoint, true);
+                ECB.SetComponentEnabled<IsBlueprint>(manyPoint, false);
+                ECB.SetComponentEnabled<IsConstuctionSlotsAssigned>(manyPoint, false);
+                ECB.SetComponentEnabled<IsInputConstructionEnabled>(manyPoint, false);
+                ECB.SetComponentEnabled<IsOutputConstuctionEnabled>(manyPoint, false);
+                ECB.SetComponent(manyPoint, new ConstructionPriorityData { ConstructionPriority = 2 });
             }
             else
             {
-                ECB.SetComponentEnabled<ChangeBluePrintState>(road, false);
-                ECB.SetComponentEnabled<IsBlueprint>(road, false);
+                ECB.SetComponentEnabled<ChangeBluePrintState>(manyPoint, false);
+                ECB.SetComponentEnabled<IsBlueprint>(manyPoint, false);
             }
             
             if (IsDemolitionLookup.HasComponent(entity)&&IsDemolitionLookup.IsComponentEnabled(entity))
             {
-                ECB.SetComponentEnabled<ChangeDemolitionStateTag>(road, true);
-                ECB.SetComponentEnabled<IsDemolition>(road, false);
+                ECB.SetComponentEnabled<ChangeDemolitionStateTag>(manyPoint, true);
+                ECB.SetComponentEnabled<IsDemolition>(manyPoint, false);
             }
             else
             {
-                ECB.SetComponentEnabled<ChangeDemolitionStateTag>(road, false);
-                ECB.SetComponentEnabled<IsDemolition>(road, false);
+                ECB.SetComponentEnabled<ChangeDemolitionStateTag>(manyPoint, false);
+                ECB.SetComponentEnabled<IsDemolition>(manyPoint, false);
             }
             
-            ECB.SetComponentEnabled<LoadInfo>(road, true);
-            ECB.SetComponentEnabled<UpdateRoad>(road, false);
+            ECB.SetComponentEnabled<LoadInfo>(manyPoint, true);
+            ECB.SetComponentEnabled<UpdateManyPoint>(manyPoint, false);
             
-            ECB.SetComponent(road, new BuildingData { BuildingIDHash = config.roadID, BuildingUniqueID = roadData.UniqueBuildingID });
+            ECB.SetComponent(manyPoint, new BuildingData { BuildingIDHash = manyPointData.buildingID, BuildingUniqueID = manyPointData.UniqueBuildingID });
 
-            ECB.SetComponent(road, new ClusterLink{ClusterIds=new()});
+            ECB.SetComponent(manyPoint, new ClusterLink{ClusterIds=new()});
 
-            ECB.SetComponentEnabled<CreateVisualTag>(road, true);
-            ECB.SetComponentEnabled<ForceDestroyTag>(road, false);
+            ECB.SetComponentEnabled<CreateVisualTag>(manyPoint, true);
+            ECB.SetComponentEnabled<CheckForDestroy>(manyPoint, false);
+            ECB.SetComponentEnabled<ForceDestroyTag>(manyPoint, false);
             
+            ECB.SetComponent(manyPoint,new BuildingStateData{State=(int)WorkStateEnum.Work});
             // 5. Удаляем команду
             ECB.DestroyEntity(entity);
         }
@@ -654,7 +663,7 @@ public partial struct BuildingCreateSystem : ISystem
                     TimeToRestore=BConfig.TimeToRestore,
                     RestoreHpPerTick=BConfig.RestoreHpPerTick,
                 });
-                    
+                ECB.SetComponent(building,new BuildingStateData{State=(int)WorkStateEnum.Work});
                 ECB.SetComponentEnabled<CreateVisualTag>(building, true);
                 ECB.SetComponent(building, new ClusterLink{ClusterIds=new()});
                 ECB.SetComponentEnabled<NeedsClusterAssign>(building, true);

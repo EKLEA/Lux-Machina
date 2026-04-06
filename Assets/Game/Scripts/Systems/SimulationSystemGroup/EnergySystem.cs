@@ -78,6 +78,7 @@ public partial struct EnergySystem : ISystem
                 EnergyLinks = energyMap.ValueRO.EnergyLinks,
                 AllEntities = entitiesDictionary.Entities,
                 IsConnectedToEnegyLookup = state.GetComponentLookup<IsConnectedToEnergy>(false),
+                BuildingStateDataLookup = state.GetComponentLookup<BuildingStateData>(false),
                 SwitchIsOffLookup = state.GetComponentLookup<SwitchIsOff>(true),
                 ECB = ecb
             }.Schedule(state.Dependency);
@@ -165,7 +166,6 @@ public partial struct EnergySystem : ISystem
                 energyMap.EnergyLinks.Remove(b.UnLinkFromBuilding);
                 energyMap.EnergyLinks.Remove(b.UnLinkToBuilding);
                 
-                Debug.Log("b");
                 ECB.SetComponentEnabled<UpdateConnectStatus>(enFrom, true);
                 ECB.SetComponentEnabled<UpdateConnectStatus>(enTo, true);
                 ECB.SetComponentEnabled<UpdateConnectionsTag>(mapEntity, true);
@@ -285,6 +285,7 @@ public partial struct EnergySystem : ISystem
         [ReadOnly] public ComponentLookup<IsConnectedToEnergy> IsConnectedToEnegyLookup;
         
         [ReadOnly] public ComponentLookup<SwitchIsOff> SwitchIsOffLookup;
+        [ReadOnly] public ComponentLookup<BuildingStateData> BuildingStateDataLookup;
         
          [ReadOnly] public Entity mapEntity;
         
@@ -296,7 +297,6 @@ public partial struct EnergySystem : ISystem
         public void Execute()
         {
             NativeHashSet<int> ConnectedSet = new(1000, Allocator.Temp);
-            Debug.Log("sddssd");
             if (!AllEntities.ContainsKey(CoreID)) return;
 
             Entity coreEntity = AllEntities[CoreID];
@@ -356,6 +356,11 @@ public partial struct EnergySystem : ISystem
                     bool isActuallyConnected = ConnectedSet.Contains(id);
                     
                     ECB.SetComponentEnabled<IsConnectedToEnergy>(entity, isActuallyConnected);
+                    if (!isActuallyConnected)
+                    {
+                        if(BuildingStateDataLookup[entity].State>(int)WorkStateEnum.DisconnectedEnergy)
+                            ECB.SetComponent(entity,new BuildingStateData{State=(int)(WorkStateEnum.DisconnectedEnergy)});
+                    }
                     ECB.SetComponentEnabled<UpdateConnectStatus>(entity, true);
                 }
             }   

@@ -643,36 +643,31 @@ public class CsvTableParserEditor : EditorWindow
     {
         var ingredients = new List<RecipeIngredient>();
 
-        if (string.IsNullOrEmpty(ingredientString.Trim()))
+        if (string.IsNullOrWhiteSpace(ingredientString))
             return ingredients;
 
-        string[] pairs = ingredientString.Split(',');
+        string cleanString = ingredientString.TrimStart('`', ' ');
+
+        if (string.IsNullOrWhiteSpace(cleanString))
+            return ingredients;
+
+        string[] pairs = cleanString.Split(',');
         foreach (string pair in pairs)
         {
             string[] parts = pair.Split(':');
             if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int amount))
             {
                 string itemIdStr = parts[0].Trim();
-                if (int.TryParse(itemIdStr, out int itemId))
+                
+                int finalId = int.TryParse(itemIdStr, out int itemId) 
+                            ? itemId 
+                            : itemIdStr.GetStableHashCode();
+
+                ingredients.Add(new RecipeIngredient
                 {
-                    ingredients.Add(
-                        new RecipeIngredient
-                        {
-                            itemId = itemId,
-                            amount = amount,
-                        }
-                    );
-                }
-                else
-                {
-                    ingredients.Add(
-                        new RecipeIngredient
-                        {
-                            itemId = itemIdStr.GetStableHashCode(),
-                            amount = amount,
-                        }
-                    );
-                }
+                    itemId = finalId,
+                    amount = amount
+                });
             }
         }
 

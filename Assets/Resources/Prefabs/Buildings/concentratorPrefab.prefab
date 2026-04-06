@@ -73,7 +73,7 @@ MonoBehaviour:
   id: 0
   clusterID: 
   clusterIndicator: {fileID: 0}
-  outlineScript: {fileID: 5506562959919381905}
+  outline: {fileID: 5506562959919381905}
   energyNodes:
   - {fileID: 8636327856847900313}
   - {fileID: 7525335262451025067}
@@ -370,6 +370,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 382cd2e8a5f696242a0faeb195f6fc59, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 99d6e782ee528ee40821bd4208833d1a, type: 2}
     - target: {fileID: 919132149155446097, guid: 382cd2e8a5f696242a0faeb195f6fc59, type: 3}
       propertyPath: m_Name
       value: Foundation 3x3

@@ -7,4 +7,4 @@ public class LuxBall : MonoBehaviour
         _renderer.material.SetColor("_Color", color);
         _renderer.material.SetColor("_PulseColor", puilseColor);
     }
-}
+}  

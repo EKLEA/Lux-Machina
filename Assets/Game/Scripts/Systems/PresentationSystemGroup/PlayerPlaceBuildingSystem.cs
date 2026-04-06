@@ -1,14 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using UniRx;
-using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using Zenject;
 [DisableAutoCreation]
@@ -45,7 +38,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
     
     public void SetUpBuilding(int buildingID,IPlaceBuildingPlayerData buildingPlayerData,Entity playerState, int2? connectionFrom = null)
     {
-        if(EntityManager.IsComponentEnabled<PlayerPlacingBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerPlacingRoad>(playerState)||EntityManager.IsComponentEnabled<PlayerDeletePoints>(playerState)) return;
+        if(EntityManager.IsComponentEnabled<PlayerPlacingBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerPlacingManyPointBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerDeletePoints>(playerState)) return;
         if(!_buildingInfo.BuildingInfos.ContainsKey(buildingID)) return;
         _buildingID=buildingID;
         Guid newGuid = Guid.NewGuid();
@@ -82,7 +75,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         _buildReadyQuery = new EntityQueryBuilder(Allocator.Temp)
         .WithAll<PlayerCommand>()
         .WithAll<PlayerPlacingBuilding>()
-        .WithDisabled<PlayerPlacingRoad>()
+        .WithDisabled<PlayerPlacingManyPointBuilding>()
         .WithDisabled<PlayerDeletePoints>()
         .WithDisabled<PathfindingRequest>()
         
@@ -191,7 +184,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
             }
             ecb.AddComponent(command,new CreateBuildingEventData{UniqueBuildingID=uniqueId,buildingID=_buildingID,rotation=_connectionFrom.y != -1?0:_rotation,buildingPosition=new int2(_pos.x,_pos.y)});
             ecb.AddComponent<IsBlueprint>(command);
-            ecb.SetComponentEnabled<IsBlueprint>(command,IsBlueprint);
+            ecb.SetComponentEnabled<IsBlueprint>(command,IsBlueprint);//
             
             Guid newGuid = Guid.NewGuid();
             uniqueId  = newGuid.GetHashCode(); 

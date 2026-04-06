@@ -72,7 +72,7 @@ MonoBehaviour:
   id: 0
   clusterID: 
   clusterIndicator: {fileID: 0}
-  outlineScript: {fileID: 285817057034929424}
+  outline: {fileID: 285817057034929424}
 --- !u!114 &285817057034929424
 MonoBehaviour:
   m_ObjectHideFlags: 0
