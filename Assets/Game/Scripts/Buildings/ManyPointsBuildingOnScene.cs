@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Mathematics;
 using UnityEngine;
 
 public class ManyPointsBuildingInstanced : BuildingOnScene
@@ -18,6 +19,7 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
     public Mesh tMesh;
     public Mesh crossMesh;
     public Mesh singleMesh;
+    public Mesh slopeMesh;
 
     [Header("Foundation")]
     public Mesh foundationMesh;
@@ -37,8 +39,8 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
     private List<Matrix4x4> crossMatrices = new();
     private List<Matrix4x4> singleMatrices = new();
     private List<Matrix4x4> foundationMatrices = new();
-
-    private HashSet<Vector2Int> cellSet;
+    private List<Matrix4x4> slopeMatrices = new();
+    private HashSet<Vector3Int> cellSet;
     private MaterialPropertyBlock _instancedBlock;
     private MeshCollider _meshCollider;
     private MeshFilter _outlineMeshFilter;
@@ -79,8 +81,8 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
             _outlineRenderer.enabled = true;
             outline.OutlineColor = color.Value;
             
-            // ЖИРНАЯ ЛИНИЯ: Ставим 10, но убедись, что в самом компоненте Outline на префабе 
-            // не стоит ограничение. Mode All заставляет рисовать поверх всего.
+            
+            
             outline.OutlineWidth = 10f; 
             outline.OutlineMode = Outline.Mode.OutlineAll;
 
@@ -115,12 +117,12 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
         _instancedBlock.SetFloat("_PhantomProcent", progress);
     }
 
-    public void Generate(Vector2Int[] cells, Dictionary<Vector2Int, bool> neighbors)
+     public void Generate(Vector3Int[] cells, Dictionary<Vector3Int, bool> neighbors)
     {
         if (_currentCellSize <= 0 || cells == null || cells.Length == 0) return;
 
         ClearData();
-        cellSet = new HashSet<Vector2Int>(cells);
+        cellSet = new HashSet<Vector3Int>(cells);
         List<CombineInstance> combineList = new List<CombineInstance>();
 
         foreach (var cell in cells)
@@ -128,25 +130,53 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
             BuildCell(cell, neighbors, combineList);
         }
 
-        if (combineList.Count > 0)
+         if (combineList.Count > 0)
         {
             Mesh finalMesh = new Mesh();
             finalMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             finalMesh.CombineMeshes(combineList.ToArray(), true, true);
+            
+            // Оптимизация меша для коллайдера
+            finalMesh.RecalculateBounds();
 
             if (generateColliders)
             {
                 if (_meshCollider == null) _meshCollider = gameObject.AddComponent<MeshCollider>();
+                
+                // Сначала обнуляем, потом назначаем — это заставляет Unity пересчитать физику
+                _meshCollider.sharedMesh = null;
                 _meshCollider.sharedMesh = finalMesh;
+                
+                // Если коллайдер должен быть выпуклым (для Rigidbody), раскомментируй:
+                // _meshCollider.convex = true;
             }
-
-            if (_outlineMeshFilter != null) _outlineMeshFilter.sharedMesh = finalMesh;
             
-            if (outline != null && outline.enabled)
-                SetOutLine(outline.OutlineColor);
+            if (_outlineMeshFilter != null) _outlineMeshFilter.sharedMesh = finalMesh;
         }
     }
+    bool TryGetSlope(Vector3Int cell, Dictionary<Vector3Int, bool> neighbors, out int3 dir)
+    {
+        // проверяем 4 направления вниз
+        Vector3Int[] slopeDirs =
+        {
+            new Vector3Int(1,-1,0),
+            new Vector3Int(-1,-1,0),
+            new Vector3Int(0,-1,1),
+            new Vector3Int(0,-1,-1),
+        };
 
+        foreach (var d in slopeDirs)
+        {
+            if (IsOccupied(cell + (Vector3Int)d, neighbors))
+            {
+                dir = new int3(d.x,d.y,d.z);
+                return true;
+            }
+        }
+
+        dir = int3.zero;
+        return false;
+}
     private void ClearData()
     {
         straightMatrices.Clear();
@@ -155,6 +185,7 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
         crossMatrices.Clear();
         singleMatrices.Clear();
         foundationMatrices.Clear();
+        slopeMatrices.Clear();
         if (_meshCollider != null) _meshCollider.sharedMesh = null;
         if (_outlineMeshFilter != null) _outlineMeshFilter.sharedMesh = null;
     }
@@ -170,6 +201,7 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
         RenderBatch(crossMatrices, crossMesh, layer);
         RenderBatch(singleMatrices, singleMesh, layer);
         RenderBatch(foundationMatrices, foundationMesh, layer);
+        RenderBatch(slopeMatrices, slopeMesh, layer);
     }
 
     void RenderBatch(List<Matrix4x4> matrices, Mesh mesh, int layer)
@@ -185,89 +217,148 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
         }
     }
 
-    void BuildCell(Vector2Int cell, Dictionary<Vector2Int, bool> neighbors, List<CombineInstance> combineList)
+private void BuildCell(Vector3Int cell, Dictionary<Vector3Int, bool> neighbors, List<CombineInstance> combineList)
+{
+    Vector3 pos = new Vector3(
+        (cell.x + 0.5f) * _currentCellSize, 
+        (cell.y * _currentCellSize), 
+        (cell.z + 0.5f) * _currentCellSize
+    );
+
+    // 1. ПРАВКА СЛОПОВ: Поворот на 180 градусов
+    if (TryGetSlope(cell, neighbors, out int3 slopeDir))
     {
-        Vector3 pos = new Vector3((cell.x + 0.5f) * _currentCellSize, 0, (cell.y + 0.5f) * _currentCellSize);
-        bool up = IsOccupied(cell + Vector2Int.up, neighbors);
-        bool down = IsOccupied(cell + Vector2Int.down, neighbors);
-        bool left = IsOccupied(cell + Vector2Int.left, neighbors);
-        bool right = IsOccupied(cell + Vector2Int.right, neighbors);
+        // Внимание: если AddSlope принимает Quaternion, добавь поворот там.
+        // Если нет — залезь в AddSlope и в конце вычисления finalRot добавь:
+        // finalRot *= Quaternion.Euler(0, 180, 0);
+        AddSlope(cell, slopeDir, combineList); 
+        return; 
+    }
+    
+    bool up = IsOccupied(cell + new Vector3Int(0, 0, 1), neighbors);
+    bool down = IsOccupied(cell + new Vector3Int(0, 0, -1), neighbors);
+    bool left = IsOccupied(cell + new Vector3Int(-1, 0, 0), neighbors);
+    bool right = IsOccupied(cell + new Vector3Int(1, 0, 0), neighbors);
+    
+    bool hasBelow = IsOccupied(cell + Vector3Int.down, neighbors);
+    Matrix4x4 worldToLocal = transform.worldToLocalMatrix;
 
-        Matrix4x4 worldToLocal = transform.worldToLocalMatrix;
-
-        // 1. ФУНДАМЕНТ
-        if (spawnFoundation && foundationMesh != null && !(up && down && left && right))
-        {
-            Vector3 meshSize = foundationMesh.bounds.size;
-            Vector3 fScale = new Vector3(_currentCellSize / meshSize.x, 1f, _currentCellSize / meshSize.z);
-            Matrix4x4 fTrs = Matrix4x4.TRS(pos, Quaternion.identity, fScale);
-            foundationMatrices.Add(fTrs);
-
-            combineList.Add(new CombineInstance { 
-                mesh = foundationMesh, 
-                transform = worldToLocal * fTrs 
-            });
-        }
-
-        // 2. ШАПКА
-        if (!spawnTop) return;
-
-        Mesh targetMesh = null;
-        List<Matrix4x4> targetList = null;
-        Quaternion logicRot = Quaternion.identity;
-
-        int conCount = (up ? 1 : 0) + (right ? 1 : 0) + (down ? 1 : 0) + (left ? 1 : 0);
-        if (!useConnections) { targetMesh = singleMesh; targetList = singleMatrices; }
-        else 
-        {
-            switch (conCount) 
-            {
-                case 4: targetMesh = crossMesh; targetList = crossMatrices; break;
-                case 3:
-                    targetMesh = tMesh; targetList = tMatrices;
-                    if (!up) logicRot = Quaternion.Euler(0, 180, 0);
-                    else if (!right) logicRot = Quaternion.Euler(0, 270, 0);
-                    else if (!down) logicRot = Quaternion.identity;
-                    else if (!left) logicRot = Quaternion.Euler(0, 90, 0);
-                    break;
-                case 2:
-                    if (up && down) { targetMesh = straightMesh; targetList = straightMatrices; }
-                    else if (left && right) { targetMesh = straightMesh; targetList = straightMatrices; logicRot = Quaternion.Euler(0, 90, 0); }
-                    else {
-                        targetMesh = cornerMesh; targetList = cornerMatrices;
-                        if (up && right) logicRot = Quaternion.identity;
-                        else if (right && down) logicRot = Quaternion.Euler(0, 90, 0);
-                        else if (down && left) logicRot = Quaternion.Euler(0, 180, 0);
-                        else if (left && up) logicRot = Quaternion.Euler(0, 270, 0);
-                    }
-                    break;
-                case 1:
-                    targetMesh = straightMesh; targetList = straightMatrices;
-                    if (up) logicRot = Quaternion.identity;
-                    else if (right) logicRot = Quaternion.Euler(0, 90, 0);
-                    else if (down) logicRot = Quaternion.Euler(0, 180, 0);
-                    else if (left) logicRot = Quaternion.Euler(0, 270, 0);
-                    break;
-                default: targetMesh = singleMesh; targetList = singleMatrices; break;
-            }
-        }
-
-        if (targetMesh != null && targetList != null)
-        {
-            float finalY = spawnFoundation ? topMeshYOffset : 0f;
-            Vector3 topPos = pos + Vector3.up * finalY;
-            Quaternion finalRot = logicRot * Quaternion.Euler(topMeshCorrection);
-            Matrix4x4 trs = Matrix4x4.TRS(topPos, finalRot, Vector3.one * _currentCellSize);
-            targetList.Add(trs);
-
-            combineList.Add(new CombineInstance { 
-                mesh = targetMesh, 
-                transform = worldToLocal * trs 
-            });
-        }
+    // 2. ФУНДАМЕНТ: Оставляем Quaternion.identity (НЕ ПОВОРАЧИВАЕМ)
+    if (spawnFoundation && foundationMesh != null && !hasBelow)
+    {
+        Vector3 meshSize = foundationMesh.bounds.size;
+        Vector3 fScale = new Vector3(_currentCellSize / meshSize.x, _currentCellSize, _currentCellSize / meshSize.z);
+        Matrix4x4 fTrs = Matrix4x4.TRS(pos, Quaternion.identity, fScale);
+        foundationMatrices.Add(fTrs);
+        combineList.Add(new CombineInstance { mesh = foundationMesh, transform = worldToLocal * fTrs });
     }
 
-    bool IsOccupied(Vector2Int pos, Dictionary<Vector2Int, bool> neighbors)
+    if (!spawnTop) return;
+
+    Vector3 topPos = pos + Vector3.up * topMeshYOffset;
+    Mesh targetMesh = null;
+    List<Matrix4x4> targetList = null;
+    Quaternion logicRot = Quaternion.identity;
+
+    int conCount = (up ? 1 : 0) + (right ? 1 : 0) + (down ? 1 : 0) + (left ? 1 : 0);
+
+    if (!useConnections) { targetMesh = singleMesh; targetList = singleMatrices; }
+    else 
+    {
+        if (conCount == 4) { targetMesh = crossMesh; targetList = crossMatrices; }
+
+        else if (conCount == 3) 
+        {
+            targetMesh = tMesh; targetList = tMatrices;
+            if (!up) logicRot = Quaternion.Euler(0, 90, 0);
+            else if (!right) logicRot = Quaternion.Euler(0, 180, 0);
+            else if (!down) logicRot = Quaternion.Euler(0, 270, 0);
+            logicRot*= Quaternion.Euler(0,180,0);
+        }
+        else if (conCount == 2) 
+        {
+            if (up && down) { targetMesh = straightMesh; targetList = straightMatrices; }
+            else if (left && right) { targetMesh = straightMesh; targetList = straightMatrices; logicRot = Quaternion.Euler(0, 90, 0); }
+            else {
+                targetMesh = cornerMesh; targetList = cornerMatrices;
+                if (up && right) logicRot = Quaternion.Euler(0, 90, 0);
+                else if (right && down) logicRot = Quaternion.Euler(0, 180, 0);
+                else if (down && left) logicRot = Quaternion.Euler(0, 270, 0);
+            }
+        }
+        else if (conCount == 1) {
+            targetMesh = straightMesh; targetList = straightMatrices;
+            if (left || right) logicRot = Quaternion.Euler(0, 90, 0);
+        }
+        else { targetMesh = singleMesh; targetList = singleMatrices; }
+    }
+
+    if (targetMesh != null)
+{
+    Quaternion finalRot = logicRot * Quaternion.Euler(topMeshCorrection);
+    
+    // Если это угол, доворачиваем на 90 градусов по оси Z
+    if (targetMesh == cornerMesh) 
+    {
+        finalRot *= Quaternion.Euler(0, 0, 90); 
+    }
+
+    Matrix4x4 trs = Matrix4x4.TRS(topPos, finalRot, Vector3.one * _currentCellSize);
+    targetList.Add(trs);
+    combineList.Add(new CombineInstance { mesh = targetMesh, transform = worldToLocal * trs });
+}
+}
+
+
+void AddSlope(Vector3Int cell, int3 dir, List<CombineInstance> combineList)
+{
+    // 1. Логика замены на singleMesh, если слопа нет
+    if (slopeMesh == null) 
+    {
+        if (singleMesh != null)
+        {
+            Vector3 singlePos = new Vector3(
+                (cell.x + 0.5f) * _currentCellSize,
+                (cell.y * _currentCellSize) + topMeshYOffset,
+                (cell.z + 0.5f) * _currentCellSize
+            );
+            Quaternion singleRot = Quaternion.Euler(topMeshCorrection);
+            Matrix4x4 singleTrs = Matrix4x4.TRS(singlePos, singleRot, Vector3.one * _currentCellSize);
+            
+            if (singleMatrices == null) singleMatrices = new List<Matrix4x4>();
+            singleMatrices.Add(singleTrs);
+            combineList.Add(new CombineInstance { mesh = singleMesh, transform = transform.worldToLocalMatrix * singleTrs });
+        }
+        return;
+    }
+
+    // 2. Ставим слоп-меш
+    Vector3 pos = new Vector3(
+        (cell.x + 0.5f) * _currentCellSize,
+        (cell.y * _currentCellSize) + topMeshYOffset, 
+        (cell.z + 0.5f) * _currentCellSize
+    );
+
+    Quaternion rot = Quaternion.identity;
+    if (dir.x == 1) rot = Quaternion.Euler(0, 90, 0);
+    else if (dir.x == -1) rot = Quaternion.Euler(0, -90, 0);
+    else if (dir.z == 1) rot = Quaternion.Euler(0, 0, 0);
+    else if (dir.z == -1) rot = Quaternion.Euler(0, 180, 0);
+
+    // ПОВОРАЧИВАЕМ ПО X:
+    // Сначала база, потом коррекция (-90 по X), и финальный переворот (180 по X), чтобы легло на дорогу
+    Quaternion finalRot = rot * Quaternion.Euler(topMeshCorrection) * Quaternion.Euler(90, 0, 0);
+
+    Matrix4x4 trs = Matrix4x4.TRS(pos, finalRot, Vector3.one * _currentCellSize);
+    slopeMatrices.Add(trs);
+
+    combineList.Add(new CombineInstance
+    {
+        mesh = slopeMesh,
+        transform = transform.worldToLocalMatrix * trs
+    });
+}
+    private bool IsOccupied(Vector3Int pos, Dictionary<Vector3Int, bool> neighbors)
     {
         if (cellSet != null && cellSet.Contains(pos)) return true;
         return neighbors != null && neighbors.TryGetValue(pos, out bool val) && val;

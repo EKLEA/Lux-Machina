@@ -7,13 +7,13 @@ using Unity.Mathematics;
 
 public struct BuildingMap : IComponentData, IDisposable
 {
-    public NativeParallelHashMap<int2, int> CellMapBuildingsIDs; 
-    public NativeParallelHashMap<int2, Entity> CellMapEntites;
-    public NativeParallelMultiHashMap<Entity, int2> CellEntityMultiMap;
-    public NativeParallelHashMap<int2, bool> IsBluePrintOrDemolitionPoints; //true blueprint false demolition
-    public NativeParallelHashMap<int2, float> CellWeights;    
-    public NativeParallelHashMap<int2, float2> CellDirections;
-    public int2 CorePos;
+    public NativeParallelHashMap<int3, int> CellMapBuildingsIDs; 
+    public NativeParallelHashMap<int3, Entity> CellMapEntites;
+    public NativeParallelMultiHashMap<Entity, int3> CellEntityMultiMap;
+    public NativeParallelHashMap<int3, bool> IsBluePrintOrDemolitionPoints; //true blueprint false demolition
+    public NativeParallelHashMap<int3, float> CellWeights;    
+    public NativeParallelHashMap<int3, float3> CellDirections;
+    public int3 CorePos;
 
     public void Dispose()
     {
@@ -25,12 +25,21 @@ public struct BuildingMap : IComponentData, IDisposable
         CellDirections.Dispose();
     }
 }
+public struct ChunkMap : IComponentData, IDisposable
+{
+    
+    public NativeParallelHashMap<int2, Entity> ChunkMapData; 
+    public void Dispose()
+    {
+        ChunkMapData.Dispose();
+    }
+}
 public struct EnergyMap: IComponentData, IDisposable
 {
     
-    public NativeParallelMultiHashMap<int2,int> CellToEnergyBuildingMap; 
-    public NativeParallelMultiHashMap<int2,Entity> CellToEnergyEntityBuildingMap; 
-    public NativeParallelMultiHashMap<Entity,int2> EnergyEntityToCellBuildingMap; 
+    public NativeParallelMultiHashMap<int3,int> CellToEnergyBuildingMap; 
+    public NativeParallelMultiHashMap<int3,Entity> CellToEnergyEntityBuildingMap; 
+    public NativeParallelMultiHashMap<Entity,int3> EnergyEntityToCellBuildingMap; 
     public NativeParallelHashMap<int2,int2> EnergyLinks; 
     
     public int CoreID;
@@ -47,7 +56,7 @@ public struct EnergyMap: IComponentData, IDisposable
 public struct ResourceMap : IComponentData, IDisposable
 {
     
-    public NativeParallelHashMap<int2,int2> ResouecesMap; //x- айди предмета, y количество
+    public NativeParallelHashMap<int3,int2> ResouecesMap; //x- айди предмета, y количество
     public void Dispose()
     {
         ResouecesMap.Dispose();
@@ -57,8 +66,8 @@ public struct TurretGrid : IComponentData, IDisposable
 {
     public NativeParallelMultiHashMap<int, Entity> EnemyGridMap;
     public NativeParallelMultiHashMap<Entity,int> EnemyToTurret;
-    public NativeParallelMultiHashMap<int2, int> TurretGridClaim;
-    public NativeParallelMultiHashMap<int2, Entity> EnemyInCellsMap; 
+    public NativeParallelMultiHashMap<int3, int> TurretGridClaim;
+    public NativeParallelMultiHashMap<int3, Entity> EnemyInCellsMap; 
     public float CellSize;
     public void Dispose()
     {
@@ -82,7 +91,7 @@ public struct SpawnMobsData : IComponentData, IEnableableComponent
 [InternalBufferCapacity(128)]
 public struct SpawnPointElement : IBufferElementData
 {
-    public int2 Position;
+    public int3 Position;
     public float Weight;
 }
 
@@ -102,8 +111,8 @@ public struct EntitiesDictionary: IComponentData, IDisposable
 public struct ClusterMap : IComponentData, IDisposable
 {
     public NativeList<int> UniqueClusterIDs;
-    public NativeParallelHashMap<int2, int> pointToClusterId;
-    public NativeParallelMultiHashMap<int, int2> logisticPoints;
+    public NativeParallelHashMap<int3, int> pointToClusterId;
+    public NativeParallelMultiHashMap<int, int3> logisticPoints;
     public NativeParallelMultiHashMap<int, SlotReference> ClusterToProducers;
     public NativeParallelMultiHashMap<int, SlotReference> ClusterToConsumers;
     public NativeParallelMultiHashMap<Entity, SlotReference> EntityInputSlots;
@@ -124,8 +133,8 @@ public struct ClusterMap : IComponentData, IDisposable
         ReverseSlotGraph = new NativeParallelMultiHashMap<SlotReference, SlotReference>(5000, allocator);
         EntityInputSlots = new NativeParallelMultiHashMap<Entity, SlotReference>(5000, allocator);
         EntityOutputSlots = new NativeParallelMultiHashMap<Entity, SlotReference>(5000, allocator);
-        pointToClusterId = new NativeParallelHashMap<int2, int> (5000, allocator);
-        logisticPoints = new NativeParallelMultiHashMap<int, int2> (5000, allocator);
+        pointToClusterId = new NativeParallelHashMap<int3, int> (5000, allocator);
+        logisticPoints = new NativeParallelMultiHashMap<int, int3> (5000, allocator);
         AllProducersList = new NativeList<SlotReference>(10000, allocator);
         SlotToClusters = new NativeParallelHashMap<SlotReference, FixedList32Bytes<int>>(10000, allocator);
     }
@@ -230,19 +239,13 @@ public struct ProductionTable : IComponentData, IDisposable
 }
 public struct MapPoint : IBufferElementData
 {
-    public int2 pos;
+    public int3 pos;
 }
 public struct PathfindingRequest : IComponentData, IEnableableComponent
 {
     public int BuildingID;
-    public int2 Start;
-    public int2 End;
+    public int3 Start;
+    public int3 End;
     public bool SamePerfer;
-}
-public struct DisablePathfindingTag : IComponentData, IEnableableComponent { }
-public struct MapUpdateRequest : IBufferElementData
-{
-    public int2 Pos;
-    public int BuildingHash;
-    public Entity Entity;
+    public bool straigh;
 }

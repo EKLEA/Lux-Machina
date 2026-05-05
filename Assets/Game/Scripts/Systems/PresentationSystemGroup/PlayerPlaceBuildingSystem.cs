@@ -16,7 +16,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
     [Inject] GameController _gameController;
     int _buildingID;
     int _rotation;
-    Vector2Int _pos;
+    Vector3Int _pos;
     EntityQuery _buildReadyQuery;
     IPlaceBuildingPlayerData _buildingPlayerData;
     PhantomObject _preview;
@@ -46,7 +46,9 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         _connectionFrom=connectionFrom ?? new int2(-1, -1);
         _buildingPlayerData=buildingPlayerData;
         _rotation=buildingPlayerData.rotation;
-        _buildingOnScene= _factorty.CreateBuilding(_buildingID,_buildingPlayerData.pos,_buildingPlayerData.rotation,true);
+        
+          var data =SystemAPI.GetSingleton<PlayerRayCastData>();
+        _buildingOnScene= _factorty.CreateBuilding(_buildingID,new Vector3Int(data.PlaceBlockPos.x,data.PlaceBlockPos.y,data.PlaceBlockPos.z),_buildingPlayerData.rotation,true);
         _preview=_visualBuildingFactory.PhantomizeObject(_buildingOnScene.gameObject);
         EntityManager.SetComponentEnabled<PlayerPlacingBuilding>(playerState,true);
         _playerState=playerState;
@@ -90,12 +92,14 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         energyMap= SystemAPI.GetSingleton<EnergyMap>();
         resourceMap= SystemAPI.GetSingleton<ResourceMap>();
         
+          var data =SystemAPI.GetSingleton<PlayerRayCastData>();
+        
         if(_buildReadyQuery.IsEmpty) return;
         
         if(_buildingPlayerData==null) return;
         
         _rotation=_buildingPlayerData.rotation;
-        _pos=_buildingPlayerData.pos;
+        _pos=new Vector3Int(data.PlaceBlockPos.x,data.PlaceBlockPos.y,data.PlaceBlockPos.z);;
         
         canBuild=true;
         UpdateFunc?.Invoke(ref canBuild);
@@ -112,7 +116,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         {
             for (int z = 0; z < size.z; z++)
             {
-                var pos = new int2(_pos.x + x, _pos.y + z);
+                var pos = new int3(_pos.x + x, _pos.y,_pos.z + z);
                 
                 if (map.CellMapBuildingsIDs.ContainsKey(pos))
                 {
@@ -153,7 +157,8 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         {
             for(int z=0; z < size.z; z++)
             {
-                var pos=new int2(_pos.x+x, _pos.y+z);
+                
+                var pos = new int3(_pos.x + x, _pos.y,_pos.z + z);
                 if(resourceMap.ResouecesMap.ContainsKey(pos))
                 {
                     result=true;
@@ -182,7 +187,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
                 _connectionFrom=node;
                 
             }
-            ecb.AddComponent(command,new CreateBuildingEventData{UniqueBuildingID=uniqueId,buildingID=_buildingID,rotation=_connectionFrom.y != -1?0:_rotation,buildingPosition=new int2(_pos.x,_pos.y)});
+            ecb.AddComponent(command,new CreateBuildingEventData{UniqueBuildingID=uniqueId,buildingID=_buildingID,rotation=_connectionFrom.y != -1?0:_rotation,buildingPosition=new int3(_pos.x,_pos.y,_pos.z)});
             ecb.AddComponent<IsBlueprint>(command);
             ecb.SetComponentEnabled<IsBlueprint>(command,IsBlueprint);//
             
@@ -199,7 +204,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         _buildingID=-1;
         _rotation=-1;
         _connectionFrom=default;
-        _pos=new Vector2Int(-1,-1);
+        _pos=new Vector3Int(-1,-1,-1);
         
         EntityManager.SetComponentEnabled<PlayerPlacingBuilding>(_playerState,false);
         onBuildingDone?.Invoke();

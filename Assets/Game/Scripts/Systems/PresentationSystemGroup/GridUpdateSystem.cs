@@ -12,6 +12,7 @@ public partial class GridUpdateSystem : SystemBase
      AttackZoneVisualizer _attackZoneVisualizer;
      IPlayerData _playerData;
      
+     EntityQuery _raycastQuery;
     EntityQuery _buildQuery;
     public void SetUpGrid(GridVisualizer visualizer,IPlayerData playerData,FlowFieldVisualizer flowFieldVisualizer)//, AttackZoneVisualizer attackZoneVisualizer
     {
@@ -26,7 +27,9 @@ public partial class GridUpdateSystem : SystemBase
         _buildQuery = new EntityQueryBuilder(Allocator.Temp)
         .WithAll<PlayerCommand>()
         .WithAny<PlayerPlacingBuilding,PlayerDeletePoints,PlayerPlacingManyPointBuilding>()
-        
+        .Build(this);
+          _raycastQuery = new EntityQueryBuilder(Allocator.Temp)
+        .WithAll<PlayerRayCastData>()
         .Build(this);
         RequireForUpdate(_buildQuery);
     }
@@ -39,12 +42,16 @@ public partial class GridUpdateSystem : SystemBase
         //         100, 
         //         map
         // );
+         // 1. Завершаем только то, что связано с рейкастом (быстро, так как query готов)
+        _raycastQuery.GetDependency().Complete();
 
+        // 2. Теперь спокойно читаем
+        var data = SystemAPI.GetSingleton<PlayerRayCastData>();
         //_attackZoneVisualizer.DrawAttackZones(SystemAPI.GetComponent<TurretGrid>(SystemAPI.GetSingletonEntity<BuildingMap>()));
         if (!_buildQuery.IsEmpty)
         {
              _visualizer.DrawGrid(
-                _playerData.pos, 
+                data.PlaceBlockPos, 
                 15, 
                 map
             );

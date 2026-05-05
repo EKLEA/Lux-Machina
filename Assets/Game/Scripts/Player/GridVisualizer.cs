@@ -19,7 +19,7 @@ public class GridVisualizer : MonoBehaviour
         renderer.material = gridMaterial;
     }
 
-    public void DrawGrid(Vector2Int center, int radius, BuildingMap map)
+    public void DrawGrid(int3 center, int radius,BuildingMap map)
     {
         if (mesh == null) Init();
 
@@ -36,8 +36,8 @@ public class GridVisualizer : MonoBehaviour
         {
             for (int y = -radius; y <= radius; y++)
             {
-                Vector2Int cellPos = new Vector2Int(center.x + x, center.y + y);
-                int2 ecsPos = new int2(cellPos.x, cellPos.y);
+                Vector2Int cellPos = new Vector2Int(center.x + x, center.z + y);
+                int3 ecsPos = new int3(cellPos.x,center.y, cellPos.y);
 
                 // Если клетка занята — СКИПАЕМ её (не рисуем ничего)
                 if (map.CellMapBuildingsIDs.ContainsKey(ecsPos)) continue;

@@ -60,12 +60,11 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
 
 
     public int rotation {get;private set;}
-    public Vector2Int pos {get;private set;}
+    public Vector3 posV3 {get;private set;}
     public bool isForce {get;private set;}
 
     public EnergyNode energyNode {get;private set;}
 
-    public Vector3 posV3  {get;private set;}
 
     Action<bool,bool> PlaceDelegate;
     Action BackDelegate;
@@ -81,7 +80,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     PlayerState playerState;
     IDisposable menuSub;
     private void OnPauseNormal(InputAction.CallbackContext context) => OnPausePerformed(context, false);
-private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerformed(context, true);
+    private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerformed(context, true);
 
     public void Initialize(PlayerPlaceBuildingSystem buildSystem, PlayerPlaceManyPointSystem roadSystem,PlayerDeleteBuildingsSystem deleteBuildingsSystem,PlayerConnectionEnergySystem connSystem,GridUpdateSystem gridSystem)
     {
@@ -90,7 +89,7 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
         playerDeleteBuildingsSystem=deleteBuildingsSystem;
         playerConnectionEnergySystem=connSystem;
         gridUpdateSystem=gridSystem;
-         SetUp();
+        SetUp();
         isLoaded = true;
         entityManager= World.DefaultGameObjectInjectionWorld.EntityManager;
         PlaceCommand=entityManager.CreateEntity();
@@ -180,8 +179,6 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
         // 1. Логика координат (земля)
         if (Physics.Raycast(ray, out hit, Mathf.Infinity,GroundMask))
         {
-            pos = gameController.GetMapPos(hit.point);
-            posV3=hit.point;
             isForce = ForceBuilding.IsPressed();
             if(playerState == PlayerState.Destroy&&playerDeleteBuildingsSystem.DeleteType==DeleteType.DeleteBuilding)
             {
@@ -302,6 +299,8 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
                 playerPlaceRoadSystem.onBuildingDone += SwitchToUIMode;
                 PlaceDelegate=playerPlaceRoadSystem.PlaceManyPoint;
                 BackDelegate=playerPlaceRoadSystem.Back;
+                
+                RotateDelegate=playerPlaceRoadSystem.Rotate;
                 playerPlaceRoadSystem.SetUpBuilding(info.GetStableHashCode(),this,PlaceCommand);
                 entityManager.SetComponentEnabled<PlayerPlacingManyPointBuilding>(PlaceCommand,true);
                 entityManager.SetComponentEnabled<PlayerPlacingBuilding>(PlaceCommand,false);
@@ -504,14 +503,13 @@ private void OnPauseEscape(InputAction.CallbackContext context) => OnPausePerfor
 public interface IPlayerConnectData:IPlaceBuildingPlayerData
 {
     EnergyNode energyNode{get;}
-    Vector3 posV3{get;}
 }
 public interface IPlaceBuildingPlayerData:IPlayerData
 {
     int rotation{get;}
+    Vector3 posV3{get;}
 }
 public interface IPlayerData
 {
-    Vector2Int pos{get;}
     bool isForce{get;}
 }

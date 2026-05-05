@@ -54,131 +54,146 @@ public partial struct TurretSystem : ISystem
     public partial struct TurretJob : IJobEntity
     {
         [ReadOnly] public TurretGrid turretGrid;
+
         public ItemsConfigReference itemsConfigReference;
+
         [ReadOnly] public ComponentLookup<ShooterTag> ShooterTagLookup;
         [ReadOnly] public ComponentLookup<HealthData> HealthDataLookup;
         [ReadOnly] public ComponentLookup<LocalTransform> TransformLookup;
-         [ReadOnly] public BufferLookup<ProjectilePrefabElement> ProjectilePrefabElementLookUp;
+
+        [ReadOnly] public BufferLookup<ProjectilePrefabElement> ProjectilePrefabElementLookUp;
+
         public Entity ConfigEntity;
-        
         public float DeltaTime;
+
         public EntityCommandBuffer.ParallelWriter ECB;
 
-        void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndex, 
-        in BuildingData buildingData,
-        in BuildingPosData posData,
-        in DynamicBuffer<StorageSlotData> storageSlots,
-        ref TurretStats stats, ref TurretTranform trans)
+        void Execute(
+            Entity entity,
+            [ChunkIndexInQuery] int chunkIndex,
+            in BuildingData buildingData,
+            in BuildingPosData posData,
+            in DynamicBuffer<StorageSlotData> storageSlots,
+            ref TurretStats stats,
+            ref TurretTranform trans)
         {
             stats.TimeToCoolDown -= DeltaTime;
 
-            int turretId = buildingData.BuildingUniqueID; 
+            int turretId = buildingData.BuildingUniqueID;
 
-            if (!turretGrid.EnemyGridMap.ContainsKey(turretId)) return;
-            
+            if (!turretGrid.EnemyGridMap.ContainsKey(turretId))
+                return;
+
             bool isShooter = ShooterTagLookup.HasComponent(entity);
+
             float3 bestTargetPos = float3.zero;
             float bestScore = -1f;
             bool targetFound = false;
+
             foreach (var enemy in turretGrid.EnemyGridMap.GetValuesForKey(turretId))
             {
-                if (!HealthDataLookup.HasComponent(enemy)) continue;
+                if (!HealthDataLookup.HasComponent(enemy))
+                    continue;
+
                 float hp = HealthDataLookup[enemy].CurrHealth;
 
                 float score = (isShooter && trans.AttacMode == 1) ? 1f : hp;
-                if (score > bestScore) 
-                { 
-                    bestScore = score; 
-                    bestTargetPos = TransformLookup[enemy].Position; 
-                    targetFound = true; 
-                    if (isShooter && trans.AttacMode == 1) break;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestTargetPos = TransformLookup[enemy].Position;
+                    targetFound = true;
+
+                    if (isShooter && trans.AttacMode == 1)
+                        break;
                 }
             }
-            if (targetFound)
+
+            if (!targetFound)
+                return;
+
+
+            float3 c = posData.center * turretGrid.CellSize;
+            float3 turretPos = new float3(c.x, c.y, c.z);
+
+            float3 dir = bestTargetPos - turretPos;
+
+
+            float targetYaw = math.atan2(dir.x, dir.z);
+
+            targetYaw -= math.PI * 0.5f;
+
+            float diff = targetYaw - trans.baseRotation;
+            diff = math.atan2(math.sin(diff), math.cos(diff));
+
+            float halfAngle = math.radians(stats.Angle * 0.5f);
+            diff = math.clamp(diff, -halfAngle, halfAngle);
+
+            trans.rotation.y = trans.baseRotation + diff;
+
+
+            if (stats.TimeToCoolDown > 0)
+                return;
+
+            if (stats.CurrAmmo > 0)
             {
-                float2 c = posData.center * turretGrid.CellSize;
-                float3 turretPos = new float3(c.x, 1, c.y);
-                float3 dir = bestTargetPos - turretPos;
-
-                float targetWorldAngle = math.atan2(dir.x, dir.z); 
-
-                targetWorldAngle -= math.PI * 0.5f; 
-
-                float diff = targetWorldAngle - trans.baseRotation;
-
-                diff = math.atan2(math.sin(diff), math.cos(diff));
-
-                float halfAngle = math.radians(stats.Angle * 0.5f);
-                diff = math.clamp(diff, -halfAngle, halfAngle);
-
-                trans.rotation.y = trans.baseRotation + diff;
-                if (stats.TimeToCoolDown <= 0)
+                if (itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
                 {
-                    if (stats.CurrAmmo > 0)
+                    if (!ProjectilePrefabElementLookUp.HasBuffer(ConfigEntity))
+                        return;
+
+                    var enemyPrefabs = ProjectilePrefabElementLookUp[ConfigEntity];
+
+                    Entity prefab = Entity.Null;
+
+                    foreach (var p in enemyPrefabs)
                     {
-                        if(itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
+                        if (p.ID == stats.ProjectilePrefabID)
                         {
-                            if (!ProjectilePrefabElementLookUp.HasBuffer(ConfigEntity)) return;
-                            var enemyPrefabs = ProjectilePrefabElementLookUp[ConfigEntity];
-                            Entity prefab = Entity.Null;
-                            foreach(var p in enemyPrefabs)
-                            {
-                                if (p.ID == stats.ProjectilePrefabID)
-                                {
-                                    prefab = p.PrefabEntity;
-                                    break;
-                                }
-                            }
-                            
-                            if(prefab == Entity.Null) return;
-                            
-                            Entity proj = ECB.Instantiate(chunkIndex, prefab);
-                            bool isArt = stats.projectileType == ProjectileType.Arch; 
-                            
-                            var pos = posData.center * turretGrid.CellSize;
-                            float dist = math.distance(pos, bestTargetPos.xz);
-
-                            
-                            ECB.SetComponent(chunkIndex, proj, new ProjectileData { 
-                                StartPos = trans.projectTyleSpawn, 
-                                TargetPos = bestTargetPos, 
-                                Speed = cfg.Speed, 
-                                Damage = cfg.Damage,
-                                Radius = cfg.Radius,
-                                ArcHeight = isArt ? dist * 0.5f : 0f,
-                                Progress = 0
-                            });
-
-                            stats.TimeToCoolDown = stats.CoolDown;
-                            stats.CurrAmmo-=1;
-                        }
-                    }
-                    else
-                    {
-                       
-                        if (storageSlots.Length > 0)
-                        {
-                            var slot = storageSlots[0];
-                            
-                            stats.AmmoID=slot.ItemId;
-                            if(itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
-                            {
-                                
-                                stats.CurrAmmo=cfg.AmmoCount;
-                            }
-                            else stats.CurrAmmo=20;
-                            
-                            // if (slot.Amount > 0)
-                            // {
-                                
-                            // }
-
+                            prefab = p.PrefabEntity;
+                            break;
                         }
                     }
 
-                    
+                    if (prefab == Entity.Null)
+                        return;
+
+                    Entity proj = ECB.Instantiate(chunkIndex, prefab);
+
+                    bool isArt = stats.projectileType == ProjectileType.Arch;
+
+                    float dist = math.distance(turretPos, bestTargetPos);
+
+                    ECB.SetComponent(chunkIndex, proj, new ProjectileData
+                    {
+                        StartPos = trans.projectTyleSpawn,
+                        TargetPos = bestTargetPos,
+                        Speed = cfg.Speed,
+                        Damage = cfg.Damage,
+                        Radius = cfg.Radius,
+                        ArcHeight = isArt ? dist * 0.5f : 0f,
+                        Progress = 0
+                    });
+
+                    stats.TimeToCoolDown = stats.CoolDown;
+                    stats.CurrAmmo -= 1;
                 }
-            }  
+            }
+            else
+            {
+                if (storageSlots.Length > 0)
+                {
+                    var slot = storageSlots[0];
+
+                    stats.AmmoID = slot.ItemId;
+
+                    if (itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
+                        stats.CurrAmmo = cfg.AmmoCount;
+                    else
+                        stats.CurrAmmo = 20;
+                }
+            }
         }
     }
 

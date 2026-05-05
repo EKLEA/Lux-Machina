@@ -10,7 +10,7 @@ using UnityEngine.Splines.ExtrusionShapes;
 [DisableAutoCreation]
 [UpdateInGroup(typeof(SimulationSystemGroup))]
 
-[UpdateAfter(typeof(TickGeneratorSystem))]
+[UpdateAfter(typeof(TerrainSystem))]
 [BurstCompile]
 
 public partial struct DestroyBuildingsSystem : ISystem
@@ -108,10 +108,14 @@ public partial struct DestroyBuildingsSystem : ISystem
                 {
                     for(int y = 0; y< posData.size.y;y++)
                     {
-                        var pos=posData.LeftCornerPos+new int2(x,y);
-                        MapData.CellMapEntites.Remove(pos);
-                        MapData.CellMapBuildingsIDs.Remove(pos);
-                        MapData.IsBluePrintOrDemolitionPoints.Remove(pos);
+                        for(int z = 0; z< posData.size.z;z++)
+                        {
+                            var pos=posData.LeftCornerPos+new int3(x,y,z);
+                            MapData.CellMapEntites.Remove(pos);
+                            MapData.CellMapBuildingsIDs.Remove(pos);
+                            MapData.IsBluePrintOrDemolitionPoints.Remove(pos);
+                        
+                        }
                     
                     }
                 }
@@ -154,13 +158,13 @@ public partial struct DestroyBuildingsSystem : ISystem
                 NativeHashSet<Entity> roadsToUpdate=new(100,Allocator.Temp);
                  for(int x = posData.LeftCornerPos.x; x < posData.LeftCornerPos.x + posData.size.x; x++)
                 {
-                    CheckPoint(new int2(x,posData.LeftCornerPos.y-1),ref roadsToUpdate);
-                    CheckPoint(new int2(x,posData.LeftCornerPos.y+posData.size.y),ref roadsToUpdate);
+                    CheckPoint(new int3(x,posData.LeftCornerPos.y,posData.LeftCornerPos.z-1),ref roadsToUpdate);
+                    CheckPoint(new int3(x,posData.LeftCornerPos.y,posData.LeftCornerPos.z+posData.size.y),ref roadsToUpdate);
                 }
-                for(int y= posData.LeftCornerPos.y; y < posData.LeftCornerPos.y + posData.size.y; y++)
+                for(int z= posData.LeftCornerPos.z; z < posData.LeftCornerPos.z + posData.size.z; z++)
                 {
-                    CheckPoint(new int2(posData.LeftCornerPos.x-1,y),ref roadsToUpdate);
-                    CheckPoint(new int2(posData.LeftCornerPos.x+posData.size.x,y),ref roadsToUpdate);
+                    CheckPoint(new int3(posData.LeftCornerPos.x-1,posData.LeftCornerPos.y,z),ref roadsToUpdate);
+                    CheckPoint(new int3(posData.LeftCornerPos.x+posData.size.x,posData.LeftCornerPos.y,z),ref roadsToUpdate);
                 }
                 foreach(var road in roadsToUpdate)
                 {
@@ -169,7 +173,7 @@ public partial struct DestroyBuildingsSystem : ISystem
                 roadsToUpdate.Dispose();
             }
         }
-        void CheckPoint(int2 pos, ref  NativeHashSet<Entity> roads)
+        void CheckPoint(int3 pos, ref  NativeHashSet<Entity> roads)
         {
             if (MapData.CellMapEntites.ContainsKey(pos))
             {
@@ -194,11 +198,11 @@ public partial struct DestroyBuildingsSystem : ISystem
                 roadEn=entity;
 
 
-                var dirs = new NativeArray<int2>(4, Allocator.Temp);
-                dirs[0] = new int2(1, 0);
-                dirs[1] = new int2(-1, 0);
-                dirs[2] = new int2(0, -1);
-                dirs[3] = new int2(0, 1);
+                var dirs = new NativeArray<int3>(4, Allocator.Temp);
+                dirs[0] = new int3(1,0, 0);
+                dirs[1] = new int3(-1,0, 0);
+                dirs[2] = new int3(0, 0,-1);
+                dirs[3] = new int3(0, 0,1);
                 NativeHashSet<Entity> roadsToUpdate=new(100,Allocator.Temp);
                 for (int i = 0; i < points.Length; i++)
                 {
@@ -230,7 +234,7 @@ public partial struct DestroyBuildingsSystem : ISystem
                 ECB.SetComponentEnabled<UpdateClustersTag>(Map,true);   
             }
         }
-        void CheckPoint(int2 pos, ref  NativeHashSet<Entity> roads)
+        void CheckPoint(int3 pos, ref  NativeHashSet<Entity> roads)
         {
             if (MapData.CellMapEntites.ContainsKey(pos))
             {

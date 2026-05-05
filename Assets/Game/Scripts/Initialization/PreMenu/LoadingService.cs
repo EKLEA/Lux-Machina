@@ -1,7 +1,7 @@
 using System;
-using Cysharp.Threading.Tasks;
 using UnityEngine;
 
+using Cysharp.Threading.Tasks;
 public interface ILoadingService
 {
     UniTask LoadWithProgressAsync(params Func<UniTask>[] loadTasks);

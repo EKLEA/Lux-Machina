@@ -35,13 +35,15 @@ public static class StaticMethods
 
         return Mathf.Abs(crossProduct) < 0.0001f;
     }
+    
 }
 public class UnityMathematicsConverter : JsonConverter
 {
     public override bool CanConvert(Type objectType)
     {
         string name = objectType.Name;
-        return objectType == typeof(int2) || 
+        return objectType == typeof(int3) || 
+               objectType == typeof(int2) || 
                objectType == typeof(float3) || 
                objectType == typeof(quaternion) ||
                name.Contains("FixedList");
@@ -54,6 +56,14 @@ public class UnityMathematicsConverter : JsonConverter
             writer.WriteStartObject();
             writer.WritePropertyName("x"); writer.WriteValue(i2.x);
             writer.WritePropertyName("y"); writer.WriteValue(i2.y);
+            writer.WriteEndObject();
+        }
+        else if (value is int3 i3)
+        {
+            writer.WriteStartObject();
+            writer.WritePropertyName("x"); writer.WriteValue(i3.x);
+            writer.WritePropertyName("y"); writer.WriteValue(i3.y);
+            writer.WritePropertyName("z"); writer.WriteValue(i3.z);
             writer.WriteEndObject();
         }
         else if (value is float3 f3)
@@ -73,61 +83,63 @@ public class UnityMathematicsConverter : JsonConverter
             writer.WritePropertyName("w"); writer.WriteValue(q.value.w);
             writer.WriteEndObject();
         }
-       else if (value.GetType().Name.Contains("FixedList"))
-{
-    writer.WriteStartArray();
-    var type = value.GetType();
-    // Получаем свойство Length и метод GetItem через рефлексию
-    var lengthProp = type.GetProperty("Length");
-    int length = (int)lengthProp.GetValue(value);
-    var getItemMethod = type.GetMethod("get_Item");
+        else if (value.GetType().Name.Contains("FixedList"))
+        {
+            writer.WriteStartArray();
+            var type = value.GetType();
+            // Получаем свойство Length и метод GetItem через рефлексию
+            var lengthProp = type.GetProperty("Length");
+            int length = (int)lengthProp.GetValue(value);
+            var getItemMethod = type.GetMethod("get_Item");
 
-    for (int i = 0; i < length; i++)
-    {
-        var item = getItemMethod.Invoke(value, new object[] { i });
-        serializer.Serialize(writer, item);
-    }
-    writer.WriteEndArray();
-}
+            for (int i = 0; i < length; i++)
+            {
+                var item = getItemMethod.Invoke(value, new object[] { i });
+                serializer.Serialize(writer, item);
+            }
+            writer.WriteEndArray();
+        }
     }
 
    public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-{
-    if (reader.TokenType == JsonToken.Null) return null;
-
-    // Обработка FixedList
-    if (objectType.Name.Contains("FixedList"))
     {
-        var array = JArray.Load(reader);
-        // Добавляем [0], так как GetGenericArguments возвращает массив
-        Type elementType = objectType.GetGenericArguments()[0];
-        
-        // Создаем экземпляр (boxing произойдет здесь)
-        object fixedList = Activator.CreateInstance(objectType);
-        var addMethod = objectType.GetMethod("Add");
+        if (reader.TokenType == JsonToken.Null) return null;
 
-        foreach (var item in array)
+        // Обработка FixedList
+        if (objectType.Name.Contains("FixedList"))
         {
-            var convertedItem = item.ToObject(elementType, serializer);
-            // Для структур Invoke работает корректно, если объект в переменной типа object
-            addMethod.Invoke(fixedList, new object[] { convertedItem });
+            var array = JArray.Load(reader);
+            // Добавляем [0], так как GetGenericArguments возвращает массив
+            Type elementType = objectType.GetGenericArguments()[0];
+            
+            // Создаем экземпляр (boxing произойдет здесь)
+            object fixedList = Activator.CreateInstance(objectType);
+            var addMethod = objectType.GetMethod("Add");
+
+            foreach (var item in array)
+            {
+                var convertedItem = item.ToObject(elementType, serializer);
+                // Для структур Invoke работает корректно, если объект в переменной типа object
+                addMethod.Invoke(fixedList, new object[] { convertedItem });
+            }
+            return fixedList; // Возвращаем измененный упакованный объект
         }
-        return fixedList; // Возвращаем измененный упакованный объект
-    }
 
-    // Обработка Mathematics типов
-    JToken token = JToken.Load(reader);
-    if (token.Type == JTokenType.Object)
-    {
-        JObject jo = (JObject)token;
-        if (objectType == typeof(int2))
-            return new int2((int)(jo["x"] ?? 0), (int)(jo["y"] ?? 0));
-        if (objectType == typeof(float3))
-            return new float3((float)(jo["x"] ?? 0), (float)(jo["y"] ?? 0), (float)(jo["z"] ?? 0));
-        if (objectType == typeof(quaternion))
-            return new quaternion((float)(jo["x"] ?? 0), (float)(jo["y"] ?? 0), (float)(jo["z"] ?? 0), (float)(jo["w"] ?? 0));
-    }
+        // Обработка Mathematics типов
+        JToken token = JToken.Load(reader);
+        if (token.Type == JTokenType.Object)
+        {
+            JObject jo = (JObject)token;
+            if (objectType == typeof(int2))
+                return new int2((int)(jo["x"] ?? 0), (int)(jo["y"] ?? 0));
+            if (objectType == typeof(int3))
+                return new int3((int)(jo["x"] ?? 0), (int)(jo["y"] ?? 0),(int)(jo["z"] ?? 0));
+            if (objectType == typeof(float3))
+                return new float3((float)(jo["x"] ?? 0), (float)(jo["y"] ?? 0), (float)(jo["z"] ?? 0));
+            if (objectType == typeof(quaternion))
+                return new quaternion((float)(jo["x"] ?? 0), (float)(jo["y"] ?? 0), (float)(jo["z"] ?? 0), (float)(jo["w"] ?? 0));
+        }
 
-    return null;
-}
+        return null;
+    }
 }

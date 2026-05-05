@@ -143,7 +143,9 @@ PlayerSettings:
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
   bundleVersion: 0.1.0
-  preloadedAssets: []
+  preloadedAssets:
+  - {fileID: 11400000, guid: 5c884656033f8a4439e2d3738aa1dbf9, type: 2}
+  - {fileID: -944628639613478452, guid: 8bec56acce13f784db01f00503be5ddb, type: 3}
   metroInputSource: 0
   wsaTransparentSwapchain: 0
   m_HolographicPauseOnTrackingLoss: 1
@@ -823,24 +825,24 @@ PlayerSettings:
   webGLCloseOnQuit: 0
   webWasm2023: 0
   scriptingDefineSymbols:
-    Android: DOTWEEN
-    EmbeddedLinux: DOTWEEN
-    GameCoreScarlett: DOTWEEN
-    GameCoreXboxOne: DOTWEEN
-    Kepler: DOTWEEN
-    LinuxHeadlessSimulation: DOTWEEN
-    Nintendo Switch: DOTWEEN
-    Nintendo Switch 2: DOTWEEN
-    PS4: DOTWEEN
-    PS5: DOTWEEN
-    QNX: DOTWEEN
-    Standalone: DOTWEEN
-    VisionOS: DOTWEEN
-    WebGL: DOTWEEN
-    Windows Store Apps: DOTWEEN
-    XboxOne: DOTWEEN
-    iPhone: DOTWEEN
-    tvOS: DOTWEEN
+    Android: DOTWEEN;DOTWEEN_NOUI
+    EmbeddedLinux: DOTWEEN;DOTWEEN_NOUI
+    GameCoreScarlett: DOTWEEN;DOTWEEN_NOUI
+    GameCoreXboxOne: DOTWEEN;DOTWEEN_NOUI
+    Kepler: DOTWEEN;DOTWEEN_NOUI
+    LinuxHeadlessSimulation: DOTWEEN;DOTWEEN_NOUI
+    Nintendo Switch: DOTWEEN;DOTWEEN_NOUI
+    Nintendo Switch 2: DOTWEEN;DOTWEEN_NOUI
+    PS4: DOTWEEN;DOTWEEN_NOUI
+    PS5: DOTWEEN;DOTWEEN_NOUI
+    QNX: DOTWEEN;DOTWEEN_NOUI
+    Standalone: DOTWEEN;DOTWEEN_NOUI
+    VisionOS: DOTWEEN;DOTWEEN_NOUI
+    WebGL: DOTWEEN;DOTWEEN_NOUI
+    Windows Store Apps: DOTWEEN;DOTWEEN_NOUI
+    XboxOne: DOTWEEN;DOTWEEN_NOUI
+    iPhone: DOTWEEN;DOTWEEN_NOUI
+    tvOS: DOTWEEN;DOTWEEN_NOUI
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:

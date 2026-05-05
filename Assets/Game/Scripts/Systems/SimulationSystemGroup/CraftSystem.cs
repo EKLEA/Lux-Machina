@@ -83,7 +83,7 @@ public partial struct CraftSystem : ISystem
     public partial struct PingProducerCraftBuildingJob : IJobEntity
     {
         [ReadOnly] public  BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
-        [ReadOnly] public  NativeParallelHashMap<int2,int2> ResouecesMap;
+        [ReadOnly] public  NativeParallelHashMap<int3,int2> ResouecesMap;
         public ComponentLookup<CanCraft> CanCraftLookup;
         public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<OutputSlotData> outputs, in ResourcesLink resourcesLink,ref BuildingStateData buildingStateData)
         {
@@ -101,7 +101,7 @@ public partial struct CraftSystem : ISystem
             bool hasResources=false;
             for(int i = 0; i < resourcesLink.ResourcesCells.Length; i++)
             {
-                int2 pos= resourcesLink.ResourcesCells[i];
+                int3 pos= resourcesLink.ResourcesCells[i];
                 if (ResouecesMap.ContainsKey(pos) && ResouecesMap[pos].y > 0)
                 {
                     hasResources= true; 
@@ -190,7 +190,7 @@ public partial struct CraftSystem : ISystem
     {
         [ReadOnly] public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
         public NativeParallelMultiHashMap<int, RecipeIngredientStruct>.ParallelWriter produced; 
-        [NativeDisableParallelForRestriction] public NativeParallelHashMap<int2,int2> ResouecesMap;
+        [NativeDisableParallelForRestriction] public NativeParallelHashMap<int3,int2> ResouecesMap;
         public float timeStep;
         public void Execute(ref RecipeBuildingData recipeData, ref DynamicBuffer<OutputSlotData> slots,EnabledRefRW<CanCraft> canCraft,ref ResourcesLink resourcesLink,ref BuildingStateData buildingStateData)
         {
@@ -227,7 +227,7 @@ public partial struct CraftSystem : ISystem
             bool hasResources=false;
             for(int i = 0; i < resourcesLink.ResourcesCells.Length; i++)
             {
-                int2 pos= resourcesLink.ResourcesCells[i];
+                int3 pos= resourcesLink.ResourcesCells[i];
                 if (ResouecesMap.ContainsKey(pos) && ResouecesMap[pos].y > 0)
                 {
                     hasResources= true; 

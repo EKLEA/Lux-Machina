@@ -11,7 +11,7 @@ public class GameStateData
     public float dayLength;
     public int CoreID;
     public PlayerCamData camData;
-    public int2 CorePos;
+    public int3 CorePos;
     public Dictionary<int,BaseBuildingSaveData> Buildings;
     public Dictionary<int,ManyPointsBuildingSaveData> ManyPointsBuildings;
     public Dictionary<int,ConstructionSlotsSaveData> constructionSlotsSaveData;
@@ -25,6 +25,6 @@ public class GameStateData
 }
 [Serializable]
 public struct ResourceCellSave { 
-    public int2 pos; 
+    public int3 pos; 
     public int2 val; 
 }

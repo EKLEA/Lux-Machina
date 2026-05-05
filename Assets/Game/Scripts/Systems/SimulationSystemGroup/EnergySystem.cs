@@ -422,15 +422,18 @@ public partial struct EnergySystem : ISystem
             {
                 for (int y = buildingPosData.LeftCornerPos.y; y < buildingPosData.LeftCornerPos.y + buildingPosData.size.y; y++)
                 {
-                    var cell = new int2(x, y);
-                    if (energyMap.CellToEnergyEntityBuildingMap.ContainsKey(cell))
+                     for (int z = buildingPosData.LeftCornerPos.z; z < buildingPosData.LeftCornerPos.z + buildingPosData.size.z; z++)
                     {
-                        var entities=energyMap.CellToEnergyEntityBuildingMap.GetValuesForKey(cell);
-                        foreach(var en in entities)
+                        var cell = new int3(x, y,z);
+                        if (energyMap.CellToEnergyEntityBuildingMap.ContainsKey(cell))
                         {
-                            if(IsConnectedToEnegyLookup.HasComponent(en)&&IsConnectedToEnegyLookup.IsComponentEnabled(en)) energyEntites.Add(en);
+                            var entities=energyMap.CellToEnergyEntityBuildingMap.GetValuesForKey(cell);
+                            foreach(var en in entities)
+                            {
+                                if(IsConnectedToEnegyLookup.HasComponent(en)&&IsConnectedToEnegyLookup.IsComponentEnabled(en)) energyEntites.Add(en);
+                            }
                         }
-                    }
+                }
                 }
             }
             ECB.SetComponentEnabled<IsConnectedToEnergy>(entity,energyEntites.Count>0);

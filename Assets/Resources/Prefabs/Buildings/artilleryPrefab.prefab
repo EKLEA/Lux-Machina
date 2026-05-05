@@ -517,6 +517,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Tower_Base
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: fb2f6cbd6dca81944a7f01e340674f72, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -582,6 +586,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 382cd2e8a5f696242a0faeb195f6fc59, type: 3}
       propertyPath: m_Name
       value: Foundation 3x3
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 382cd2e8a5f696242a0faeb195f6fc59, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

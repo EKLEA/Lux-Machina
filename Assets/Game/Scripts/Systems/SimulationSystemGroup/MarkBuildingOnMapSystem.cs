@@ -51,6 +51,8 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         var resourceMapRW = SystemAPI.GetSingletonRW<ResourceMap>();
         var mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
         var config = SystemAPI.GetSingleton<BuildingConfigReference>();
+        var chunkMap = SystemAPI.GetSingleton<ChunkMap>();
+        var worldSettings = SystemAPI.GetSingleton<WorldSettings>();
         var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
         if (runBuilding)
@@ -93,24 +95,33 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             var SpawnMobsDataLookup = SystemAPI.GetComponentLookup<SpawnMobsData>(false);
             var ManyPointPointHealthDataLookup = SystemAPI.GetBufferLookup<ManyPointPointHealthData>(false);
              
-            var weightJob = new CalculateDestructionWeightsJob {
+           var weightJob = new CalculateDestructionWeightsJob
+            {
                 BuildingsMap = buildingMapRW.ValueRW,
-                HealthDataLookup=HealthDataLookup,
-                ManyPointPointHealthDataLookup=ManyPointPointHealthDataLookup,
-                buildingConfigReference=config,
-                SpawnManagerEntity=mapEntity,
-                SpawnMobsDataLookup=SpawnMobsDataLookup,
-                
+                SpawnMobsDataLookup = SpawnMobsDataLookup,
+                SpawnManagerEntity = mapEntity,
+
+                buildingConfigReference = config,
+                HealthDataLookup = HealthDataLookup,
+                ManyPointPointHealthDataLookup = ManyPointPointHealthDataLookup,
+
+                ChunkMap = chunkMap,
+                BlockLookup = SystemAPI.GetBufferLookup<BlockElement>(true),
+                Settings = worldSettings,
+
+                ECB = ecb
             };
             state.Dependency = weightJob.Schedule(state.Dependency);
-
 
             var flowJob = new GenerateFlowDirectionsJob
             {
                 Weights = buildingMapRW.ValueRO.CellWeights,
-                BuildingIDs = buildingMapRW.ValueRO.CellMapBuildingsIDs,
-                Directions = buildingMapRW.ValueRW.CellDirections,
-                IsBluePrintOrDemolition=buildingMapRW.ValueRO.IsBluePrintOrDemolitionPoints
+
+                ChunkMap = chunkMap,
+                BlockLookup = SystemAPI.GetBufferLookup<BlockElement>(true),
+                Settings = worldSettings,
+
+                Directions = buildingMapRW.ValueRW.CellDirections
             };
 
             state.Dependency = flowJob.Schedule(state.Dependency);
@@ -152,6 +163,8 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         if(resourceMap.ResouecesMap.IsCreated)resourceMap.Dispose();
         var TurretGrid=state.EntityManager.GetComponentData<TurretGrid>(mapEntity);
         if(TurretGrid.TurretGridClaim.IsCreated)TurretGrid.Dispose();
+        var ChunkMap=state.EntityManager.GetComponentData<ChunkMap>(mapEntity);
+        if(ChunkMap.ChunkMapData.IsCreated)ChunkMap.Dispose();
         
         state.EntityManager.DestroyEntity(mapEntity);
     
@@ -199,22 +212,25 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             {
                 for (int y = buildingPosData.LeftCornerPos.y; y < buildingPosData.LeftCornerPos.y + buildingPosData.size.y; y++)
                 {
-                    var cell = new int2(x, y);
-                    MapData.CellMapBuildingsIDs.TryAdd(cell, buildingData.BuildingIDHash);
-                    MapData.CellMapEntites.TryAdd(cell, entity);
-                    MapData.CellEntityMultiMap.Add(entity, cell);
+                    for (int z = buildingPosData.LeftCornerPos.z; z < buildingPosData.LeftCornerPos.z + buildingPosData.size.z; z++)
+                    {
+                        var cell = new int3(x, y,z);
+                        MapData.CellMapBuildingsIDs.TryAdd(cell, buildingData.BuildingIDHash);
+                        MapData.CellMapEntites.TryAdd(cell, entity);
+                        MapData.CellEntityMultiMap.Add(entity, cell);
+                    }
                 }
             }
             if (TurretStatsLookup.HasComponent(entity))
             {
                 var stats= TurretStatsLookup[entity];
-                float2 forward = buildingPosData.Rotation switch
+                float3 forward = buildingPosData.Rotation switch
                 {
-                    3 => new float2(0, 1),  
-                    0 => new float2(1, 0), 
-                    1 => new float2(0, -1), 
-                    2 => new float2(-1, 0), 
-                    _ => new float2(0, 1)
+                    3 => new float3(0,0, 1),  
+                    0 => new float3(1,0, 0), 
+                    1 => new float3(0, 0,-1), 
+                    2 => new float3(-1,0, 0), 
+                    _ => new float3(0, 0,1)
                 };
 
                 float cosHalfAngle = math.cos(math.radians(stats.Angle * 0.5f));
@@ -225,30 +241,30 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 {
                     for (int y = -radiusInCells; y <= radiusInCells; y++)
                     {
-                        // Если это сама клетка турели, всегда помечаем
-                        if (x == 0 && y == 0) 
+                         for (int z= -radiusInCells; z <= radiusInCells; z++)
                         {
-                            int2 cell = new int2((int)buildingPosData.center.x, (int)buildingPosData.center.y);
-                            TurretGrid.TurretGridClaim.Add(cell, buildingData.BuildingUniqueID);
-                            continue;
-                        }
-
-                        float2 relativePos = new float2(x, y) * TurretGrid.CellSize;
-                        float distSq = math.lengthsq(relativePos);
-
-                        if (distSq <= radiusSq)
-                        {
-                            // Используем math.dot для проверки угла без лишних тригонометрических функций
-                            // Нормализуем вручную, чтобы избежать проблем с нулем
-                            float dist = math.sqrt(distSq);
-                            float2 directionToCell = relativePos / dist; 
-                            
-                            float dot = math.dot(forward, directionToCell);
-
-                            if (dot >= cosHalfAngle)
+                            if (x == 0 && y == 0&&z==0) 
                             {
-                                int2 cell = new int2((int)buildingPosData.center.x + x, (int)buildingPosData.center.y + y);
+                                int3 cell = new int3((int)buildingPosData.center.x, (int)buildingPosData.center.y,(int)buildingPosData.center.z);
                                 TurretGrid.TurretGridClaim.Add(cell, buildingData.BuildingUniqueID);
+                                continue;
+                            }
+
+                            float3 relativePos = new float3(x, y,z) * TurretGrid.CellSize;
+                            float distSq = math.lengthsq(relativePos);
+
+                            if (distSq <= radiusSq)
+                            {
+                                float dist = math.sqrt(distSq);
+                                float3 directionToCell = relativePos / dist; 
+                                
+                                float dot = math.dot(forward, directionToCell);
+
+                                if (dot >= cosHalfAngle)
+                                {
+                                    int3 cell = new int3((int)buildingPosData.center.x + x, (int)buildingPosData.center.y + y,(int)buildingPosData.center.z + z);
+                                    TurretGrid.TurretGridClaim.Add(cell, buildingData.BuildingUniqueID);
+                                }
                             }
                         }
                     }
@@ -262,12 +278,15 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 {
                     for (int y = buildingPosData.LeftCornerPos.y; y < buildingPosData.LeftCornerPos.y + buildingPosData.size.y; y++)
                     {
-                        var cell = new int2(x, y);
-                        
-                        if (EnergyMap.CellToEnergyBuildingMap.ContainsKey(cell))
+                        for (int z = buildingPosData.LeftCornerPos.z; z < buildingPosData.LeftCornerPos.z + buildingPosData.size.z; z++)
                         {
-                            var values=EnergyMap.CellToEnergyBuildingMap.GetValuesForKey(cell);
-                            foreach(var v in values) entitiesHasSet.Add(v);
+                            var cell = new int3(x, y,z);
+                            
+                            if (EnergyMap.CellToEnergyBuildingMap.ContainsKey(cell))
+                            {
+                                var values=EnergyMap.CellToEnergyBuildingMap.GetValuesForKey(cell);
+                                foreach(var v in values) entitiesHasSet.Add(v);
+                            }
                         }
                     }
                 }
@@ -288,7 +307,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             if (EnergyBuildingDataLookup.HasComponent(entity))
             {
                 var enData = EnergyBuildingDataLookup[entity];
-                int2 center = (int2)buildingPosData.center;
+                int3 center = (int3)buildingPosData.center;
                 float radius = enData.radius;
                 int radiusSq = (int)(radius * radius);
                 NativeHashSet<Entity> entitiesToPing=new(radiusSq,Allocator.Temp);
@@ -296,15 +315,19 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 {
                     for (int y = (int)(center.y - radius); y <= center.y + radius; y++)
                     {
-                        int dx = x - center.x;
-                        int dy = y - center.y;
-                        var pos=new int2(x, y);
-                        if (dx * dx + dy * dy <= radiusSq)
+                        for (int z = (int)(center.z - radius); z <= center.z + radius; z++)
                         {
-                            EnergyMap.CellToEnergyBuildingMap.Add(pos, buildingData.BuildingUniqueID);
-                            EnergyMap.CellToEnergyEntityBuildingMap.Add(pos, entity);
-                            EnergyMap.EnergyEntityToCellBuildingMap.Add(entity,pos );
-                            if(MapData.CellMapEntites.ContainsKey(pos)) entitiesToPing.Add(MapData.CellMapEntites[pos]);
+                            int dx = x - center.x;
+                            int dy = y - center.y;
+                            int dz = z - center.z;
+                            var pos=new int3(x, y,z);
+                            if (dx * dx + dy * dy +dz*dz<= radiusSq)
+                            {
+                                EnergyMap.CellToEnergyBuildingMap.Add(pos, buildingData.BuildingUniqueID);
+                                EnergyMap.CellToEnergyEntityBuildingMap.Add(pos, entity);
+                                EnergyMap.EnergyEntityToCellBuildingMap.Add(entity,pos );
+                                if(MapData.CellMapEntites.ContainsKey(pos)) entitiesToPing.Add(MapData.CellMapEntites[pos]);
+                            }
                         }
                     }
                 }
@@ -321,9 +344,9 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 resourcesLink.indexCell=0;
                 for (int x = buildingPosData.LeftCornerPos.x; x < buildingPosData.LeftCornerPos.x + buildingPosData.size.x; x++)
                 {
-                    for (int y = buildingPosData.LeftCornerPos.y; y < buildingPosData.LeftCornerPos.y + buildingPosData.size.y; y++)
+                    for (int z = buildingPosData.LeftCornerPos.z; z < buildingPosData.LeftCornerPos.z + buildingPosData.size.z; z++)
                     {
-                        int2 point=new(x,y);
+                        int3 point=new(x,buildingPosData.LeftCornerPos.y,z);
                         if (ResourceMap.ResouecesMap.ContainsKey(point))
                         {
                             resourcesLink.ResourcesCells.Add(point);
@@ -364,13 +387,13 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
     [BurstCompile]
     public partial struct ResizeMapJob : IJob
     {
-        public NativeParallelHashMap<int2, int> CellMapBuildingsIDs; 
-        public NativeParallelHashMap<int2, Entity> CellMapEntites;
-        public NativeParallelMultiHashMap<Entity, int2> CellEntityMultiMap;
+        public NativeParallelHashMap<int3, int> CellMapBuildingsIDs; 
+        public NativeParallelHashMap<int3, Entity> CellMapEntites;
+        public NativeParallelMultiHashMap<Entity, int3> CellEntityMultiMap;
         public NativeParallelHashMap<int, Entity> Entities;
-        public NativeParallelHashMap<int2, bool> IsBluePrintOrDemolitionPoints; 
-        public NativeParallelHashMap<int2, float> CellWeights;    
-        public NativeParallelHashMap<int2, float2> CellDirections;
+        public NativeParallelHashMap<int3, bool> IsBluePrintOrDemolitionPoints; 
+        public NativeParallelHashMap<int3, float> CellWeights;    
+        public NativeParallelHashMap<int3, float3> CellDirections;
         public Entity MapEntity;
         public ComponentLookup<UpdateMapTag> UpdateMapTagLookup;
         public void Execute(
@@ -396,113 +419,185 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
     [BurstCompile]
     public struct CalculateDestructionWeightsJob : IJob
     {
-        public  BuildingMap BuildingsMap;
+        public BuildingMap BuildingsMap;
+
         public ComponentLookup<SpawnMobsData> SpawnMobsDataLookup;
-        public Entity SpawnManagerEntity;        
+        public Entity SpawnManagerEntity;
+
         [ReadOnly] public BuildingConfigReference buildingConfigReference;
         [ReadOnly] public ComponentLookup<HealthData> HealthDataLookup;
-        [ReadOnly] public BufferLookup<ManyPointPointHealthData> ManyPointPointHealthDataLookup;        
+        [ReadOnly] public BufferLookup<ManyPointPointHealthData> ManyPointPointHealthDataLookup;
+
+        [ReadOnly] public ChunkMap ChunkMap;
+        [ReadOnly] public BufferLookup<BlockElement> BlockLookup;
+        [ReadOnly] public WorldSettings Settings;
+
         public EntityCommandBuffer ECB;
 
         public void Execute()
         {
             var spawnMobsData = SpawnMobsDataLookup[SpawnManagerEntity];
-            spawnMobsData.totalWeights=0;
+            spawnMobsData.totalWeights = 0;
+
             BuildingsMap.CellWeights.Clear();
-            var queue = new NativeQueue<int2>(Allocator.Temp);
+
+            var queue = new NativeQueue<int3>(Allocator.Temp);
 
             foreach (var building in BuildingsMap.CellMapBuildingsIDs)
             {
-                int2 bPos = building.Key;
+                int3 bPos = building.Key;
                 int buildingID = building.Value;
-                if(BuildingsMap.IsBluePrintOrDemolitionPoints.ContainsKey(bPos)&&BuildingsMap.IsBluePrintOrDemolitionPoints[bPos])continue;
+
+                if (BuildingsMap.IsBluePrintOrDemolitionPoints.ContainsKey(bPos) &&
+                    BuildingsMap.IsBluePrintOrDemolitionPoints[bPos])
+                    continue;
+
                 float startWeight = 0f;
+
                 if (buildingConfigReference.BuildingsBaseConfigs.Value.TryGetConfig(buildingID, out var config))
                 {
-                    
                     startWeight = GetPriorityScore(config.buildingType, config.typeOfLogic);
                 }
-                var en=BuildingsMap.CellMapEntites[bPos];
-                float procent=1f;
-                if(ManyPointPointHealthDataLookup.HasBuffer(en))
+
+                var en = BuildingsMap.CellMapEntites[bPos];
+
+                float healthPercent = 1f;
+
+                if (ManyPointPointHealthDataLookup.HasBuffer(en))
                 {
-                    foreach(var b in ManyPointPointHealthDataLookup[en])
+                    foreach (var b in ManyPointPointHealthDataLookup[en])
                     {
-                        if (bPos.x == b.pos.x && bPos.y == b.pos.y)
+                        if (bPos.Equals(b.pos))
                         {
-                            procent = (float)b.CurrHealth / b.MaxHealth;
+                            healthPercent = (float)b.CurrHealth / b.MaxHealth;
                             break;
                         }
                     }
                 }
                 else
                 {
-                    procent= (float)(HealthDataLookup[en].CurrHealth)/HealthDataLookup[en].MaxHealth;
+                    healthPercent =
+                        (float)HealthDataLookup[en].CurrHealth /
+                        HealthDataLookup[en].MaxHealth;
                 }
-                float res=startWeight*procent;
-                spawnMobsData.totalWeights+=(21f-res);
-                BuildingsMap.CellWeights[bPos] =  res;
+
+                float res = startWeight * healthPercent;
+
+                spawnMobsData.totalWeights += (21f - res);
+
+                BuildingsMap.CellWeights[bPos] = res;
+
                 queue.Enqueue(bPos);
             }
 
-            int maxSearchDist = 20; 
 
-            while (queue.TryDequeue(out int2 curr))
+            int maxSearchDist = 20;
+
+            while (queue.TryDequeue(out int3 curr))
             {
                 float currWeight = BuildingsMap.CellWeights[curr];
 
-                for (int x = -1; x <= 1; x++)
+                for (int i = 0; i < directions.Length; i++)
                 {
-                    for (int y = -1; y <= 1; y++)
-                        {
-                            if (x == 0 && y == 0) continue;
-                            int2 neighbor = curr + new int2(x, y);
-                            if (BuildingsMap.CellMapBuildingsIDs.ContainsKey(neighbor)) 
-                            {
-                                bool isBlueprint = BuildingsMap.IsBluePrintOrDemolitionPoints.ContainsKey(neighbor) && 
-                                                BuildingsMap.IsBluePrintOrDemolitionPoints[neighbor];
-                                
-                                if (!isBlueprint) continue; // Пропускаем только настоящие здания
-                            }
+                    int3 offset = directions[i];
+                    int3 neighbor = curr + offset;
 
-                            float distMod = (x != 0 && y != 0) ? 1.41f : 1.0f;
-                            
-                            float stepCost = 1.0f * distMod; 
-                            float newWeight = currWeight + stepCost;
+                    if (IsBlocked(neighbor)) continue;
 
-                            if (newWeight > maxSearchDist) continue;
+                    float distMod = math.length(offset); // 1 or 1.41 or 1.73
+                    float stepCost = distMod;
 
-                            if (!BuildingsMap.CellWeights.TryGetValue(neighbor, out float oldWeight) || newWeight < oldWeight)
-                            {
-                                BuildingsMap.CellWeights[neighbor] = newWeight;
-                                queue.Enqueue(neighbor);
-                            }
-                        }
+                    float newWeight = currWeight + stepCost;
+
+                    if (newWeight > maxSearchDist) continue;
+
+                    if (!BuildingsMap.CellWeights.TryGetValue(neighbor, out float old) ||
+                        newWeight < old)
+                    {
+                        BuildingsMap.CellWeights[neighbor] = newWeight;
+                        queue.Enqueue(neighbor);
+                    }
                 }
             }
+
             SpawnMobsDataLookup[SpawnManagerEntity] = spawnMobsData;
         }
+
+        bool IsBlocked(int3 worldPos)
+        {
+            int2 chunkPos = new int2(
+                (int)math.floor((float)worldPos.x / Settings.Size),
+                (int)math.floor((float)worldPos.z / Settings.Size)
+            );
+
+            if (!ChunkMap.ChunkMapData.TryGetValue(chunkPos, out var chunkEntity))
+                return true;
+
+            if (!BlockLookup.HasBuffer(chunkEntity))
+                return true;
+
+            var buffer = BlockLookup[chunkEntity];
+
+            int3 local = new int3(
+                worldPos.x - chunkPos.x * Settings.Size,
+                worldPos.y,
+                worldPos.z - chunkPos.y * Settings.Size
+            );
+
+            if (local.x < 0 || local.z < 0 ||
+                local.x >= Settings.Size ||
+                local.z >= Settings.Size ||
+                local.y < 0 ||
+                local.y >= Settings.Height)
+                return true;
+
+            int index =
+                local.x +
+                local.z * Settings.Size +
+                local.y * Settings.Size * Settings.Size;
+
+            return buffer[index].BlockID != 0;
+        }
+
+        static readonly int3[] directions =
+        {
+            new int3(1,0,0), new int3(-1,0,0),
+            new int3(0,1,0), new int3(0,-1,0),
+            new int3(0,0,1), new int3(0,0,-1),
+
+            new int3(1,1,0), new int3(-1,1,0),
+            new int3(1,0,1), new int3(-1,0,1),
+            new int3(0,1,1), new int3(0,-1,1),
+
+            new int3(1,-1,0), new int3(-1,-1,0),
+            new int3(1,0,-1), new int3(-1,0,-1),
+            new int3(0,1,-1), new int3(0,-1,-1)
+        };
 
         private float GetPriorityScore(BuildingsTypes type, TypeOfLogic logic)
         {
             switch (type)
             {
-                case BuildingsTypes.Special:    return 1f;   
-                case BuildingsTypes.Enegry:     return 5f;
-                case BuildingsTypes.Logistic:   return 10f;
+                case BuildingsTypes.Special: return 1f;
+                case BuildingsTypes.Enegry: return 5f;
+                case BuildingsTypes.Logistic: return 10f;
                 case BuildingsTypes.Procession: return 15f;
-                case BuildingsTypes.Defence:    return 20f + (logic == TypeOfLogic.WorkWithItems ? 10 : 0);  
-                default:                        return 20f;
+                case BuildingsTypes.Defence:
+                    return 20f + (logic == TypeOfLogic.WorkWithItems ? 10 : 0);
+                default: return 20f;
             }
         }
     }
     [BurstCompile]
     public struct GenerateFlowDirectionsJob : IJob
     {
-        [ReadOnly] public NativeParallelHashMap<int2, float> Weights; 
-        [ReadOnly] public NativeParallelHashMap<int2, int> BuildingIDs; 
-        [ReadOnly] public NativeParallelHashMap<int2, bool> IsBluePrintOrDemolition; 
-        public NativeParallelHashMap<int2, float2> Directions;
+        [ReadOnly] public NativeParallelHashMap<int3, float> Weights;
+
+        [ReadOnly] public ChunkMap ChunkMap;
+        [ReadOnly] public BufferLookup<BlockElement> BlockLookup;
+        [ReadOnly] public WorldSettings Settings;
+
+        public NativeParallelHashMap<int3, float3> Directions;
 
         public void Execute()
         {
@@ -510,53 +605,77 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
 
             foreach (var entry in Weights)
             {
-                int2 curr = entry.Key;
-
-                if (BuildingIDs.ContainsKey(curr))
-                {
-                    bool isBlueprint = IsBluePrintOrDemolition.ContainsKey(curr) && IsBluePrintOrDemolition[curr];
-                    if (!isBlueprint)
-                    {
-                        Directions.TryAdd(curr, float2.zero);
-                        continue;
-                    }
-                }
-
+                int3 curr = entry.Key;
                 float currWeight = entry.Value;
-                float2 aggregateDir = float2.zero;
-                bool foundLower = false;
 
-                for (int x = -1; x <= 1; x++)
+                float3 dir = float3.zero;
+                bool found = false;
+
+                for (int i = 0; i < directions.Length; i++)
                 {
-                    for (int y = -1; y <= 1; y++)
-                    {
-                        if (x == 0 && y == 0) continue;
-                        int2 neighbor = curr + new int2(x, y);
+                    int3 n = curr + directions[i];
 
-                        if (Weights.TryGetValue(neighbor, out float nWeight))
-                        {
-                            if (nWeight < currWeight)
-                            {
-                                float2 toNeighbor = new float2(x, y);
-                                float weightDiff = currWeight - nWeight;
-                                
-                                aggregateDir += math.normalize(toNeighbor) * weightDiff;
-                                foundLower = true;
-                            }
-                        }
+                    if (IsBlocked(n))
+                        continue;
+
+                    if (Weights.TryGetValue(n, out float w) && w < currWeight)
+                    {
+                        float3 v = (float3)(n - curr);
+                        float diff = currWeight - w;
+
+                        dir += math.normalize(v) * diff;
+                        found = true;
                     }
                 }
 
-                if (foundLower && math.lengthsq(aggregateDir) > 0.001f)
-                {
-                    Directions.TryAdd(curr, math.normalize(aggregateDir));
-                }
-                else
-                {
-                    Directions.TryAdd(curr, float2.zero);
-                }
+                Directions[curr] =
+                    (found && math.lengthsq(dir) > 0.001f)
+                        ? math.normalize(dir)
+                        : float3.zero;
             }
         }
-    }
 
+        bool IsBlocked(int3 worldPos)
+        {
+            int2 chunkPos = new int2(
+                (int)math.floor((float)worldPos.x / Settings.Size),
+                (int)math.floor((float)worldPos.z / Settings.Size)
+            );
+
+            if (!ChunkMap.ChunkMapData.TryGetValue(chunkPos, out var chunkEntity))
+                return true;
+
+            if (!BlockLookup.HasBuffer(chunkEntity))
+                return true;
+
+            var buffer = BlockLookup[chunkEntity];
+
+            int3 local = new int3(
+                worldPos.x - chunkPos.x * Settings.Size,
+                worldPos.y,
+                worldPos.z - chunkPos.y * Settings.Size
+            );
+
+            if (local.x < 0 || local.z < 0 ||
+                local.x >= Settings.Size ||
+                local.z >= Settings.Size ||
+                local.y < 0 ||
+                local.y >= Settings.Height)
+                return true;
+
+            int index =
+                local.x +
+                local.z * Settings.Size +
+                local.y * Settings.Size * Settings.Size;
+
+            return buffer[index].BlockID != 0;
+        }
+
+        static readonly int3[] directions =
+        {
+            new int3(1,0,0), new int3(-1,0,0),
+            new int3(0,1,0), new int3(0,-1,0),
+            new int3(0,0,1), new int3(0,0,-1)
+        };
+    }
 }

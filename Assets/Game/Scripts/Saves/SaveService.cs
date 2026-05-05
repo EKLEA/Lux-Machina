@@ -123,10 +123,10 @@ public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
         save.storageSlotsSaveData=new();
         save.buildingEnergyNetvorkLinkSaveData=new();
         save.ResourcesCellsList=new();
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(5,5),val=new int2(1,20)});
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(5,6),val=new int2(1,20)});
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(6,5),val=new int2(1,20)});
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int2(6,6),val=new int2(1,20)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int3(5,0,5),val=new int2(1,20)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int3(5,0,6),val=new int2(1,20)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int3(6,0,5),val=new int2(1,20)});
+        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int3(6,0,6),val=new int2(1,20)});
 
         save.camData = new PlayerCamData()
         {
@@ -135,7 +135,7 @@ public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
         };
         var hash = "Core".GetStableHashCode();
         save.CoreID=hash;
-        save.CorePos=new int2(-1, -1);
+        save.CorePos=new int3(-2, 11,-2);
         save.Buildings.Add(
             hash,
             new BaseBuildingSaveData

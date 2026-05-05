@@ -175,7 +175,7 @@ public partial class BuildingSaveSystem : SystemBase
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookUp;
         public void Execute(Entity entity,  BuildingData buildingData,DynamicBuffer<MapPoint> mapPoints)
         {
-            FixedList512Bytes<int2> points =new();
+            FixedList4096Bytes<int3> points =new();
             foreach(var p in mapPoints) 
                 points.Add(p.pos);
             manyPointsBuildings.TryAdd(buildingData.BuildingUniqueID,new ManyPointsBuildingSaveData

@@ -51,6 +51,7 @@ public class BootStrapperBindings : MonoInstaller
                         ls.cellSize,
                         ls.tickPerSecond,
                         ls.range,
+                        ls.chumkMat,
                         ls.defaultDistributionPriority,
                         ls.selectBuildingColor,
                         ls.makeAsDemolitionBuidlingColor,

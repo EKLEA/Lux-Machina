@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: New Game Field Settings SO
   m_EditorClassIdentifier: 
   cellSize: 1
+  chumkMat: {fileID: 2100000, guid: 0be0a33211d05204a9bf186ba166d370, type: 2}
   tickPerSecond: 20
   range: 25
   defaultDistributionPriority: 3

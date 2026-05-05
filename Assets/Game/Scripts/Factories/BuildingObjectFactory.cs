@@ -28,21 +28,20 @@ public class BuildingObjectFactory
         BuildingOnScene.Dispose();
         Object.DestroyImmediate(BuildingOnScene.gameObject);
     }
-    public GameObject CreatePrimitive(Vector2Int pos,bool IsRemove=false)
+    public GameObject CreatePrimitive(Vector3Int pos,bool IsRemove=false)
     {
         GameObject cube  = _instantiator.InstantiatePrefab(_buildingInfo.primitive);
         cube.transform.localScale=(Vector3.one+Vector3.up*2)*_gameFieldSettings.cellSize;
         cube.transform.position = CalculateWorldPosition(CenterGridPosition(pos, Vector3.one));
         if (IsRemove)
         {
-            // Вместо цикла while:
             int layerIndex = Mathf.RoundToInt(Mathf.Log(_gameFieldSettings.removeLayer.value, 2));
             cube.layer = layerIndex;
         } 
                     
         return cube;
     }
-    public BuildingOnScene CreateBuilding(int buidlingID, Vector2Int pos, int rotation,bool IsPlaceDestroy=false)
+    public BuildingOnScene CreateBuilding(int buidlingID, Vector3Int pos, int rotation,bool IsPlaceDestroy=false)
     {
         var buildingInfo = _buildingInfo.BuildingInfos[buidlingID];
         var buildingPrefab = _buildingInfo.GetBuildingPrefab(buidlingID);
@@ -69,7 +68,7 @@ public class BuildingObjectFactory
         return buildingOnScene;
     }
 
-    public ManyPointsBuildingInstanced CreateManyPoint(int buildingID, Vector2Int[] points,Dictionary<Vector2Int, bool> neighborsMap,bool IsPlaceDestroy=false)
+    public ManyPointsBuildingInstanced CreateManyPoint(int buildingID, Vector3Int[] points,Dictionary<Vector3Int, bool> neighborsMap,bool IsPlaceDestroy=false)
     {
 
         if (!_buildingInfo.BuildingInfos.TryGetValue(buildingID, out var info))
@@ -95,7 +94,7 @@ public class BuildingObjectFactory
         }
         return manyPointBuildingOnScene;
     }
-    public void MoveBuilding(GameObject buildingOnScene, Vector2Int pos,int rotation=-1,int buidlingID=-1)
+    public void MoveBuilding(GameObject buildingOnScene, Vector3Int pos,int rotation=-1,int buidlingID=-1)
     {
         Vector3Int size=Vector3Int.FloorToInt( new Vector3(buildingOnScene.transform.localScale.x/_gameFieldSettings.cellSize,0,buildingOnScene.transform.localScale.z/_gameFieldSettings.cellSize));
         if (buidlingID != -1)
@@ -120,9 +119,9 @@ public class BuildingObjectFactory
         return pos * _gameFieldSettings.cellSize;
     }
 
-    Vector3 CenterGridPosition(Vector2Int pos, Vector3 size)
+    Vector3 CenterGridPosition(Vector3Int pos, Vector3 size)
     {
-        return new Vector3(pos.x + size.x * 0.5f, 0, pos.y + size.z * 0.5f);
+        return new Vector3(pos.x + size.x * 0.5f, pos.y, pos.z + size.z * 0.5f);
     }
 
     Quaternion GetRotationFromData(int rotationValue)

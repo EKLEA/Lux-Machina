@@ -431,6 +431,7 @@ public partial struct BuildingCreateSystem : ISystem
         _createBuildingQuery= new EntityQueryBuilder(Allocator.Temp)
             .WithAll<CreateBuildingEventData>()
             .Build(ref state);
+        state.RequireForUpdate<BuildingConfigReference>();
 
     }
     public void OnUpdate(ref SystemState state)
@@ -633,20 +634,21 @@ public partial struct BuildingCreateSystem : ISystem
             }
             
             ArchetypeInfo info=GetBuildingType(BConfig);
+            //if(!info.Types.IsCreated) return;
             Entity building = ECB.CreateEntity(info.Archetype);
             
             if (building != Entity.Null)
             {
                 var size = (data.rotation & 1) != 0
-                ? new int2(BConfig.size.z, BConfig.size.x)
-                : new int2(BConfig.size.x, BConfig.size.z);
+                ? new int3(BConfig.size.z, BConfig.size.y,BConfig.size.x)
+                : new int3(BConfig.size.x,BConfig.size.y, BConfig.size.z);
 
                 ECB.SetComponent(building, new BuildingPosData
                 {
                     LeftCornerPos = data.buildingPosition,
                     Rotation = data.rotation,
                     size = size,
-                    center=data.buildingPosition+(float2)size/2
+                    center=data.buildingPosition+(float3)size/2
                 });
                 ECB.SetComponentEnabled<MarkOnMap>(building,true);
 
@@ -668,7 +670,6 @@ public partial struct BuildingCreateSystem : ISystem
                 ECB.SetComponent(building, new ClusterLink{ClusterIds=new()});
                 ECB.SetComponentEnabled<NeedsClusterAssign>(building, true);
                 ECB.SetComponentEnabled<LoadInfo>(building, true);
-
                 HandleBase(entity,building,info.Types);
                 HandleEnergy(entity,building,info.Types,BConfig.id);
                 HandleResources(building,info.Types,BConfig.id);

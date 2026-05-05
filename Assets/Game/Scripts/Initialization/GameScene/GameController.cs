@@ -41,10 +41,11 @@ public class GameController : IInitializable
         LoadGame();
     }
   
-    public Vector2Int GetMapPos(Vector3 pos)
+    public Vector3Int GetMapPos(Vector3 pos)
     {
-        return new Vector2Int(
+        return new Vector3Int(
         Mathf.FloorToInt(pos.x / gameFieldSettings.cellSize),
+        Mathf.FloorToInt(pos.y / gameFieldSettings.cellSize),
         Mathf.FloorToInt(pos.z / gameFieldSettings.cellSize)
     );
     }
@@ -140,6 +141,8 @@ public class GameController : IInitializable
 
         world.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>();
         world.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
+        AddUnmanaged<TerrainSystem>(simGroup);
+        AddUnmanaged<PlayerInputSystem>(simGroup);
         AddUnmanaged<DestroyBuildingsSystem>(simGroup);
         AddUnmanaged<MarkBuildingOnMapSystem>(simGroup);
         AddUnmanaged<ProcessManyPointPointsSystem>(simGroup);
@@ -158,6 +161,7 @@ public class GameController : IInitializable
         AddUnmanaged<TickGeneratorSystem>(simGroup);
         AddUnmanaged<TickCleanerSystem>(simGroup);
 
+        RegisterManagedSystem<PlayerVisualSystem>(presGroup);
         RegisterManagedSystem<BuildingCreateDestroyVisualSystem>(presGroup);
         RegisterManagedSystem<BuildingChangeVisualSystem>(presGroup);
         RegisterManagedSystem<ProccessDeletePointsSystem>(presGroup);
@@ -245,6 +249,39 @@ public class GameController : IInitializable
             baseTick=0.05f,
             dayLength=0.7f
         });
+         World.EntityManager.AddComponentData(Map, new ChunkMap
+        {
+            ChunkMapData=new(50000,Allocator.Persistent),
+        });
+        World.EntityManager.AddComponentData(Map, new WorldSettings
+        {
+            Seed = 12345,
+            Size = 32,
+            Height = 128,
+            cellSize = gameFieldSettings.cellSize,
+            SafeZoneRadius=80,
+            TerrainScale = 0.005f,
+            BiomeScale = 0.005f,
+            HeightMultiplier = 40,
+            TerraceSteps = 5,
+            PlainsHeight = 10,
+            Smoothness = 0.2f,
+            DetailScale = 0.015f,
+            ErosionThreshold = 0.2f,
+// Size 0.01 - огромные жилы, 0.02 - средние.
+// Frequency 0.02 - редко, 0.05 - умеренно.
+// Richness теперь множитель. 1.0 - бедно, 6.0 - очень богато.
+        Iron   = new OreSettings { Frequency = 0.012f, Size = 0.013f, Richness = 2.0f },
+        Copper = new OreSettings { Frequency = 0.015f, Size = 0.012f, Richness = 1.8f },
+        Tin    = new OreSettings { Frequency = 0.015f, Size = 0.015f, Richness = 1.5f },
+        Coal   = new OreSettings { Frequency = 0.02f, Size = 0.011f, Richness = 2.5f },
+        Stone  = new OreSettings { Frequency = 0.04f,  Size = 0.017f, Richness = 3.0f },
+
+
+
+
+        });
+        
         World.EntityManager.AddComponent<IsTickFrame>(Map);
         World.EntityManager.AddComponent<IsPause>(Map);
         World.EntityManager.AddComponent<IsGameOver>(Map);
@@ -259,7 +296,6 @@ public class GameController : IInitializable
         World.EntityManager.SetComponentEnabled<IsPause>(Map,false);
         World.EntityManager.SetComponentEnabled<IsGameOver>(Map,false);
 
-
         
         await UniTask.Yield();
     }
@@ -267,13 +303,46 @@ public class GameController : IInitializable
     {
         ResourceMap resourceMap=new ResourceMap
         {
-            ResouecesMap=new(10000,Allocator.Persistent)
+            ResouecesMap=new(1000,Allocator.Persistent)
         };
         foreach(var c in gameStateData.ResourcesCellsList)
         {
             resourceMap.ResouecesMap.Add(c.pos,c.val);
         }
-         World.EntityManager.AddComponentData(Map, resourceMap);
+        
+        World.EntityManager.AddComponentData(Map,new PlayerData{});
+        World.EntityManager.AddComponentData(Map,new PlayerRayCastData{});
+        World.EntityManager.AddComponentData(Map, resourceMap);
+        int range=25;
+        for (int x = -range; x <= range; x++)
+        {
+            for (int y = -range; y <= range; y++)
+            {
+                float distSq = x * x + y * y;
+                if (distSq > range * range) continue;
+
+                float dist = math.sqrt(distSq);
+                int lod = 0;
+
+                if (dist <= range/2) lod = 0;
+                else if (dist <= range/2+range/4) lod = 1;
+                else lod = 3; // Для дистанции 30-45
+
+                var chunk = World.EntityManager.CreateEntity();
+                
+                // Добавляем компонент состояния меша с нужным LOD
+                World.EntityManager.AddComponentData(chunk, new ChangeLODChunkState { 
+                    newLIOD = lod 
+                });
+
+                World.EntityManager.AddComponentData(chunk, new CreateChunk { 
+                    Position = new int2(x, y), 
+                    isVisible = true 
+                });
+                
+                World.EntityManager.AddBuffer<ModifiedBlockElement>(chunk);
+            }
+        }
         await UniTask.Yield();
     }
     async UniTask LoadSavedEntities(GameStateData gameStateData)

@@ -8,7 +8,7 @@ public struct ManyPointsBuildingSaveData
 {
     
     public int buildingID;
-    public FixedList512Bytes<int2> points; 
+    public FixedList4096Bytes<int3> points; 
     public bool isBlueprint;
     public bool IsDemolition;
 }
@@ -17,7 +17,7 @@ public struct ManyPointsBuildingSaveData
 public struct BaseBuildingSaveData
 {
     public int buildingID;
-    public int2 buildingPosition;
+    public int3 buildingPosition;
     public int rotation;
     public bool isBlueprint;
     public bool IsDemolition;

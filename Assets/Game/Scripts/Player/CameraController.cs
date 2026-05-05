@@ -1,9 +1,10 @@
 using System;
+using Unity.Entities;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Zenject;
 
-public class CameraController : MonoBehaviour
+public class CameraController : MonoBehaviour,IInitializable
 {
     [SerializeField]
     Transform LookPoint;
@@ -49,6 +50,7 @@ public class CameraController : MonoBehaviour
 
     [SerializeField]
     LayerMask layerMask;
+    [Inject] World world;
     Vector2 currentRotation;
     Vector2 targetRotation;
     Vector2 rotationVelocity;
@@ -64,7 +66,6 @@ public class CameraController : MonoBehaviour
         if (minDistance > maxDistance)
             maxDistance = minDistance + 1;
     }
-
     public void SetUp(PlayerCamData playerCamData)
     {
         camData = playerCamData;
@@ -92,7 +93,6 @@ public class CameraController : MonoBehaviour
             SaveCameraState();
         }
     }
-
     void Update()
     {
         if (CameraRotateBT.action.IsPressed())
@@ -189,6 +189,19 @@ public class CameraController : MonoBehaviour
             camData.CamPosition = transform.position;
             camData.isInitialized = true;
         }
+        var query = world.EntityManager.CreateEntityQuery(typeof(PlayerRayCastData));
+        if (!query.IsEmpty) {
+            var entity = query.GetSingletonEntity();
+            
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            
+            world.EntityManager.SetComponentData(entity, new PlayerRayCastData 
+            {
+                Origin = ray.origin,
+                Direction = ray.direction,
+                MaxDistance = 1000
+            });
+        }
     }
 
     float GetGroundHeight(Vector3 position)
@@ -218,5 +231,10 @@ public class CameraController : MonoBehaviour
         CameraRotateBT.action.Disable();
         MouseRotate.action.Disable();
         HoldBT.action.Disable();
+    }
+
+    public void Initialize()
+    {
+        throw new NotImplementedException();
     }
 }

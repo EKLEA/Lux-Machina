@@ -137,6 +137,7 @@ MonoBehaviour:
   tMesh: {fileID: 0}
   crossMesh: {fileID: 0}
   singleMesh: {fileID: 6873742659897571179, guid: 1e0b3e730e016a649997e1c6d1967b7c, type: 3}
+  slopeMesh: {fileID: 0}
   foundationMesh: {fileID: 6549673948351473199, guid: 8151c3970e291b74b9c2d7abbb264a0d, type: 3}
   material: {fileID: 2100000, guid: 99d6e782ee528ee40821bd4208833d1a, type: 2}
   topMeshYOffset: 1

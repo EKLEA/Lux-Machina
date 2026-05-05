@@ -44,7 +44,7 @@ public struct BuildingTag : IComponentData{}
     #region распределение ресурсов
     public struct ResourcesLink : IComponentData
     {
-        public FixedList512Bytes<int2> ResourcesCells;
+        public FixedList512Bytes<int3> ResourcesCells;
         public int indexCell;
     }
 
@@ -182,7 +182,7 @@ public struct BuildingTag : IComponentData{}
     #region кластеризация
     public struct ClusterLink : IComponentData
     {
-        public FixedList64Bytes<int> ClusterIds; 
+        public FixedList512Bytes<int> ClusterIds; 
     }
     public struct NeedsClusterAssign : IComponentData, IEnableableComponent {}
     public struct IsLogicEnabled : IComponentData, IEnableableComponent{}
@@ -203,13 +203,13 @@ public struct BuildingTag : IComponentData{}
     }
     public struct TakeDamage : IBufferElementData
     {
-        public int2 pos;
+        public int3 pos;
         public float Damage;
     }
     
     public struct ManyPointPointHealthData: IBufferElementData
     {
-        public int2 pos;
+        public int3 pos;
         public float CurrHealth;
         public float MaxHealth;
         public float CurrTimeToRestore;

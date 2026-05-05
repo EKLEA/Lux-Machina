@@ -2,7 +2,6 @@ using UnityEngine;
 
 public class SunController : MonoBehaviour
 {
-    public static SunController Instance;
 
     [Header("Lights")]
     public Light sunLight;
@@ -14,7 +13,6 @@ public class SunController : MonoBehaviour
     public Gradient ambientColor; 
     public AnimationCurve skyExposure; 
 
-    private void Awake() => Instance = this;
 
     public void UpdateVisuals(bool isDay, float localProgress)
     {

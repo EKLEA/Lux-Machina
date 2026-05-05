@@ -30,7 +30,7 @@ public partial class ProccessDeletePointsSystem : SystemBase
         {
             if (mapData.CellMapEntites.TryGetValue(p.pos, out Entity roadEntity))
             {
-                
+                if(mapData.CellMapBuildingsIDs[p.pos]!=deleteData.buildingID) continue;
                 entitiesToPoints.Add(roadEntity, p);
             }
         }
@@ -48,7 +48,7 @@ public partial class ProccessDeletePointsSystem : SystemBase
                     
             var roadPoints = EntityManager.GetBuffer<MapPoint>(road);
             
-            var demolitionSet = new NativeParallelHashSet<int2>(16, Allocator.Temp);
+            var demolitionSet = new NativeParallelHashSet<int3>(16, Allocator.Temp);
             var demolitionList = new NativeList<MapPoint>(16, Allocator.Temp);
             foreach (var p in entitiesToPoints.GetValuesForKey(road))
             {

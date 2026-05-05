@@ -137,7 +137,10 @@ public partial class BuildingChangeVisualSystem : SystemBase
                 {
                     for(int y = 0; y< buildingPosData.size.y;y++)
                     {
-                        MapData.IsBluePrintOrDemolitionPoints.Remove(buildingPosData.LeftCornerPos+new int2(x,y));
+                        for(int z= 0; z< buildingPosData.size.z;z++)
+                        {
+                            MapData.IsBluePrintOrDemolitionPoints.Remove(buildingPosData.LeftCornerPos+new int3(x,y,z));
+                        }
                     }
                 }
             }
@@ -163,11 +166,14 @@ public partial class BuildingChangeVisualSystem : SystemBase
                 {
                     for(int y = 0; y< buildingPosData.size.y;y++)
                     {
-                        var pos =buildingPosData.LeftCornerPos+new int2(x,y);
-                        if(MapData.IsBluePrintOrDemolitionPoints.ContainsKey(pos))
-                                MapData.IsBluePrintOrDemolitionPoints[pos]=true;
-                        else
-                                MapData.IsBluePrintOrDemolitionPoints.Add(pos,true);
+                        for(int z = 0; y< buildingPosData.size.z;z++)
+                        {
+                            var pos =buildingPosData.LeftCornerPos+new int3(x,y,z);
+                            if(MapData.IsBluePrintOrDemolitionPoints.ContainsKey(pos))
+                                    MapData.IsBluePrintOrDemolitionPoints[pos]=true;
+                            else
+                                    MapData.IsBluePrintOrDemolitionPoints.Add(pos,true);
+                        }
                     }
                 }
             }
@@ -206,7 +212,10 @@ public partial class BuildingChangeVisualSystem : SystemBase
                 {
                     for(int y = 0; y< buildingPosData.size.y;y++)
                     {
-                        MapData.IsBluePrintOrDemolitionPoints.Remove(buildingPosData.LeftCornerPos+new int2(x,y));
+                        for(int z= 0; z< buildingPosData.size.z;z++)
+                        {
+                            MapData.IsBluePrintOrDemolitionPoints.Remove(buildingPosData.LeftCornerPos+new int3(x,y,z));
+                        }
                     }
                 }
             }
@@ -233,13 +242,17 @@ public partial class BuildingChangeVisualSystem : SystemBase
                     for(int y = 0; y< buildingPosData.size.y;y++)
                     {
                         
-                        var pos =buildingPosData.LeftCornerPos+new int2(x,y);
-                        if(MapData.IsBluePrintOrDemolitionPoints.ContainsKey(pos))
-                            
-                            MapData.IsBluePrintOrDemolitionPoints[pos]=false;
-                        else
+                        for(int z= 0; z< buildingPosData.size.z;z++)
                         {
-                            MapData.IsBluePrintOrDemolitionPoints.Add(pos,false);
+                            
+                            var pos =buildingPosData.LeftCornerPos+new int3(x,y,z);
+                            if(MapData.IsBluePrintOrDemolitionPoints.ContainsKey(pos))
+                                
+                                MapData.IsBluePrintOrDemolitionPoints[pos]=false;
+                            else
+                            {
+                                MapData.IsBluePrintOrDemolitionPoints.Add(pos,false);
+                            }
                         }
                     }
                 }

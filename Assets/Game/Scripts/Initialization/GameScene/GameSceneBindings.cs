@@ -66,6 +66,9 @@ public class GameSceneBindings : MonoInstaller
          Container.Bind<PlayerConnectionEnergySystem>().FromMethod(ctx => 
             ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerConnectionEnergySystem>()
         ).AsSingle();
+          Container.Bind<PlayerVisualSystem>().FromMethod(ctx => 
+            ctx.Container.Resolve<GameController>().World.GetOrCreateSystemManaged<PlayerVisualSystem>()
+        ).AsSingle();
         Container.Bind<PlayerController>().FromInstance(playerController).AsSingle();
         Container.Bind<SunController>().FromInstance(sunController).AsSingle();
         Container.Bind<GridVisualizer>().FromInstance(gridVisualizer).AsSingle();

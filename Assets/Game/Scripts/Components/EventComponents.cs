@@ -6,7 +6,7 @@ public struct CreateBuildingEventData : IComponentData
 {
     public int UniqueBuildingID;
     public int buildingID;
-    public int2 buildingPosition;
+    public int3 buildingPosition;
     public int rotation;
 }
 public struct CreateEnemyEventData : IComponentData

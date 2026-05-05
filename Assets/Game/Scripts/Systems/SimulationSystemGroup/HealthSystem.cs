@@ -109,9 +109,10 @@ public partial struct   HealthSystem: ISystem
                     var destroyCellCommand=ECB.CreateEntity(sortKey);
                     ECB.AddComponent(sortKey,destroyCellCommand,new DeleteManyPointsBuildingFromMap{isForce=true,buildingID=buildingDataLookup[entity].BuildingIDHash});
                     var cellToDelete=ECB.AddBuffer<MapPoint>(sortKey,destroyCellCommand);
-                    var damagePerCell=new NativeHashMap<int2, float>(takeDamage.Length, Allocator.Temp);
-                    var healthCell=new NativeHashMap<int2, float>(takeDamage.Length, Allocator.Temp);
+                    var damagePerCell=new NativeHashMap<int3, float>(takeDamage.Length, Allocator.Temp);
                     var healthList = new NativeList<ManyPointPointHealthData>(ManyPointPointHealthDataLookup[entity].Length, Allocator.Temp);
+                    
+                    var healthCell = new NativeHashMap<int3, float>(healthList.Length, Allocator.Temp);
                     healthList.AddRange(ManyPointPointHealthDataLookup[entity].AsNativeArray());
                     foreach (var h in healthList)
                     {

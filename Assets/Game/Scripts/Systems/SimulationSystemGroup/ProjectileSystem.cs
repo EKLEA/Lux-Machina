@@ -44,79 +44,82 @@ public partial struct ProjectileSystem : ISystem
     }
 
    [BurstCompile]
-public partial struct ProjectileMovementJob : IJobEntity
-{
-    public float DeltaTime;
-    public float CellSize;
-    public EntityCommandBuffer.ParallelWriter ECB;
-
-    [ReadOnly] public NativeParallelMultiHashMap<int2, Entity> EnemyInCellsMap;
-    
-    [ReadOnly] 
-    [NativeDisableContainerSafetyRestriction] 
-    public ComponentLookup<LocalTransform> TransformLookup; 
-    
-    [ReadOnly] public ComponentLookup<HealthData> HealthLookup;
-
-    void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndex, ref ProjectileData data, ref LocalTransform transform)
+    public partial struct ProjectileMovementJob : IJobEntity
     {
-        float distXZ = math.distance(data.StartPos.xz, data.TargetPos.xz);
-        data.Progress += (data.Speed / math.max(0.1f, distXZ)) * DeltaTime;
+        public float DeltaTime;
+        public float CellSize;
+        public EntityCommandBuffer.ParallelWriter ECB;
 
-        float3 nextPos = math.lerp(data.StartPos, data.TargetPos, math.min(1.0f, data.Progress));
-        if (data.ArcHeight > 0) nextPos.y += math.sin(data.Progress * math.PI) * data.ArcHeight;
-        transform.Position = nextPos;
+        [ReadOnly] public NativeParallelMultiHashMap<int3, Entity> EnemyInCellsMap;
+        
+        [ReadOnly] 
+        [NativeDisableContainerSafetyRestriction] 
+        public ComponentLookup<LocalTransform> TransformLookup; 
+        
+        [ReadOnly] public ComponentLookup<HealthData> HealthLookup;
 
-    if (data.Progress >= 1.0f)
-{
-    int2 targetCell = (int2)math.floor(data.TargetPos.xz / CellSize);
-    bool isAreaEffect = data.ArcHeight > 0;
-    
-    // Для пуль даем щедрый радиус поиска, так как враг мог сместиться
-    float searchRadius = isAreaEffect ? data.Radius : 2.0f; 
-    int range = (int)math.ceil(searchRadius / CellSize);
-
-    for (int x = -range; x <= range; x++)
-    {
-        for (int y = -range; y <= range; y++)
+        void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndex, ref ProjectileData data, ref LocalTransform transform)
         {
-            int2 currentCell = targetCell + new int2(x, y);
+            float distXZ = math.distance(data.StartPos.xz, data.TargetPos.xz);
+            data.Progress += (data.Speed / math.max(0.1f, distXZ)) * DeltaTime;
 
-            if (EnemyInCellsMap.TryGetFirstValue(currentCell, out Entity victim, out var it))
+            float3 nextPos = math.lerp(data.StartPos, data.TargetPos, math.min(1.0f, data.Progress));
+            if (data.ArcHeight > 0) nextPos.y += math.sin(data.Progress * math.PI) * data.ArcHeight;
+            transform.Position = nextPos;
+
+            if (data.Progress >= 1.0f)
             {
-                do
+                int3 targetCell = (int3)math.floor(data.TargetPos / CellSize);
+                bool isAreaEffect = data.ArcHeight > 0;
+                
+                // Для пуль даем щедрый радиус поиска, так как враг мог сместиться
+                float searchRadius = isAreaEffect ? data.Radius : 2.0f; 
+                int range = (int)math.ceil(searchRadius / CellSize);
+
+                for (int x = -range; x <= range; x++)
                 {
-                    if (!HealthLookup.HasComponent(victim)) continue;
-
-                    float3 victimPos = TransformLookup[victim].Position;
-                    float distSq = math.distancesq(data.TargetPos.xz, victimPos.xz);
-                    
-                    // Эффективный радиус: радиус взрыва/пули + толщина врага (0.9f)
-                    float combinedRadius = searchRadius + 0.9f;
-
-                    if (distSq <= (combinedRadius * combinedRadius)) 
+                    for (int y = -range; y <= range; y++)
                     {
-                        ECB.AppendToBuffer(chunkIndex, victim, new TakeDamage { 
-                            Damage = data.Damage, 
-                            pos = currentCell 
-                        });
-                        
-                        // Если это пуля, она исчезает после первого попадания
-                        if (!isAreaEffect) 
+                        for (int z = -range; z <= range; z++)
                         {
-                            ECB.DestroyEntity(chunkIndex, entity);
-                            return; 
-                        }
+                            int3 currentCell = targetCell + new int3(x, y,z);
+
+                            if (EnemyInCellsMap.TryGetFirstValue(currentCell, out Entity victim, out var it))
+                            {
+                                do
+                                {
+                                    if (!HealthLookup.HasComponent(victim)) continue;
+
+                                    float3 victimPos = TransformLookup[victim].Position;
+                                    float distSq = math.distancesq(data.TargetPos.xz, victimPos.xz);
+                                    
+                                    // Эффективный радиус: радиус взрыва/пули + толщина врага (0.9f)
+                                    float combinedRadius = searchRadius + 0.9f;
+
+                                    if (distSq <= (combinedRadius * combinedRadius)) 
+                                    {
+                                        ECB.AppendToBuffer(chunkIndex, victim, new TakeDamage { 
+                                            Damage = data.Damage, 
+                                            pos = currentCell 
+                                        });
+                                        
+                                        // Если это пуля, она исчезает после первого попадания
+                                        if (!isAreaEffect) 
+                                        {
+                                            ECB.DestroyEntity(chunkIndex, entity);
+                                            return; 
+                                        }
+                                    }
+                                } 
+                                while (EnemyInCellsMap.TryGetNextValue(out victim, ref it));
+                            }
                     }
-                } 
-                while (EnemyInCellsMap.TryGetNextValue(out victim, ref it));
+                    }
+                }
+                
+                // Уничтожаем снаряд, если он долетел, даже если никого не задел
+                ECB.DestroyEntity(chunkIndex, entity);
             }
         }
     }
-    
-    // Уничтожаем снаряд, если он долетел, даже если никого не задел
-    ECB.DestroyEntity(chunkIndex, entity);
-}
-    }
-}
 }

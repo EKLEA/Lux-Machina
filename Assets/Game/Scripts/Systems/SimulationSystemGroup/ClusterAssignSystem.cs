@@ -108,17 +108,19 @@ public partial struct ClusterAssignSystem : ISystem
     [BurstCompile]
     public struct LogisticClusteringJob : IJob
     {
-        [ReadOnly] public NativeParallelHashMap<int2, Entity> CellMapEntities;
-        [ReadOnly] public NativeParallelMultiHashMap<Entity, int2> CellEntityMultiMap; 
-        public NativeParallelMultiHashMap<int, int2> ClusterLogisticPoints;
+        [ReadOnly] public NativeParallelHashMap<int3, Entity> CellMapEntities;
+        [ReadOnly] public NativeParallelMultiHashMap<Entity, int3> CellEntityMultiMap; 
+        
+        public NativeParallelMultiHashMap<int, int3> ClusterLogisticPoints;
         
         public Entity MapEntity;
+
         public ComponentLookup<UpdateClustersTag> UpdateClusterTagLookup;
         public ComponentLookup<LogisticTag> LogisticTagLookup;
         public ComponentLookup<ClusterLink> ClusterLinkLookup;
-        public NativeList<int> clusterIDs;
-        public NativeParallelHashMap<int2, int> pointToClusterLink;
 
+        public NativeList<int> clusterIDs;
+        public NativeParallelHashMap<int3, int> pointToClusterLink;
 
         public void Execute()
         {
@@ -126,7 +128,7 @@ public partial struct ClusterAssignSystem : ISystem
             ClusterLogisticPoints.Clear();
             pointToClusterLink.Clear(); 
 
-            NativeParallelHashSet<int2> logisticPoints = new NativeParallelHashSet<int2>(CellMapEntities.Count(), Allocator.Temp);
+            var logisticPoints = new NativeParallelHashSet<int3>(CellMapEntities.Count(), Allocator.Temp);
             
             foreach (var pair in CellMapEntities)
             {
@@ -138,43 +140,52 @@ public partial struct ClusterAssignSystem : ISystem
             
             if (logisticPoints.IsEmpty) return;
 
-            var currentClusterLink = 0;
-            var directions = new NativeArray<int2>(4, Allocator.Temp) 
-            { 
-                [0] = new int2(1,0), [1] = new int2(-1,0), 
-                [2] = new int2(0,1), [3] = new int2(0,-1) 
-            };
+            int currentClusterLink = 0;
 
-            while (!logisticPoints.IsEmpty)
+            // ❗ только XZ (без Y)
+            var directions = new NativeArray<int3>(12, Allocator.Temp)
+        {
+            // Прямые (горизонт)
+            [0] = new int3(1,0,0), [1] = new int3(-1,0,0),
+            [2] = new int3(0,0,1), [3] = new int3(0,0,-1),
+            // Ступеньки вверх
+            [4] = new int3(1,1,0), [5] = new int3(-1,1,0),
+            [6] = new int3(0,1,1), [7] = new int3(0,1,-1),
+            // Ступеньки вниз
+            [8] = new int3(1,-1,0), [9] = new int3(-1,-1,0),
+            [10] = new int3(0,-1,1), [11] = new int3(0,-1,-1)
+        };
+
+        while (!logisticPoints.IsEmpty)
+        {
+            clusterIDs.Add(currentClusterLink);
+            var enumerator = logisticPoints.GetEnumerator();
+            enumerator.MoveNext();
+            var start = enumerator.Current;
+
+            var queue = new NativeQueue<int3>(Allocator.Temp);
+            queue.Enqueue(start);
+            logisticPoints.Remove(start);
+
+            while (queue.TryDequeue(out int3 pos))
             {
-                clusterIDs.Add(currentClusterLink); 
+                ClusterLogisticPoints.Add(currentClusterLink, pos);
+                pointToClusterLink[pos] = currentClusterLink;
 
-                var enumerator = logisticPoints.GetEnumerator();
-                enumerator.MoveNext();
-                var start = enumerator.Current;
-                var queue = new NativeQueue<int2>(Allocator.Temp);
-
-                queue.Enqueue(start);
-                logisticPoints.Remove(start);
-
-                while(queue.TryDequeue(out int2 pos))
+                for (int i = 0; i < directions.Length; i++) // Теперь до 12
                 {
-                    ClusterLogisticPoints.Add(currentClusterLink, pos);
-                    pointToClusterLink[pos] = currentClusterLink;
+                    var neighbor = pos + directions[i];
 
-                    for (int i = 0; i < 4; i++)
+                    if (logisticPoints.Contains(neighbor))
                     {
-                        var neighbor = pos + directions[i];
-                        if (logisticPoints.Contains(neighbor))
-                        {
-                            queue.Enqueue(neighbor);
-                            logisticPoints.Remove(neighbor);
-                        }
+                        queue.Enqueue(neighbor);
+                        logisticPoints.Remove(neighbor);
                     }
                 }
-
-                currentClusterLink++;
             }
+            currentClusterLink++;
+        }
+
             var entityToClusters = new NativeParallelMultiHashMap<Entity, int>(CellEntityMultiMap.Count(), Allocator.Temp);
 
             foreach (var entityPair in CellEntityMultiMap)
@@ -187,7 +198,9 @@ public partial struct ClusterAssignSystem : ISystem
 
             var entities = entityToClusters.GetKeyArray(Allocator.Temp);
             var uniqueEntities = new NativeParallelHashSet<Entity>(entities.Length, Allocator.Temp);
-            for(int i = 0; i < entities.Length; i++) uniqueEntities.Add(entities[i]);
+
+            for (int i = 0; i < entities.Length; i++)
+                uniqueEntities.Add(entities[i]);
 
             foreach (var entity in uniqueEntities)
             {
@@ -195,31 +208,33 @@ public partial struct ClusterAssignSystem : ISystem
                 {
                     var link = ClusterLinkLookup[entity];
                     link.ClusterIds.Clear();
-                    
+                        
                     var clusters = entityToClusters.GetValuesForKey(entity);
-                    while(clusters.MoveNext())
+
+                    while (clusters.MoveNext())
                     {
                         if (!link.ClusterIds.Contains(clusters.Current))
                             link.ClusterIds.Add(clusters.Current);
                     }
+
                     ClusterLinkLookup[entity] = link;
                 }
             }
+
             if (UpdateClusterTagLookup.HasComponent(MapEntity))
             {
                 UpdateClusterTagLookup.SetComponentEnabled(MapEntity, false);
             }
         }
-    }
-
+}
 
     [BurstCompile]
     [WithAll(typeof(NeedsClusterAssign))]
     [WithNone(typeof(LogisticTag))]
     public partial struct AssignClusterJob : IJobEntity
     {
-        [ReadOnly] public NativeParallelHashMap<int2, Entity> CellMapEntities;
-    
+        [ReadOnly] public NativeParallelHashMap<int3, Entity> CellMapEntities;
+        
         public ComponentLookup<NeedsClusterAssign> NeedsClusterAssignLookup;
         public ComponentLookup<IsLogicEnabled> IsLogicEnabledLookup;
         
@@ -228,43 +243,50 @@ public partial struct ClusterAssignSystem : ISystem
         [ReadOnly] public ComponentLookup<IsBlueprint> IsBlueprintLookup;
         [ReadOnly] public ComponentLookup<IsDemolition> IsDemolitionLookup;
         [ReadOnly] public ComponentLookup<LogisticTag> RoadLookup;
+
         void Execute(
             Entity entity, 
-            in BuildingPosData buildingPosData,ref ClusterLink clusterLink,ref BuildingStateData buildingStateData)
+            in BuildingPosData buildingPosData,
+            ref ClusterLink clusterLink,
+            ref BuildingStateData buildingStateData)
         {
-             var neighborClusters = new FixedList128Bytes<int>(); 
+            var neighborClusters = new FixedList128Bytes<int>(); 
 
-            for(int x = buildingPosData.LeftCornerPos.x; x < buildingPosData.LeftCornerPos.x + buildingPosData.size.x; x++)
+            // ❗ работаем в XZ (Y фиксированный)
+            int y = buildingPosData.LeftCornerPos.y;
+
+            for (int x = buildingPosData.LeftCornerPos.x; x < buildingPosData.LeftCornerPos.x + buildingPosData.size.x; x++)
             {
-                CheckPoint(new int2(x,buildingPosData.LeftCornerPos.y-1),ref neighborClusters);
-                CheckPoint(new int2(x,buildingPosData.LeftCornerPos.y+buildingPosData.size.y),ref neighborClusters);
+                CheckPoint(new int3(x, y, buildingPosData.LeftCornerPos.z - 1), ref neighborClusters);
+                CheckPoint(new int3(x, y, buildingPosData.LeftCornerPos.z + buildingPosData.size.z), ref neighborClusters);
             }
-             for(int y= buildingPosData.LeftCornerPos.y; y < buildingPosData.LeftCornerPos.y + buildingPosData.size.y; y++)
+
+            for (int z = buildingPosData.LeftCornerPos.z; z < buildingPosData.LeftCornerPos.z + buildingPosData.size.z; z++)
             {
-                CheckPoint(new int2(buildingPosData.LeftCornerPos.x-1,y),ref neighborClusters);
-                CheckPoint(new int2(buildingPosData.LeftCornerPos.x+buildingPosData.size.x,y),ref neighborClusters);
+                CheckPoint(new int3(buildingPosData.LeftCornerPos.x - 1, y, z), ref neighborClusters);
+                CheckPoint(new int3(buildingPosData.LeftCornerPos.x + buildingPosData.size.x, y, z), ref neighborClusters);
             }
+
             if (IsLogicEnabledLookup.HasComponent(entity))
             {
-                IsLogicEnabledLookup.SetComponentEnabled(entity, neighborClusters.Length>0);
+                IsLogicEnabledLookup.SetComponentEnabled(entity, neighborClusters.Length > 0);
             }
+
             clusterLink.ClusterIds.Clear();
-            foreach(var n in neighborClusters)
-            {
+
+            foreach (var n in neighborClusters)
                 clusterLink.ClusterIds.Add(n);
-            }
+
             if (clusterLink.ClusterIds.Length <= 0)
             {
-                if(buildingStateData.State>(int) WorkStateEnum.AwaitConntionToCluster) buildingStateData.State=(int)WorkStateEnum.AwaitConntionToCluster;
+                if (buildingStateData.State > (int)WorkStateEnum.AwaitConntionToCluster)
+                    buildingStateData.State = (int)WorkStateEnum.AwaitConntionToCluster;
             }
-            // else
-            // {
-            //      if(buildingStateData.State<=(int) WorkStateEnum.AwaitConntionToCluster)buildingStateData.State=(int)WorkStateEnum.Work;
-            // }
+
             NeedsClusterAssignLookup.SetComponentEnabled(entity, false);
         }
 
-        private void CheckPoint(int2 pos, ref FixedList128Bytes<int> list)
+        private void CheckPoint(int3 pos, ref FixedList128Bytes<int> list)
         {
             if (clusterMap.pointToClusterId.TryGetValue(pos, out int clusterId)) 
             {
@@ -274,10 +296,11 @@ public partial struct ClusterAssignSystem : ISystem
 
                     bool isDemolition = IsDemolitionLookup.HasComponent(roadEntity) && IsDemolitionLookup.IsComponentEnabled(roadEntity);
                     bool isBlueprint = IsBlueprintLookup.HasComponent(roadEntity) && IsBlueprintLookup.IsComponentEnabled(roadEntity);
-                    
+                        
                     if (!isDemolition && !isBlueprint && RoadLookup.HasComponent(roadEntity))
                     {
-                        if(!list.Contains(clusterId)) list.Add(clusterId);
+                        if (!list.Contains(clusterId))
+                            list.Add(clusterId);
                     }
                 }
             }

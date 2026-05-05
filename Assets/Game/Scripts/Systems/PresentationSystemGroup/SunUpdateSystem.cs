@@ -7,6 +7,7 @@ using Zenject;
 
 [DisableAutoCreation]
 [UpdateInGroup(typeof(PresentationSystemGroup))]
+
 public partial class SunUpdateSystem : SystemBase
 {
     [Inject] SunController sunController;

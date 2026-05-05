@@ -22,21 +22,22 @@ public partial class PlayerPlaceManyPointSystem : SystemBase
     [Inject] VisualBuildingFactory _visualBuildingFactory;
     int _buildingID;
     bool isSecondPoint;
-    Vector2Int _pos;
-    Vector2Int _cachedPos;
+    Vector3Int _pos;
+    Vector3Int _cachedPos;
     int _cachedRot;
-    Vector2Int _firstPos;
+    Vector3Int _firstPos;
     EntityQuery _buildReadyQuery;
     IPlaceBuildingPlayerData _placeManyPointPlayerData;
     ManyPointsBuildingInstanced _manyPointBuilding;
     PhantomObject _preview;
-    List<int2> _manyPointBuildingPoints;
+    List<int3> _manyPointBuildingPoints;
     
     Entity _playerState;
     bool _isProcessing = false;
-    
+    bool _isStraight;
     public  Action onBuildingDone;
     public bool canBuild{get;private set;}
+    public bool updateDraw;
     public void SetUpBuilding(int buildingID,IPlaceBuildingPlayerData placeManyPointPlayerData, Entity playerState)
     {
         if(_isProcessing || _manyPointBuilding != null || EntityManager.IsComponentEnabled<PlayerPlacingManyPointBuilding>(playerState)||EntityManager.IsComponentEnabled<PlayerDeletePoints>(playerState)) return;
@@ -45,7 +46,8 @@ public partial class PlayerPlaceManyPointSystem : SystemBase
         _manyPointBuildingPoints=new();
         _buildingID=buildingID;
         _placeManyPointPlayerData=placeManyPointPlayerData;
-        _manyPointBuilding = _factorty.CreateManyPoint(_buildingID,new Vector2Int[]{_placeManyPointPlayerData.pos},null,true);
+        var data =SystemAPI.GetSingleton<PlayerRayCastData>();
+        _manyPointBuilding = _factorty.CreateManyPoint(_buildingID,new Vector3Int[]{new Vector3Int(data.PlaceBlockPos.x,data.PlaceBlockPos.y,data.PlaceBlockPos.z)},null,true);
         _preview=_visualBuildingFactory.PhantomizeObject(_manyPointBuilding.gameObject);
         EntityManager.SetComponentEnabled<PlayerPlacingManyPointBuilding>(playerState,true);
         
@@ -67,6 +69,7 @@ public partial class PlayerPlaceManyPointSystem : SystemBase
     protected override void OnUpdate()
     {
         
+        var data =SystemAPI.GetSingleton<PlayerRayCastData>();
         var mapData = SystemAPI.GetSingleton<BuildingMap>();
         var buildingConfig = SystemAPI.GetSingleton<BuildingConfigReference>();
         if(_buildReadyQuery.IsEmpty) return;
@@ -77,32 +80,33 @@ public partial class PlayerPlaceManyPointSystem : SystemBase
             if (_manyPointBuilding == null) return;
             _manyPointBuildingPoints.Clear();
             var playerCommand = SystemAPI.GetSingletonEntity<PlayerCommand>();
-            _pos=_placeManyPointPlayerData.pos;
+            _pos=new Vector3Int(data.PlaceBlockPos.x,data.PlaceBlockPos.y,data.PlaceBlockPos.z);
             if (!isSecondPoint)
             {
                 _firstPos=_pos;
-                _manyPointBuilding.Generate(new Vector2Int[]{_firstPos},null);
-                var pos=new int2(_pos.x,_pos.y);
+                _manyPointBuilding.Generate(new Vector3Int[]{_firstPos},null);
+                var pos=new int3(_pos.x,_pos.y,_pos.z);
                 
                 _preview.CanBuild(!(mapData.CellMapBuildingsIDs.ContainsKey(pos)&&mapData.CellMapBuildingsIDs[pos]!=_buildingID),_placeManyPointPlayerData.isForce);
             }
             else
             {
                 
-                if(_pos!=_cachedPos||_cachedRot!=_placeManyPointPlayerData.rotation)
+                if(_pos!=_cachedPos||_cachedRot!=_placeManyPointPlayerData.rotation||updateDraw)
                 {
                     _cachedRot=_placeManyPointPlayerData.rotation;
-                    ecb.SetComponent(playerCommand,new PathfindingRequest{BuildingID=_buildingID,Start=new int2(_firstPos.x,_firstPos.y),End=new int2(_pos.x,_pos.y),SamePerfer= _cachedRot%2==0});
+                    ecb.SetComponent(playerCommand,new PathfindingRequest{BuildingID=_buildingID,Start=new int3(_firstPos.x,_firstPos.y,_firstPos.z),End=new int3(_pos.x,_pos.y,_pos.z),SamePerfer= _cachedRot%2==0,straigh=_isStraight});
                     ecb.SetComponentEnabled<PathfindingRequest>(playerCommand,true);
                     _cachedPos=_pos;
                 }
                 var buff=EntityManager.GetBuffer<MapPoint>(playerCommand,true);
+                
                 foreach(var p in buff)
                 {
                     _manyPointBuildingPoints.Add(p.pos);
                 }
               
-                _manyPointBuilding.Generate(_manyPointBuildingPoints.Select(f=>new Vector2Int(f.x,f.y)).ToArray(),null);
+                _manyPointBuilding.Generate(_manyPointBuildingPoints.Select(f=>new Vector3Int(f.x,f.y,f.z)).ToArray(),null);
                 
                 _preview.CanBuild(true,_placeManyPointPlayerData.isForce);
             }
@@ -110,6 +114,14 @@ public partial class PlayerPlaceManyPointSystem : SystemBase
         
 
     } 
+    public void Rotate(bool isHold)
+    {
+        if(isHold)
+        {
+            _isStraight=!_isStraight;
+            updateDraw=true;
+        }
+    }
     public void PlaceManyPoint(bool IsHold,bool IsBlueprint)
     {
         var ecb = World.GetOrCreateSystemManaged<BeginSimulationEntityCommandBufferSystem>().CreateCommandBuffer();
@@ -125,6 +137,7 @@ public partial class PlayerPlaceManyPointSystem : SystemBase
             var buff = ecb.AddBuffer<MapPoint>(command);
             foreach (var p in _manyPointBuildingPoints)
             {
+                
                 buff.Add(new MapPoint{pos=p});
             }
 
@@ -141,7 +154,7 @@ public partial class PlayerPlaceManyPointSystem : SystemBase
         }
         else
         {
-            var pos=new int2(_pos.x,_pos.y);
+            var pos=new int3(_pos.x,_pos.y,_pos.z);
             if(mapData.CellMapBuildingsIDs.ContainsKey(pos)&&mapData.CellMapBuildingsIDs[pos]!=_buildingID) return;
             _firstPos = _pos;
             isSecondPoint = true;
@@ -167,7 +180,7 @@ public partial class PlayerPlaceManyPointSystem : SystemBase
             _manyPointBuilding=null;
             _preview=null;
             _buildingID=-1;
-            _pos=new Vector2Int(-1,-1);
+            _pos=new Vector3Int(-1,-1,-1);
             EntityManager.SetComponentEnabled<PlayerPlacingManyPointBuilding>(_playerState,false);
             
              Debug.Log("вызов");

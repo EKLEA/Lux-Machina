@@ -6,6 +6,7 @@ public class GameFieldSettingsSO : ScriptableObject
     [Range(0, 5)]
     [SerializeField]
     public float cellSize;
+    public Material chumkMat;
 
     [Range(10, 30)]
     [SerializeField]

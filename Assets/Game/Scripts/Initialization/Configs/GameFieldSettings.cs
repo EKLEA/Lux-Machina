@@ -7,6 +7,7 @@ public interface IReadOnlyGameFieldSettings
 {
     float cellSize { get; }
     int tickPerSecond { get; }
+    Material chunkMat{get;}
     int range{get;}
     DistributionPriority defaultDistributionPriority { get; set; }
    
@@ -38,6 +39,7 @@ public class GameFieldSettings : IReadOnlyGameFieldSettings,IReadOnlyOutLineConf
     public float cellSize { get; private set; }
 
     public int tickPerSecond { get; private set; }
+    public Material chunkMat{ get; private set; }
 
     public DistributionPriority defaultDistributionPriority { get; set; }
     public Color selectBuildingColor { get; private set; }
@@ -60,10 +62,13 @@ public class GameFieldSettings : IReadOnlyGameFieldSettings,IReadOnlyOutLineConf
     public Color DisconnectPulseColor { get; private set; }
 
     public EnergyLine energyLine  { get; private set; }
+
+
     public GameFieldSettings(
         float cellSize,
         int tickPerSecond,
         int range,
+        Material chunkMat,
         DistributionPriority distributionPriority,
         Color selectBuildingColor,
         Color makeAsDemolitionBuidlingColor,
@@ -83,6 +88,7 @@ public class GameFieldSettings : IReadOnlyGameFieldSettings,IReadOnlyOutLineConf
         this.tickPerSecond = tickPerSecond;
         this.range=range;
         this.cellSize = cellSize;
+        this.chunkMat=chunkMat;
         this.defaultDistributionPriority = distributionPriority;
         this.selectBuildingColor=selectBuildingColor;
         this.makeAsDemolitionBuidlingColor=makeAsDemolitionBuidlingColor;

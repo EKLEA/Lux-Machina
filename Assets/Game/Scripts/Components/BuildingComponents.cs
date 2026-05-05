@@ -11,10 +11,10 @@ public struct BuildingData : IComponentData
 [Serializable]
 public struct BuildingPosData : IComponentData
 {
-    public int2 LeftCornerPos;
-    public int2 size;
+    public int3 LeftCornerPos;
+    public int3 size;
     public int Rotation;
-    public float2 center;
+    public float3 center;
 }
 public class BuildingOnSceneReference : IComponentData
 {   

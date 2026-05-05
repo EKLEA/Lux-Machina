@@ -169,7 +169,7 @@ public struct IntegratedSpawnJob : IJob
                     if (sectorBudget < enemyCfg.costInPoints) break;
 
                     Entity eventEntity = ECB.CreateEntity();
-                    float2 noise = rnd.NextFloat2Direction() * rnd.NextFloat(1f, 5f);
+                    float3 noise = rnd.NextFloat3Direction() * rnd.NextFloat(1f, 5f);
                     
                     ECB.AddComponent(eventEntity, new CreateEnemyEventData { 
                         EnemyID = enemyCfg.id, 
@@ -216,15 +216,15 @@ public struct IntegratedSpawnJob : IJob
 [BurstCompile]
 public struct EvaluateSpawnZonesParallelJob : IJobParallelFor
 {
-    [ReadOnly] public NativeArray<int2> AllPositions;
+    [ReadOnly] public NativeArray<int3> AllPositions;
     [ReadOnly] public NativeArray<float> AllWeights;
-    [ReadOnly] public NativeParallelHashMap<int2, float> WeightsMap; 
+    [ReadOnly] public NativeParallelHashMap<int3, float> WeightsMap; 
     
     public NativeList<SpawnPointElement>.ParallelWriter ResultPoints;
 
     public void Execute(int index)
     {
-        int2 centerPos = AllPositions[index];
+        int3 centerPos = AllPositions[index];
         float currentWeight = AllWeights[index];
 
         if (currentWeight < 18f || currentWeight > 20f) return;
@@ -237,12 +237,15 @@ public struct EvaluateSpawnZonesParallelJob : IJobParallelFor
         {
             for (int y = -searchRadius; y <= searchRadius; y += step)
             {
-                if (x * x + y * y > searchRadius * searchRadius) continue;
-
-                int2 neighbor = centerPos + new int2(x, y);
-                if (WeightsMap.TryGetValue(neighbor, out float nWeight))
+                 for (int z = -searchRadius; z <= searchRadius; z += step)
                 {
-                    areaSum += (21f - nWeight); 
+                    if (x * x + y * y+z*z > searchRadius * searchRadius) continue;
+
+                    int3 neighbor = centerPos + new int3(x, y,z);
+                    if (WeightsMap.TryGetValue(neighbor, out float nWeight))
+                    {
+                        areaSum += (21f - nWeight); 
+                    }
                 }
             }
         }
@@ -264,7 +267,7 @@ public struct ClearMultiHashMapsJob : IJob
     public NativeParallelMultiHashMap<int, Entity> TurretTargets;
     public NativeParallelMultiHashMap<Entity, int> TargetsToTurrets;
     
-    public NativeParallelMultiHashMap<int2, Entity> EnemyInCellsMap;
+    public NativeParallelMultiHashMap<int3, Entity> EnemyInCellsMap;
     
 
     public void Execute()
@@ -278,28 +281,28 @@ public struct ClearMultiHashMapsJob : IJob
 [WithDisabled(typeof(LoadInfo))]
 public partial struct EnemyLogicJob : IJobEntity
 {
-    [ReadOnly] public NativeParallelHashMap<int2, float2> FlowDirections;
-    [ReadOnly] public NativeParallelHashMap<int2, Entity> CellEntities;
+    [ReadOnly] public NativeParallelHashMap<int3, float3> FlowDirections;
+    [ReadOnly] public NativeParallelHashMap<int3, Entity> CellEntities;
     
 
-    [ReadOnly] public NativeParallelMultiHashMap<int2, int> TurretCells;
+    [ReadOnly] public NativeParallelMultiHashMap<int3, int> TurretCells;
 
     [ReadOnly] public BufferLookup<TakeDamage> DamageLookUp;
     [ReadOnly] public ComponentLookup<CheckForDestroy> CheckForDestroyLookUp;
-    [ReadOnly] public NativeParallelHashMap<int2, bool> IsBluePrintOrDemolition;
+    [ReadOnly] public NativeParallelHashMap<int3, bool> IsBluePrintOrDemolition;
     public EntityCommandBuffer.ParallelWriter ECB;   
     public NativeParallelMultiHashMap<int, Entity>.ParallelWriter TurretTargets;
     public NativeParallelMultiHashMap<Entity, int>.ParallelWriter TargetsToTurrets;
     
-    public NativeParallelMultiHashMap<int2, Entity>.ParallelWriter  EnemyInCellsMap;
+    public NativeParallelMultiHashMap<int3, Entity>.ParallelWriter  EnemyInCellsMap;
      
     public float DeltaTime;
     public float ElapsedTime;
 
     public void Execute(Entity entity,  [ChunkIndexInQuery] int chunkIndex,ref LocalTransform transform, ref EnemyStats stats)
     {
-        float2 currentPos = transform.Position.xz;
-        int2 cellPos = (int2)math.floor(currentPos);
+        float3 currentPos = transform.Position;
+        int3 cellPos = (int3)math.floor(currentPos);
          EnemyInCellsMap.Add(cellPos, entity);
         if (TurretCells.TryGetFirstValue(cellPos, out int turretIndex, out var it))
         {
@@ -311,9 +314,9 @@ public partial struct EnemyLogicJob : IJobEntity
             while (TurretCells.TryGetNextValue(out turretIndex, ref it));
         }
         
-        if (FlowDirections.TryGetValue(cellPos, out float2 moveDir))
+        if (FlowDirections.TryGetValue(cellPos, out float3 moveDir))
         {
-            int2 nextCell = (int2)math.floor(currentPos + moveDir * 0.5f); 
+            int3 nextCell = (int3)math.floor(currentPos + moveDir * 0.5f); 
 
             if (CellEntities.TryGetValue(nextCell, out Entity targetBuilding) && !nextCell.Equals(cellPos))
             {
@@ -340,7 +343,7 @@ public partial struct EnemyLogicJob : IJobEntity
         }
         else
         {
-            float2 toCenter = math.normalize(float2.zero - currentPos);
+            float3 toCenter = math.normalize(float3.zero - currentPos);
             transform.Position += new float3(toCenter.x, 0, toCenter.y) * stats.Speed * DeltaTime;
         }
     }
