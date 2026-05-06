@@ -2,6 +2,7 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
@@ -23,41 +24,51 @@ public partial struct CraftSystem : ISystem
     }
     public void OnUpdate(ref SystemState state)
     {
-        
         if(!_IsPause.IsEmpty) return;
         var query = SystemAPI.QueryBuilder().WithAll<IsTickFrame>().Build();
         if (query.IsEmpty) return;
-
-        var tickData=SystemAPI.GetSingleton<WorldTime>();
+        var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+        var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
+        // 1. Получаем синглтоны и данные
+        var tickData = SystemAPI.GetSingleton<WorldTime>();
         var recipeCache = SystemAPI.GetSingleton<RecipeConfigRefernce>();
         var productionTable = SystemAPI.GetSingletonRW<ProductionTable>();
-        var canCraftLookup=SystemAPI.GetComponentLookup<CanCraft>(false);
-        var recipesRef = recipeCache.RecipesConfig; 
-        var ResourceMap = SystemAPI.GetSingletonRW<ResourceMap>();
+        var recipesRef = recipeCache.RecipesConfig;
+        
+        var chunkMap = SystemAPI.GetSingleton<ChunkMap>().ChunkMapData; 
 
+        var canCraftLookup = SystemAPI.GetComponentLookup<CanCraft>(false);
+        var resourceBufferLookup = SystemAPI.GetBufferLookup<ResourceElement>(false); 
+
+        
         var handle = new PingConsumerCraftBuildingJob 
         { 
-            CanCraftLookup=canCraftLookup,
+            CanCraftLookup = canCraftLookup,
             RecipesConfig = recipesRef 
-        }.ScheduleParallel(state.Dependency);
-            handle = new PingProducerCraftBuildingJob 
+        }.Schedule(state.Dependency);
+
+        handle = new PingProducerCraftBuildingJob 
         { 
             RecipesConfig = recipesRef,
-            CanCraftLookup=canCraftLookup,
-            ResouecesMap=ResourceMap.ValueRO.ResouecesMap
+            CanCraftLookup = canCraftLookup,
+            ChunkMapData = chunkMap,
+            ResourceElementLookup = resourceBufferLookup
+        }.Schedule(handle); 
+        handle = new PingProcessorCraftBuildingJob 
+        { 
+            RecipesConfig = recipesRef,
+            CanCraftLookup = canCraftLookup
         }.Schedule(handle);
 
-            handle = new PingProcessorCraftBuildingJob 
-        { 
-            RecipesConfig = recipesRef,
-            CanCraftLookup=canCraftLookup
-        }.Schedule(handle);
 
         handle = new ProducerCraftJob {
             RecipesConfig = recipesRef,
             produced = productionTable.ValueRW.produced.AsParallelWriter(),
             timeStep = tickData.acceleretedTick,
-            ResouecesMap=ResourceMap.ValueRW.ResouecesMap
+            ChunkMapData = chunkMap,
+            ResourceElementLookup = resourceBufferLookup,
+            ECB=ecb.AsParallelWriter()
+
         }.ScheduleParallel(handle);
 
         handle = new ConsumerCraftJob {
@@ -73,49 +84,71 @@ public partial struct CraftSystem : ISystem
             timeStep = tickData.acceleretedTick
         }.ScheduleParallel(handle);
 
+
         state.Dependency = handle;
     }
 
-
     [BurstCompile]
-    [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnergy),typeof(IsLogicEnabled),typeof(ProducerTypeBuildingTag))]
-    [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]
+    [WithAll(typeof(BuildingTag), typeof(IsConnectedToEnergy), typeof(IsLogicEnabled), typeof(ProducerTypeBuildingTag))]
+    [WithDisabled(typeof(ForceDestroyTag), typeof(IsBlueprint), typeof(IsDemolition))]
     public partial struct PingProducerCraftBuildingJob : IJobEntity
     {
-        [ReadOnly] public  BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
-        [ReadOnly] public  NativeParallelHashMap<int3,int2> ResouecesMap;
+        [ReadOnly] public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
+        [ReadOnly] public NativeParallelHashMap<int2, Entity> ChunkMapData; 
         public ComponentLookup<CanCraft> CanCraftLookup;
-        public void Execute(Entity entity,in RecipeBuildingData recipeData,in DynamicBuffer<OutputSlotData> outputs, in ResourcesLink resourcesLink,ref BuildingStateData buildingStateData)
+        [ReadOnly] public BufferLookup<ResourceElement> ResourceElementLookup;
+
+        public void Execute(Entity entity, in RecipeBuildingData recipeData, in DynamicBuffer<OutputSlotData> outputs, in DynamicBuffer<ResourcesInChunkLink> resourcesLink, ref BuildingStateData buildingStateData)
         {
-            RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var res);
+            if (!RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash, out var recipe)) return;
+            if (resourcesLink.Length == 0) return; 
+
+            int requiredResourceID = recipe.OutputItems[0].ItemId;
             
-            bool b= CanCraft(outputs,res,resourcesLink);
-            CanCraftLookup.SetComponentEnabled(entity,b);
-            buildingStateData.State=(int)(b?WorkStateEnum.Work:WorkStateEnum.Await);
+            bool b = CanCraft(outputs, recipe, resourcesLink, requiredResourceID);
             
-            
+            CanCraftLookup.SetComponentEnabled(entity, b);
+            buildingStateData.State = (int)(b ? WorkStateEnum.Work : WorkStateEnum.Await);
         }
         
-        bool CanCraft(in DynamicBuffer<OutputSlotData> slots,RecipeStructConfig recipe,ResourcesLink resourcesLink)
+         bool CanCraft(in DynamicBuffer<OutputSlotData> slots, RecipeStructConfig recipe, in DynamicBuffer<ResourcesInChunkLink> links, int resourceID)
         {
-            bool hasResources=false;
-            for(int i = 0; i < resourcesLink.ResourcesCells.Length; i++)
+            if (slots.Length < recipe.OutputItems.Length) 
             {
-                int3 pos= resourcesLink.ResourcesCells[i];
-                if (ResouecesMap.ContainsKey(pos) && ResouecesMap[pos].y > 0)
+                return false; 
+            }
+
+            for (int i = 0; i < recipe.OutputItems.Length; i++)
+            {
+                if (i >= slots.Length) return false;
+
+                if (slots[i].Capacity - slots[i].Amount < recipe.OutputItems[i].Amount) 
+                    return false;
+            }
+
+            if (links.Length == 0) return false;
+
+            for (int i = 0; i < links.Length; i++)
+            {
+                var link = links[i];
+                
+                if (link.chunkPos.x == int.MinValue) continue;
+
+                if (!ChunkMapData.TryGetValue(link.chunkPos, out Entity chunkEntity)) continue;
+                if (!ResourceElementLookup.HasBuffer(chunkEntity)) continue;
+
+                var chunkResources = ResourceElementLookup[chunkEntity];
+                for (int j = 0; j < chunkResources.Length; j++)
                 {
-                    hasResources= true; 
-                    break;
+                    var res = chunkResources[j];
+                    if (res.Amount > 0 && res.ID == resourceID && link.ResourcesCells.Contains(res.LocalPos))
+                        return true;
                 }
             }
-            if(!hasResources) return false;
-            for(int i=0;i<slots.Length;i++)
-            {
-                if (slots[i].Capacity - slots[i].Amount < recipe.OutputItems[i].Amount) return false;
-            }
-            return true;
+            return false;
         }
     }
+
     [BurstCompile]
     
     [WithAll(typeof(BuildingTag),typeof(IsConnectedToEnergy),typeof(IsLogicEnabled),typeof(ConsumerTypeBuildingTag))]
@@ -189,60 +222,116 @@ public partial struct CraftSystem : ISystem
     public partial struct ProducerCraftJob : IJobEntity
     {
         [ReadOnly] public BlobAssetReference<BlobLibrary<RecipeStructConfig>> RecipesConfig;
-        public NativeParallelMultiHashMap<int, RecipeIngredientStruct>.ParallelWriter produced; 
-        [NativeDisableParallelForRestriction] public NativeParallelHashMap<int3,int2> ResouecesMap;
+        public NativeParallelMultiHashMap<int, RecipeIngredientStruct>.ParallelWriter produced;
+        [ReadOnly] public NativeParallelHashMap<int2, Entity> ChunkMapData;
+        [NativeDisableParallelForRestriction] public BufferLookup<ResourceElement> ResourceElementLookup;
+        public EntityCommandBuffer.ParallelWriter ECB; 
         public float timeStep;
-        public void Execute(ref RecipeBuildingData recipeData, ref DynamicBuffer<OutputSlotData> slots,EnabledRefRW<CanCraft> canCraft,ref ResourcesLink resourcesLink,ref BuildingStateData buildingStateData)
+
+        public void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndex,ref RecipeBuildingData recipeData, ref DynamicBuffer<OutputSlotData> slots, EnabledRefRW<CanCraft> canCraft, ref DynamicBuffer<ResourcesInChunkLink> resourcesLink, ref BuildingStateData buildingStateData)
         {
-            if(recipeData.CurrTime>=recipeData.TimeToCraft)
+            if (recipeData.CurrTime < recipeData.TimeToCraft)
             {
-                if ( RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash,out var recipe))
-                {
-                    var resCell=ResouecesMap[resourcesLink.ResourcesCells[resourcesLink.indexCell]];
-                    resCell.y-=1;
-                    
-                    ResouecesMap[resourcesLink.ResourcesCells[resourcesLink.indexCell]]=resCell;
-                    resourcesLink.indexCell=( resourcesLink.indexCell+1)%resourcesLink.ResourcesCells.Length;;
-                    for(int i = 0; i < slots.Length; i++)
-                    {
-                        var data=slots[i];
-                        data.Amount+=recipe.OutputItems[i].Amount;
-                        produced.Add(recipe.OutputItems[i].ItemId,recipe.OutputItems[i]);
-                        slots[i]=data;
-                    }
-                    
-                    recipeData.CurrTime=0;
-                    bool b=CanCraft(slots,recipe,resourcesLink);
-                    canCraft.ValueRW=b;
-                    
-                    buildingStateData.State=(int)(b?WorkStateEnum.Work:WorkStateEnum.Await);
-                }
-                
+                recipeData.CurrTime += timeStep;
+                return;
             }
-            else recipeData.CurrTime+=timeStep;
+
+            if (resourcesLink.Length == 0 || !RecipesConfig.Value.TryGetConfig(recipeData.RecipeIDHash, out var recipe)) return;
+
+            int requiredResourceID = recipe.OutputItems[0].ItemId;
             
-        }
-        bool CanCraft(in DynamicBuffer<OutputSlotData> slots,RecipeStructConfig recipe,ResourcesLink resourcesLink)
-        {
-            bool hasResources=false;
-            for(int i = 0; i < resourcesLink.ResourcesCells.Length; i++)
+            var link = resourcesLink[0]; 
+            int3 targetLocalPos = link.ResourcesCells[link.indexCell];
+            
+            bool successMining = false;
+
+            if (ChunkMapData.TryGetValue(link.chunkPos, out Entity chunkEntity))
             {
-                int3 pos= resourcesLink.ResourcesCells[i];
-                if (ResouecesMap.ContainsKey(pos) && ResouecesMap[pos].y > 0)
+                var chunkResources = ResourceElementLookup[chunkEntity];
+                for (int i = 0; i < chunkResources.Length; i++)
                 {
-                    hasResources= true; 
-                    break;
+                    var res = chunkResources[i];
+                    if (res.LocalPos.Equals(targetLocalPos) && res.ID == requiredResourceID && res.Amount > 0)
+                    {
+                        res.Amount -= 1;
+                        
+                        if (res.Amount <= 0)
+                        {
+                            ECB.SetComponentEnabled<NeedsCleanupTag>(chunkIndex, chunkEntity,true);
+                        }
+
+                        chunkResources[i] = res;
+                        successMining = true;
+                        break;
+                    }
                 }
             }
-            if(!hasResources) return false;
-            for(int i=0;i<slots.Length;i++)
+
+            if (successMining)
             {
-                if (slots[i].Capacity - slots[i].Amount < recipe.OutputItems[i].Amount) return false;
+                link.indexCell = (link.indexCell + 1) % link.ResourcesCells.Length;
+                resourcesLink[0] = link;
+
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    var data = slots[i];
+                    data.Amount += recipe.OutputItems[i].Amount;
+                    slots[i] = data;
+                    produced.Add(recipe.OutputItems[i].ItemId, recipe.OutputItems[i]);
+                }
+                recipeData.CurrTime = 0;
             }
-            return true;
+            else
+            {
+                link.indexCell = (link.indexCell + 1) % link.ResourcesCells.Length;
+                resourcesLink[0] = link;
+            }
+
+            bool b = CanCraft(slots, recipe, resourcesLink, requiredResourceID);
+            canCraft.ValueRW = b;
+            buildingStateData.State = (int)(b ? WorkStateEnum.Work : WorkStateEnum.Await);
+        }
+
+
+        bool CanCraft(in DynamicBuffer<OutputSlotData> slots, RecipeStructConfig recipe, in DynamicBuffer<ResourcesInChunkLink> links, int resourceID)
+        {
+            if (slots.Length < recipe.OutputItems.Length) 
+            {
+                return false; 
+            }
+
+            for (int i = 0; i < recipe.OutputItems.Length; i++)
+            {
+                if (i >= slots.Length) return false;
+
+                if (slots[i].Capacity - slots[i].Amount < recipe.OutputItems[i].Amount) 
+                    return false;
+            }
+
+            if (links.Length == 0) return false;
+
+            for (int i = 0; i < links.Length; i++)
+            {
+                var link = links[i];
+                
+                if (link.chunkPos.x == int.MinValue) continue;
+
+                if (!ChunkMapData.TryGetValue(link.chunkPos, out Entity chunkEntity)) continue;
+                if (!ResourceElementLookup.HasBuffer(chunkEntity)) continue;
+
+                var chunkResources = ResourceElementLookup[chunkEntity];
+                for (int j = 0; j < chunkResources.Length; j++)
+                {
+                    var res = chunkResources[j];
+                    if (res.Amount > 0 && res.ID == resourceID && link.ResourcesCells.Contains(res.LocalPos))
+                        return true;
+                }
+            }
+            return false;
         }
     }
-    
+
+
     [BurstCompile]
     [WithAll(typeof(IsConnectedToEnergy),typeof(IsRecipeAssigned),typeof(IsLogicEnabled),typeof(ConsumerTypeBuildingTag))]
     [WithDisabled(typeof(ForceDestroyTag),typeof(IsBlueprint),typeof(IsDemolition))]

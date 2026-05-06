@@ -34,7 +34,9 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
     EntitiesDictionary entitiesDictionary;
     BuildingMap buildingMap;
     EnergyMap energyMap;
-    ResourceMap resourceMap;
+    ChunkMap chunkMap;
+    WorldSettings worldSettings;
+    BufferLookup<ResourceElement> _resourceLookup;
     
     public void SetUpBuilding(int buildingID,IPlaceBuildingPlayerData buildingPlayerData,Entity playerState, int2? connectionFrom = null)
     {
@@ -68,7 +70,7 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         }
         if(_buildingInfo.BuildingInfos[_buildingID].buildingType==BuildingsTypes.Procession&&_buildingInfo.BuildingProcessionInfos[_buildingID].typeOfProcession==TypeOfProcession.Generate)
         {
-            UpdateFunc+=(ref bool b)=>UpdateResourceBuilding(ref b,size,resourceMap);
+            UpdateFunc+=(ref bool b)=>UpdateResourceBuilding(ref b,_pos.y-1,size,chunkMap,worldSettings,_resourceLookup);
         }        
     }
 
@@ -80,8 +82,10 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         .WithDisabled<PlayerPlacingManyPointBuilding>()
         .WithDisabled<PlayerDeletePoints>()
         .WithDisabled<PathfindingRequest>()
-        
         .Build(this);
+        
+         _resourceLookup = GetBufferLookup<ResourceElement>(true);
+
         RequireForUpdate(_buildReadyQuery);
     }
     protected override void OnUpdate()
@@ -90,14 +94,15 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         entitiesDictionary= SystemAPI.GetSingleton<EntitiesDictionary>();
         buildingMap= SystemAPI.GetSingleton<BuildingMap>();
         energyMap= SystemAPI.GetSingleton<EnergyMap>();
-        resourceMap= SystemAPI.GetSingleton<ResourceMap>();
+        chunkMap= SystemAPI.GetSingleton<ChunkMap>();
+        worldSettings= SystemAPI.GetSingleton<WorldSettings>();
         
-          var data =SystemAPI.GetSingleton<PlayerRayCastData>();
+        var data =SystemAPI.GetSingleton<PlayerRayCastData>();
         
         if(_buildReadyQuery.IsEmpty) return;
         
         if(_buildingPlayerData==null) return;
-        
+         _resourceLookup.Update(this);
         _rotation=_buildingPlayerData.rotation;
         _pos=new Vector3Int(data.PlaceBlockPos.x,data.PlaceBlockPos.y,data.PlaceBlockPos.z);;
         
@@ -150,25 +155,53 @@ public partial class PlayerPlaceBuildingSystem : SystemBase
         
         prevBool=prevBool&&result;
     }
-    void UpdateResourceBuilding(ref bool prevBool,Vector3Int size,ResourceMap resourceMap)
+    void UpdateResourceBuilding(ref bool prevBool, int y, Vector3Int size, ChunkMap chunkMap, WorldSettings worldSettings, BufferLookup<ResourceElement> resourceLookup)
     {
-        bool result=false;
-        for(int x=0; x < size.x; x++)
-        {
-            for(int z=0; z < size.z; z++)
-            {
-                
-                var pos = new int3(_pos.x + x, _pos.y,_pos.z + z);
-                if(resourceMap.ResouecesMap.ContainsKey(pos))
-                {
-                    result=true;
-                    break;
-                }
-            }
-        }
-        prevBool=prevBool&&result;
+        if (!prevBool) return;
+
+        bool hasResources = false;
         
-        Debug.Log(prevBool);
+
+        for (int x = 0; x < size.x; x++)
+        {
+            for (int z = 0; z < size.z; z++)
+            {
+                int3 worldPos = new int3(_pos.x + x, y, _pos.z + z);
+
+                int2 chunkPos = new int2(
+                    Mathf.FloorToInt((float)worldPos.x / worldSettings.Size),
+                    Mathf.FloorToInt((float)worldPos.z / worldSettings.Size)
+                );
+
+                int3 localPos = new int3(
+                    worldPos.x - (chunkPos.x * worldSettings.Size),
+                    worldPos.y,
+                    worldPos.z - (chunkPos.y * worldSettings.Size)
+                );
+
+                if (chunkMap.ChunkMapData.TryGetValue(chunkPos, out Entity chunkEntity))
+                {
+                    if (resourceLookup.HasBuffer(chunkEntity))
+                    {
+                        var resources = resourceLookup[chunkEntity];
+                        
+                        for (int i = 0; i < resources.Length; i++)
+                        {
+                            if (resources[i].LocalPos.Equals(localPos) && resources[i].Amount > 0)
+                            {
+                                hasResources = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (hasResources) break;
+            }
+            if (hasResources) break;
+        }
+
+        prevBool = hasResources;
     }
     public void PlaceBuilding(bool isHold,bool IsBlueprint)
     {

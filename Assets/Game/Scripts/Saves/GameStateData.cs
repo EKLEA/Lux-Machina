@@ -19,7 +19,6 @@ public class GameStateData
     public Dictionary<int,RecipeAndCraftBuildingSaveData> recipeBuildingSaveData;
     public Dictionary<int,StorageSlotsSaveData> storageSlotsSaveData;
     public Dictionary<int,BuildingEnergyNetvorkLinkSaveData> buildingEnergyNetvorkLinkSaveData;
-    public List<ResourceCellSave> ResourcesCellsList; 
     public EnemyAIConfig EnemyAiConfig;
     public SpawnMobsData SpawnMobsData;
 }

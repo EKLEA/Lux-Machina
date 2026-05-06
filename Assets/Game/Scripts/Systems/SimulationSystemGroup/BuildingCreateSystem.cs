@@ -228,7 +228,7 @@ public partial struct BuildingCreateSystem : ISystem
             typeof(ChangeDemolitionStateTag),
             typeof(IsDemolition),
             typeof(BuildingPosData),
-            typeof(ResourcesLink),
+            typeof(ResourcesInChunkLink),
             typeof(IsInputConstructionEnabled),
             typeof(IsOutputConstuctionEnabled),
             typeof(IsConstuctionSlotsAssigned),
@@ -775,6 +775,7 @@ public partial struct BuildingCreateSystem : ISystem
             else if (HasType(types, ComponentType.ReadWrite<ProducerTypeBuildingTag>()))
             {
                 ECB.SetComponentEnabled<IsOutputCraftEnabled>(building, false);
+                ECB.AddBuffer<ResourcesInChunkLink>(building);
             }
             else if (HasType(types, ComponentType.ReadWrite<ConsumerTypeBuildingTag>()))
             {

@@ -244,7 +244,7 @@ public class GameController : IInitializable
          World.EntityManager.AddComponentData(Map, new WorldTime
         {
             CurrentTick=gameStateData.CurrTick,
-            TicksPerDay=400,//12000
+            TicksPerDay=12000,//12000
             SpeedMultiplier=1,
             baseTick=0.05f,
             dayLength=0.7f
@@ -301,19 +301,11 @@ public class GameController : IInitializable
     }
     async UniTask PrepareWorld(Entity Map,GameStateData gameStateData)
     {
-        ResourceMap resourceMap=new ResourceMap
-        {
-            ResouecesMap=new(1000,Allocator.Persistent)
-        };
-        foreach(var c in gameStateData.ResourcesCellsList)
-        {
-            resourceMap.ResouecesMap.Add(c.pos,c.val);
-        }
+        
         
         World.EntityManager.AddComponentData(Map,new PlayerData{});
         World.EntityManager.AddComponentData(Map,new PlayerRayCastData{});
-        World.EntityManager.AddComponentData(Map, resourceMap);
-        int range=25;
+        int range=55;
         for (int x = -range; x <= range; x++)
         {
             for (int y = -range; y <= range; y++)
@@ -326,11 +318,10 @@ public class GameController : IInitializable
 
                 if (dist <= range/2) lod = 0;
                 else if (dist <= range/2+range/4) lod = 1;
-                else lod = 3; // Для дистанции 30-45
+                else lod = 3; 
 
                 var chunk = World.EntityManager.CreateEntity();
                 
-                // Добавляем компонент состояния меша с нужным LOD
                 World.EntityManager.AddComponentData(chunk, new ChangeLODChunkState { 
                     newLIOD = lod 
                 });

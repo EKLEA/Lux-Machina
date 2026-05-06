@@ -33,6 +33,7 @@ public partial struct TerrainSystem : ISystem
             typeof(UpdateChunkDataTag),
             typeof(UpdateVisualTag),
             typeof(IsVisibleTag), 
+            typeof(NeedsCleanupTag), 
             typeof(VertexElement),
             typeof(IndexElement), 
             typeof(ChangeVisibleChunkState),
@@ -128,23 +129,23 @@ public partial struct TerrainSystem : ISystem
                     float2 worldXZ = new float2(offsetX + x, offsetZ + z);
                     float dist = math.length(worldXZ);
                     
-                    // Маска гор (начинаются за пределами радиуса 40-60)
+                    
                     float plainMask = math.smoothstep(40f, 60f, dist); 
 
-                    // Базовый шум рельефа
+                    
                     float rawNoise = (noise.snoise(worldXZ * World.TerrainScale + World.Seed) + 1f) * 0.5f;
                     float terraceInput = rawNoise * World.TerraceSteps;
                     float terraceMask = (math.floor(terraceInput) + math.smoothstep(0.05f, 0.15f, terraceInput % 1f)) / World.TerraceSteps;
                     
-                    // Высота гор и биома
+                    
                     float mountainHeight = terraceMask * World.HeightMultiplier * plainMask;
                     float biomeNoise = noise.snoise(worldXZ * World.BiomeScale + (World.Seed + 100));
                     float biomeWeight = math.saturate(biomeNoise * 2.5f) * plainMask; 
 
-                    // Итоговая высота поверхности
+                    
                     float surfaceHeight = World.PlainsHeight + (mountainHeight * biomeWeight);
 
-                    // Расчет крутизны (для скал)
+                    
                     float2 step = new float2(0.1f, 0.1f);
                     float rawNoiseNext = (noise.snoise((worldXZ + step) * World.TerrainScale + World.Seed) + 1f) * 0.5f;
                     float terraceNext = (math.floor(rawNoiseNext * World.TerraceSteps) + math.smoothstep(0.05f, 0.15f, (rawNoiseNext * World.TerraceSteps) % 1f)) / World.TerraceSteps;
@@ -159,47 +160,53 @@ public partial struct TerrainSystem : ISystem
                         if (y <= (int)surfaceHeight)
                         {
                             int depth = (int)surfaceHeight - y;
+                            
+                            // ТОЛЬКО ПОВЕРХНОСТЬ (верхний блок)
                             if (depth == 0)
                             {
                                 bool isStartingArea = dist < 70f;
-                                
-                                // --- ЛОГИКА РАВНИНЫ (ФАКТОРИО) ---
-                                // Разрешаем руду только если высота блока соответствует базовой высоте равнины
-                                // Это исключает любые склоны, террасы и вершины гор автоматически.
                                 bool isFlatLowland = (int)surfaceHeight <= (int)World.PlainsHeight;
 
                                 byte oreBlockID = 0;
                                 int oreAmount = 0;
+                                int resourceID = 0; // Для буфера ResourceElement
 
                                 if (isFlatLowland) 
                                 {
-                                    if (CheckOre(worldXZ, World.Iron, World.Seed + 1, dist, out oreAmount, isStartingArea, 0)) oreBlockID = 4;
-                                    else if (CheckOre(worldXZ, World.Copper, World.Seed + 2, dist, out oreAmount, isStartingArea, 1)) oreBlockID = 5;
-                                    else if (CheckOre(worldXZ, World.Tin, World.Seed + 3, dist, out oreAmount, isStartingArea, 2)) oreBlockID = 6;
-                                    else if (CheckOre(worldXZ, World.Coal, World.Seed + 4, dist, out oreAmount, isStartingArea, 3)) oreBlockID = 7;
-                                    else if (CheckOre(worldXZ, World.Stone, World.Seed + 5, dist, out oreAmount, isStartingArea, 4)) oreBlockID = 1;
+                                    // Проверяем руды и сразу сопоставляем ID ресурса
+                                    if (CheckOre(worldXZ, World.Iron, World.Seed + 1, dist, out oreAmount, isStartingArea, 0)) { oreBlockID = 4; resourceID = 1; }
+                                    else if (CheckOre(worldXZ, World.Copper, World.Seed + 2, dist, out oreAmount, isStartingArea, 1)) { oreBlockID = 5; resourceID = 2; }
+                                    else if (CheckOre(worldXZ, World.Tin, World.Seed + 3, dist, out oreAmount, isStartingArea, 2)) { oreBlockID = 6; resourceID = 3; }
+                                    else if (CheckOre(worldXZ, World.Coal, World.Seed + 4, dist, out oreAmount, isStartingArea, 3)) { oreBlockID = 7; resourceID = 4; }
+                                    else if (CheckOre(worldXZ, World.Stone, World.Seed + 5, dist, out oreAmount, isStartingArea, 4)) { oreBlockID = 1; resourceID = 5; }
                                 }
 
                                 if (oreBlockID != 0)
                                 {
                                     blockID = oreBlockID;
-                                    SpawnOre(new int3(x, y, z), oreBlockID - 3, oreAmount, ref resBuffer); 
+                                    // Спавним данные для добычи только если это руда
+                                    SpawnOre(new int3(x, y, z), resourceID, oreAmount, ref resBuffer); 
                                 }
                                 else 
                                 {
-                                    // Обычный ландшафт
-                                    if (steepness > 0.15f) blockID = 1; // Скалы на уклонах
-                                    else if (dirtNoise > 0.75f) blockID = 2; // Земляные пятна
-                                    else blockID = 3; // Трава
+                                    // Обычный ландшафт, если руды нет
+                                    if (steepness > 0.15f) blockID = 1;
+                                    else if (dirtNoise > 0.75f) blockID = 2; 
+                                    else blockID = 3; 
                                 }
                             }
+                            // ВСЁ ЧТО НИЖЕ (depth > 0) — только камень или земля
                             else if (depth < 3)
                             {
                                 blockID = (steepness > 0.7f) ? (byte)1 : (byte)2;
                             }
-                            else blockID = 1; 
+                            else 
+                            {
+                                blockID = 1; // Глубинный камень
+                            }
                         }
 
+                        // ВАЖНО: Твоя формула индекса X -> Y -> Z
                         int index = x + World.Size * (y + World.Height * z);
                         blocks[index] = new BlockElement { BlockID = blockID };
                     }
@@ -210,7 +217,7 @@ public partial struct TerrainSystem : ISystem
         bool CheckOre(float2 pos, OreSettings settings, uint seed, float dist, out int amount, bool isStartingArea, int oreIndex)
         {
             amount = 0;
-            float baseAmountPerBlock = 500f; // Базовое число руды на клетку
+            float baseAmountPerBlock = 500f; 
 
             if (isStartingArea)
             {
@@ -220,7 +227,7 @@ public partial struct TerrainSystem : ISystem
                 
                 if (distToPatchCenter < 6f) 
                 {
-                    // В центре пятна (dist=0) множитель 1.0, на краю (dist=6) множитель 0.1
+                    
                     float patchFalloff = math.lerp(1.0f, 0.1f, distToPatchCenter / 6f);
                     amount = (int)(baseAmountPerBlock * settings.Richness * patchFalloff);
                     return true;
@@ -234,13 +241,10 @@ public partial struct TerrainSystem : ISystem
 
                 if (n > activeThreshold)
                 {
-                    // 1. Коэффициент расстояния от центра мира (чем дальше, тем жирнее)
+                    
                     float worldDistFactor = 1.0f + (dist / 1000f); 
-
-                    // 2. Коэффициент "центра кляксы"
-                    // Насколько значение шума выше порога (от 0.0 до 1.0)
                     float patchDensity = (n - activeThreshold) / (1.0f - activeThreshold);
-                    // Плавное затухание к краям (в центре кляксы больше, на краях меньше)
+                    
                     float patchFalloff = math.smoothstep(0f, 1f, patchDensity);
 
                     amount = (int)(baseAmountPerBlock * settings.Richness * worldDistFactor * patchFalloff);
@@ -267,7 +271,6 @@ public partial struct TerrainSystem : ISystem
     {
         [ReadOnly] public WorldSettings World;
         
-
          public void Execute(ref DynamicBuffer<VertexElement> vertices, ref DynamicBuffer<IndexElement> indices,
             in DynamicBuffer<BlockElement> blocks, in ChunkMeshState meshState)
         {

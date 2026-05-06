@@ -122,11 +122,6 @@ public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
         save.recipeBuildingSaveData=new();
         save.storageSlotsSaveData=new();
         save.buildingEnergyNetvorkLinkSaveData=new();
-        save.ResourcesCellsList=new();
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int3(5,0,5),val=new int2(1,20)});
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int3(5,0,6),val=new int2(1,20)});
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int3(6,0,5),val=new int2(1,20)});
-        save.ResourcesCellsList.Add(new ResourceCellSave{pos= new int3(6,0,6),val=new int2(1,20)});
 
         save.camData = new PlayerCamData()
         {

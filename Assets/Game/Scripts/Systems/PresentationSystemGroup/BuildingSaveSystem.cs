@@ -104,7 +104,6 @@ public partial class BuildingSaveSystem : SystemBase
         handle= new StorageSaveJob{storageSlotsSaveData=storageSlotsSaveData.AsParallelWriter()}.ScheduleParallel(handle);
         handle.Complete();
         this.Dependency=handle;
-        save.ResourcesCellsList=saveData.GameState.ResourcesCellsList;
         save.Buildings = new Dictionary<int, BaseBuildingSaveData>();
         foreach (var pair in buildings) {
             save.Buildings.Add(pair.Key, pair.Value);

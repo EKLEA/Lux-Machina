@@ -42,16 +42,15 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         var energyBuildingDataLookup = SystemAPI.GetComponentLookup<EnergyBuildingData>(false);
         var connectToEnegyEntitiesLookup = SystemAPI.GetComponentLookup<ConnectToEnegyEntities>(false);
         var updateConnectStatusLookup = SystemAPI.GetComponentLookup<UpdateConnectStatus>(false);
-        var resourcesLinkLookup = SystemAPI.GetComponentLookup<ResourcesLink>(false);
+        var resourcesLinkLookup = SystemAPI.GetBufferLookup<ResourcesInChunkLink>(false);
         var TurretStatsLookup = SystemAPI.GetComponentLookup<TurretStats>(false);
         var buildingMapRW = SystemAPI.GetSingletonRW<BuildingMap>();
         var energyMapRW = SystemAPI.GetSingletonRW<EnergyMap>();
         var entitiesRW = SystemAPI.GetSingletonRW<EntitiesDictionary>();
         var turretMapRW = SystemAPI.GetSingletonRW<TurretGrid>();
-        var resourceMapRW = SystemAPI.GetSingletonRW<ResourceMap>();
         var mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
         var config = SystemAPI.GetSingleton<BuildingConfigReference>();
-        var chunkMap = SystemAPI.GetSingleton<ChunkMap>();
+        var chunkMap = SystemAPI.GetSingletonRW<ChunkMap>();
         var worldSettings = SystemAPI.GetSingleton<WorldSettings>();
         var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
@@ -64,7 +63,8 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 EntityDictionary = entitiesRW.ValueRW,
                 TurretGrid=turretMapRW.ValueRW,
                 MapEntity = mapEntity,
-                ResourceMap=resourceMapRW.ValueRO,
+                worldSettings=worldSettings,
+                ChunkMapData=chunkMap.ValueRO.ChunkMapData,
                 ResourcesLinkLookup=resourcesLinkLookup,
                 UpdateMapTagLookup = updateMapLookup,
                 UpdateClusterTagLookup = updateClusterLookup,
@@ -105,7 +105,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 HealthDataLookup = HealthDataLookup,
                 ManyPointPointHealthDataLookup = ManyPointPointHealthDataLookup,
 
-                ChunkMap = chunkMap,
+                ChunkMap = chunkMap.ValueRO,
                 BlockLookup = SystemAPI.GetBufferLookup<BlockElement>(true),
                 Settings = worldSettings,
 
@@ -117,7 +117,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
             {
                 Weights = buildingMapRW.ValueRO.CellWeights,
 
-                ChunkMap = chunkMap,
+                ChunkMap = chunkMap.ValueRO,
                 BlockLookup = SystemAPI.GetBufferLookup<BlockElement>(true),
                 Settings = worldSettings,
 
@@ -159,8 +159,6 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         if(productionTable.produced.IsCreated)productionTable.Dispose();
         var energyMap=state.EntityManager.GetComponentData<EnergyMap>(mapEntity);
         if(energyMap.EnergyLinks.IsCreated)energyMap.Dispose();
-        var resourceMap=state.EntityManager.GetComponentData<ResourceMap>(mapEntity);
-        if(resourceMap.ResouecesMap.IsCreated)resourceMap.Dispose();
         var TurretGrid=state.EntityManager.GetComponentData<TurretGrid>(mapEntity);
         if(TurretGrid.TurretGridClaim.IsCreated)TurretGrid.Dispose();
         var ChunkMap=state.EntityManager.GetComponentData<ChunkMap>(mapEntity);
@@ -193,7 +191,8 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
     {
         public BuildingMap MapData; 
         public EnergyMap EnergyMap; 
-        public ResourceMap ResourceMap; 
+        [ReadOnly] public NativeParallelHashMap<int2, Entity> ChunkMapData; 
+        public WorldSettings worldSettings;
         public TurretGrid TurretGrid;
         public EntitiesDictionary EntityDictionary; 
         public Entity MapEntity;
@@ -202,7 +201,7 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
         public ComponentLookup<EnergyBuildingData> EnergyBuildingDataLookup;
         public ComponentLookup<UpdateConnectStatus> UpdateConnectStatusLookup;
         public ComponentLookup<ConnectToEnegyEntities> ConnectToEnegyEntitiesLookup;
-        public ComponentLookup<ResourcesLink> ResourcesLinkLookup;
+        public BufferLookup<ResourcesInChunkLink> ResourcesLinkLookup;
         public ComponentLookup<TurretStats> TurretStatsLookup;
 
         public void Execute(Entity entity,in BuildingData buildingData, in BuildingPosData buildingPosData,EnabledRefRW<MarkOnMap> markOnMap)
@@ -337,24 +336,58 @@ public partial struct  MarkBuildingOnMapSystem: ISystem
                 }
                 entitiesToPing.Dispose();
             }
-            if (ResourcesLinkLookup.HasComponent(entity))
+            if (ResourcesLinkLookup.HasBuffer(entity))
             {
-                ResourcesLink resourcesLink=new();
-                resourcesLink.ResourcesCells=new();
-                resourcesLink.indexCell=0;
+                var resourcesBuffer = ResourcesLinkLookup[entity];
+                resourcesBuffer.Clear();
+
+                var chunkGroups = new NativeParallelHashMap<int2, FixedList512Bytes<int3>>(8, Allocator.Temp);
+
+                int mineY = buildingPosData.LeftCornerPos.y - 1;
+
                 for (int x = buildingPosData.LeftCornerPos.x; x < buildingPosData.LeftCornerPos.x + buildingPosData.size.x; x++)
                 {
                     for (int z = buildingPosData.LeftCornerPos.z; z < buildingPosData.LeftCornerPos.z + buildingPosData.size.z; z++)
                     {
-                        int3 point=new(x,buildingPosData.LeftCornerPos.y,z);
-                        if (ResourceMap.ResouecesMap.ContainsKey(point))
+                        int3 worldPos = new int3(x, mineY, z);
+
+                        int2 chunkPos = new int2(
+                            Mathf.FloorToInt((float)worldPos.x / worldSettings.Size),
+                            Mathf.FloorToInt((float)worldPos.z / worldSettings.Size)
+                        );
+
+                        int3 localPos = new int3(
+                            worldPos.x - (chunkPos.x * worldSettings.Size),
+                            worldPos.y, 
+                            worldPos.z - (chunkPos.y * worldSettings.Size)
+                        );
+
+                        if (!chunkGroups.TryGetValue(chunkPos, out var list))
                         {
-                            resourcesLink.ResourcesCells.Add(point);
+                            list = new FixedList512Bytes<int3>();
+                        }
+                        
+                        if (list.Length < list.Capacity)
+                        {
+                            list.Add(localPos);
+                            chunkGroups[chunkPos] = list;
                         }
                     }
                 }
-                ResourcesLinkLookup[entity]=resourcesLink;
+
+                foreach (var pair in chunkGroups)
+                {
+                    resourcesBuffer.Add(new ResourcesInChunkLink
+                    {
+                        chunkPos = pair.Key,
+                        ResourcesCells = pair.Value,
+                        indexCell = 0
+                    });
+                }
+
+                chunkGroups.Dispose();
             }
+
         }
     }
     [BurstCompile]

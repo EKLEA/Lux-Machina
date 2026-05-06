@@ -42,8 +42,10 @@ public struct BuildingTag : IComponentData{}
     #endregion
 
     #region распределение ресурсов
-    public struct ResourcesLink : IComponentData
+    [InternalBufferCapacity(9)]
+    public struct ResourcesInChunkLink : IBufferElementData
     {
+        public int2 chunkPos;
         public FixedList512Bytes<int3> ResourcesCells;
         public int indexCell;
     }

@@ -66,6 +66,7 @@ public struct PlayerRayCastData : IComponentData {
 
 public struct UpdateChunkDataTag: IComponentData, IEnableableComponent {}
 public struct UpdateVisualTag : IComponentData, IEnableableComponent {}
+public struct NeedsCleanupTag : IComponentData, IEnableableComponent {}
 public struct IsVisibleTag : IComponentData, IEnableableComponent {}
 public struct ChangeVisibleChunkState : IComponentData,IEnableableComponent{}
 public struct ChangeLODChunkState : IComponentData,IEnableableComponent{ public int newLIOD;}

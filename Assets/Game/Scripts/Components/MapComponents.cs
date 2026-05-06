@@ -53,15 +53,6 @@ public struct EnergyMap: IComponentData, IDisposable
     }
 }
 
-public struct ResourceMap : IComponentData, IDisposable
-{
-    
-    public NativeParallelHashMap<int3,int2> ResouecesMap; //x- айди предмета, y количество
-    public void Dispose()
-    {
-        ResouecesMap.Dispose();
-    }
-}
 public struct TurretGrid : IComponentData, IDisposable
 {
     public NativeParallelMultiHashMap<int, Entity> EnemyGridMap;
