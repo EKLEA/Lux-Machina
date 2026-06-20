@@ -89,7 +89,8 @@
             "id": 6,
             "title": "живая эссенция",
             "RecipesGroupIds": [
-                1
+                4,
+                5
             ],
             "ItemClass": 1,
             "inputItems": [],
@@ -165,7 +166,12 @@
                     "amount": 1
                 }
             ],
-            "outputItems": [],
+            "outputItems": [
+                {
+                    "itemId": 9,
+                    "amount": 1
+                }
+            ],
             "craftTime": 1.0,
             "recipeSpritePath": "tin_ignot"
         },

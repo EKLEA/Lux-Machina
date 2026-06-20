@@ -14,12 +14,16 @@ public partial class GridUpdateSystem : SystemBase
      
      EntityQuery _raycastQuery;
     EntityQuery _buildQuery;
-    public void SetUpGrid(GridVisualizer visualizer,IPlayerData playerData,FlowFieldVisualizer flowFieldVisualizer)//, AttackZoneVisualizer attackZoneVisualizer
+    int c=0;
+    int a=0;
+    bool b=true;
+    public void SetUpGrid(GridVisualizer visualizer,IPlayerData playerData,FlowFieldVisualizer flowFieldVisualizer, AttackZoneVisualizer attackZoneVisualizer)//
     {
         _visualizer=visualizer;
         _playerData =playerData;
         this.flowFieldVisualizer=flowFieldVisualizer;
-       // _attackZoneVisualizer=attackZoneVisualizer;
+       _attackZoneVisualizer=attackZoneVisualizer;
+      
 
     }
      protected override void OnCreate()
@@ -36,18 +40,13 @@ public partial class GridUpdateSystem : SystemBase
     protected override void OnUpdate()
     {
         if (!SystemAPI.TryGetSingleton<BuildingMap>(out var map)) return;
-
-        // flowFieldVisualizer.DrawFlowField(
-        //       new Vector2Int(0,0), 
-        //         100, 
-        //         map
-        // );
+      
          // 1. Завершаем только то, что связано с рейкастом (быстро, так как query готов)
         _raycastQuery.GetDependency().Complete();
 
         // 2. Теперь спокойно читаем
         var data = SystemAPI.GetSingleton<PlayerRayCastData>();
-        //_attackZoneVisualizer.DrawAttackZones(SystemAPI.GetComponent<TurretGrid>(SystemAPI.GetSingletonEntity<BuildingMap>()));
+        
         if (!_buildQuery.IsEmpty)
         {
              _visualizer.DrawGrid(
@@ -56,6 +55,21 @@ public partial class GridUpdateSystem : SystemBase
                 map
             );
         }
+      
         else _visualizer?.Clear();
+        //   if (a % 500 == 0)
+        // {
+        //     _attackZoneVisualizer.DrawAttackZones(SystemAPI.GetComponent<TurretGrid>(SystemAPI.GetSingletonEntity<BuildingMap>()));
+        // }
+        // else a++;
+        // c++;
+        // if(c<100) return;
+        // if (b)
+        // {
+        //       flowFieldVisualizer.DrawFlowField(
+        //         map
+        //     );
+        //     b=false;
+        // }
     }
 }

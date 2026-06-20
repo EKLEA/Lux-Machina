@@ -160,7 +160,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         
         Pause.performed += OnPauseNormal;
         Escape.performed += OnPauseEscape;
-        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);//,attackZoneVisualizer
+        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer,attackZoneVisualizer);//
         menuSub = manager.pauseMenu.isOpened.Subscribe(value =>
         {
             if(value)
@@ -176,16 +176,12 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
         if (energyNode == null) energyNode = null; 
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
-        // 1. Логика координат (земля)
-        if (Physics.Raycast(ray, out hit, Mathf.Infinity,GroundMask))
-        {
-            isForce = ForceBuilding.IsPressed();
+        isForce = ForceBuilding.IsPressed();
             if(playerState == PlayerState.Destroy&&playerDeleteBuildingsSystem.DeleteType==DeleteType.DeleteBuilding)
             {
                 selectColor = isForce ? GameFieldSettings.forceDestoryBuidlingColor : GameFieldSettings.makeAsDemolitionBuidlingColor;
                 cachedBuilding?.SetOutLine(selectColor); 
             }
-        }
         if (Physics.Raycast(ray, out hit, Mathf.Infinity, EnergyNodeMask)&&playerState==PlayerState.Energy)
         {
             if(!(playerState==PlayerState.Building||playerState == PlayerState.Destroy&&playerDeleteBuildingsSystem.DeleteType!=DeleteType.DeleteBuilding))
@@ -254,7 +250,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     public void SetUpAction(string info)
     {
         
-        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer);//,attackZoneVisualizer
+        gridUpdateSystem.SetUpGrid(gridVisualizer,this,FlowFieldVisualizer,attackZoneVisualizer);//,attackZoneVisualizer
         ClearAction();
         if(info.Contains("Delete"))
         {

@@ -35,6 +35,8 @@ public struct BuildingTag : IComponentData{}
     public struct ForceDestroyTag: IComponentData, IEnableableComponent{}
     public struct CheckForDestroy: IComponentData, IEnableableComponent{}
     public struct MarkOnMap: IComponentData, IEnableableComponent{}
+
+
     public struct UpdateManyPoint: IComponentData, IEnableableComponent{}
     
    

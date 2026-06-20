@@ -6,6 +6,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
+using Unity.VisualScripting;
 using UnityEngine;
 
 [DisableAutoCreation]
@@ -73,7 +74,7 @@ public partial struct TurretSystem : ISystem
             [ChunkIndexInQuery] int chunkIndex,
             in BuildingData buildingData,
             in BuildingPosData posData,
-            in DynamicBuffer<StorageSlotData> storageSlots,
+            ref DynamicBuffer<StorageSlotData> storageSlots,
             ref TurretStats stats,
             ref TurretTranform trans)
         {
@@ -113,88 +114,152 @@ public partial struct TurretSystem : ISystem
             if (!targetFound)
                 return;
 
-
             float3 c = posData.center * turretGrid.CellSize;
             float3 turretPos = new float3(c.x, c.y, c.z);
 
-            float3 dir = bestTargetPos - turretPos;
+           float3 dir = bestTargetPos - turretPos; 
 
-
+            // 2. Рассчитываем желаемый угол (Yaw)
             float targetYaw = math.atan2(dir.x, dir.z);
 
-            targetYaw -= math.PI * 0.5f;
-
-            float diff = targetYaw - trans.baseRotation;
+            // Дальнейший код разворота остается прежним
+            float diff = targetYaw - trans.rotation.y;
             diff = math.atan2(math.sin(diff), math.cos(diff));
 
+            float maxRotationThisFrame = math.PI * DeltaTime; 
+            float step = math.clamp(diff, -maxRotationThisFrame, maxRotationThisFrame);
+            float newRotationY = trans.rotation.y + step;
+
+            float angleFromBase = newRotationY - trans.baseRotation;
+            angleFromBase = math.atan2(math.sin(angleFromBase), math.cos(angleFromBase));
+
             float halfAngle = math.radians(stats.Angle * 0.5f);
-            diff = math.clamp(diff, -halfAngle, halfAngle);
+            angleFromBase = math.clamp(angleFromBase, -halfAngle, halfAngle);
 
-            trans.rotation.y = trans.baseRotation + diff;
+            // Записываем финальный поворот
+            trans.rotation.y = trans.baseRotation + angleFromBase;
+            float finalRotationY = trans.rotation.y;
 
+            if (stats.CurrAmmo <= 0 && storageSlots.Length > 0)
+            {
+                for (int i = 0; i < storageSlots.Length; i++)
+                {
+                    var slot = storageSlots[i];
+                    if (slot.Amount > 0)
+                    {
+                        stats.AmmoID = slot.ItemId;
+                        if (itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
+                            stats.CurrAmmo = cfg.AmmoCount;
+                        else
+                            stats.CurrAmmo = 20; 
+                        
+                        slot.Amount -= 1;
+                        storageSlots[i] = slot;
+                        break;
+                    }
+                }
+            }
 
-            if (stats.TimeToCoolDown > 0)
+            if (stats.TimeToCoolDown > 0) return;
+
+            float finalDiff = targetYaw - finalRotationY;
+            finalDiff = math.atan2(math.sin(finalDiff), math.cos(finalDiff));
+
+            if (math.abs(finalDiff) > math.radians(5f))
                 return;
 
             if (stats.CurrAmmo > 0)
             {
+                // Проверяем буфер префабов сначала на ConfigEntity, затем на самой турели (entity)
+                Entity targetBufferEntity = Entity.Null;
+                if (ProjectilePrefabElementLookUp.HasBuffer(ConfigEntity))
+                    targetBufferEntity = ConfigEntity;
+                else if (ProjectilePrefabElementLookUp.HasBuffer(entity))
+                    targetBufferEntity = entity;
+
+                if (targetBufferEntity == Entity.Null)
+                    return;
+
+                var enemyPrefabs = ProjectilePrefabElementLookUp[targetBufferEntity];
+                if (enemyPrefabs.Length == 0)
+                    return;
+
+                Entity prefab = Entity.Null;
+
+                foreach (var p in enemyPrefabs)
+                {
+                    if (p.ID == stats.ProjectilePrefabID)
+                    {
+                        prefab = p.PrefabEntity;
+                        break;
+                    }
+                }
+
+                // ФОЛБЕК: Если конкретный ID префаба не найден, берем первый попавшийся из буфера
+                if (prefab == Entity.Null)
+                {
+                    prefab = enemyPrefabs[0].PrefabEntity;
+                }
+
+                if (prefab == Entity.Null)
+                    return;
+
+                float speed = 10f;
+                float damage = 10f;
+                float radius = 0.5f;
+
                 if (itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
                 {
-                    if (!ProjectilePrefabElementLookUp.HasBuffer(ConfigEntity))
-                        return;
-
-                    var enemyPrefabs = ProjectilePrefabElementLookUp[ConfigEntity];
-
-                    Entity prefab = Entity.Null;
-
-                    foreach (var p in enemyPrefabs)
-                    {
-                        if (p.ID == stats.ProjectilePrefabID)
-                        {
-                            prefab = p.PrefabEntity;
-                            break;
-                        }
-                    }
-
-                    if (prefab == Entity.Null)
-                        return;
-
-                    Entity proj = ECB.Instantiate(chunkIndex, prefab);
-
-                    bool isArt = stats.projectileType == ProjectileType.Arch;
-
-                    float dist = math.distance(turretPos, bestTargetPos);
-
-                    ECB.SetComponent(chunkIndex, proj, new ProjectileData
-                    {
-                        StartPos = trans.projectTyleSpawn,
-                        TargetPos = bestTargetPos,
-                        Speed = cfg.Speed,
-                        Damage = cfg.Damage,
-                        Radius = cfg.Radius,
-                        ArcHeight = isArt ? dist * 0.5f : 0f,
-                        Progress = 0
-                    });
-
-                    stats.TimeToCoolDown = stats.CoolDown;
-                    stats.CurrAmmo -= 1;
+                    speed = cfg.Speed;
+                    damage = cfg.Damage;
+                    radius = cfg.Radius;
                 }
-            }
-            else
-            {
-                if (storageSlots.Length > 0)
+
+               Entity proj = ECB.Instantiate(chunkIndex, prefab);
+                bool isArt = stats.projectileType == ProjectileType.Arch;
+                float dist = math.distance(turretPos, bestTargetPos);
+
+                // 1. Считаем вектор направления полёта пули
+                float3 projectileDir = bestTargetPos - trans.projectTyleSpawn;
+
+                if (!isArt) 
                 {
-                    var slot = storageSlots[0];
-
-                    stats.AmmoID = slot.ItemId;
-
-                    if (itemsConfigReference.ProjectileStructConfigs.Value.TryGetConfig(stats.AmmoID, out var cfg))
-                        stats.CurrAmmo = cfg.AmmoCount;
-                    else
-                        stats.CurrAmmo = 20;
+                    projectileDir.y = 0f; 
                 }
+
+                // 2. Вычисляем базовый поворот «лицом к цели»
+                quaternion baseRotation = math.lengthsq(projectileDir) > 0.001f 
+                    ? quaternion.LookRotation(math.normalize(projectileDir), math.up()) 
+                    : quaternion.identity;
+
+                // 3. ИСПРАВЛЕНО: Доворачиваем пулю на 90 градусов влево (против часовой стрелки)
+                quaternion finalProjectileRotation = math.mul(baseRotation, quaternion.RotateY(math.radians(-90f)));
+
+                // 4. Применяем итоговый поворот к LocalTransform
+                ECB.SetComponent(chunkIndex, proj, new LocalTransform
+                {
+                    Position = trans.projectTyleSpawn,
+                    Rotation = finalProjectileRotation,
+                    Scale = 1f
+                });
+                // 3. Заполняем ваши данные для логики полёта
+                ECB.SetComponent(chunkIndex, proj, new ProjectileData
+                {
+                    StartPos = trans.projectTyleSpawn,
+                    TargetPos = bestTargetPos,
+                    Speed = speed,
+                    Damage = damage,
+                    Radius = radius,
+                    ArcHeight = isArt ? dist * 0.5f : 0f,
+                    Progress = 0
+                });
+
+                stats.TimeToCoolDown = stats.CoolDown;
+                stats.CurrAmmo -= 1;
             }
         }
+
     }
+
 
 }

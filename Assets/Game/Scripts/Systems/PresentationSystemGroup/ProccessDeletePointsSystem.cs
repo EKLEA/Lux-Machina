@@ -57,7 +57,6 @@ public partial class ProccessDeletePointsSystem : SystemBase
             }
 
             Entity createDemolitonManyPointCommand = Entity.Null;
-            Debug.Log("Процесс  "+deleteData.isForce);
             if (!deleteData.isForce && demolitionList.Length > 0)
             {
                 createDemolitonManyPointCommand = ecb.CreateEntity();

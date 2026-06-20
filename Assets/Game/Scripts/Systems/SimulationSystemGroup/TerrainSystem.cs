@@ -161,7 +161,6 @@ public partial struct TerrainSystem : ISystem
                         {
                             int depth = (int)surfaceHeight - y;
                             
-                            // ТОЛЬКО ПОВЕРХНОСТЬ (верхний блок)
                             if (depth == 0)
                             {
                                 bool isStartingArea = dist < 70f;
@@ -169,11 +168,9 @@ public partial struct TerrainSystem : ISystem
 
                                 byte oreBlockID = 0;
                                 int oreAmount = 0;
-                                int resourceID = 0; // Для буфера ResourceElement
-
+                                int resourceID = 0;
                                 if (isFlatLowland) 
                                 {
-                                    // Проверяем руды и сразу сопоставляем ID ресурса
                                     if (CheckOre(worldXZ, World.Iron, World.Seed + 1, dist, out oreAmount, isStartingArea, 0)) { oreBlockID = 4; resourceID = 1; }
                                     else if (CheckOre(worldXZ, World.Copper, World.Seed + 2, dist, out oreAmount, isStartingArea, 1)) { oreBlockID = 5; resourceID = 2; }
                                     else if (CheckOre(worldXZ, World.Tin, World.Seed + 3, dist, out oreAmount, isStartingArea, 2)) { oreBlockID = 6; resourceID = 3; }
@@ -184,7 +181,6 @@ public partial struct TerrainSystem : ISystem
                                 if (oreBlockID != 0)
                                 {
                                     blockID = oreBlockID;
-                                    // Спавним данные для добычи только если это руда
                                     SpawnOre(new int3(x, y, z), resourceID, oreAmount, ref resBuffer); 
                                 }
                                 else 
@@ -195,18 +191,16 @@ public partial struct TerrainSystem : ISystem
                                     else blockID = 3; 
                                 }
                             }
-                            // ВСЁ ЧТО НИЖЕ (depth > 0) — только камень или земля
                             else if (depth < 3)
                             {
                                 blockID = (steepness > 0.7f) ? (byte)1 : (byte)2;
                             }
                             else 
                             {
-                                blockID = 1; // Глубинный камень
+                                blockID = 1; 
                             }
                         }
 
-                        // ВАЖНО: Твоя формула индекса X -> Y -> Z
                         int index = x + World.Size * (y + World.Height * z);
                         blocks[index] = new BlockElement { BlockID = blockID };
                     }

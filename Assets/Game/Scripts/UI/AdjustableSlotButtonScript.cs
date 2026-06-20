@@ -16,6 +16,7 @@ public class AdjustableSlotButtonScript :MonoBehaviour, IDisposable,IInitializab
     [SerializeField]  Button MainBT;
     [SerializeField]  Button CloseBT;
     [SerializeField]  Image icon;
+    [SerializeField]  Image BackGround;
     [SerializeField]  TextMeshProUGUI valueText;
     public event Action onSlotDeleted;
 
@@ -96,7 +97,7 @@ public class AdjustableSlotButtonScript :MonoBehaviour, IDisposable,IInitializab
                     slotData.IsInputEnabled.Value = true;
                     slotData.IsOutputEnabled.Value = true;
                 }
-                icon.color = new Color(0, 0.8f, 0, 0.5f);
+                BackGround.color = new Color(0, 0.8f, 0, 0.5f);
                 break;
             case 1:
                 if (userChange)
@@ -104,7 +105,7 @@ public class AdjustableSlotButtonScript :MonoBehaviour, IDisposable,IInitializab
                     slotData.IsInputEnabled.Value = true;
                     slotData.IsOutputEnabled.Value = false;
                 }
-                icon.color = new Color(1, 0.5647f, 0, 0.5f);
+                BackGround.color = new Color(1, 0.5647f, 0, 0.5f);
                 break;
             case 2:
                 if (userChange)
@@ -112,7 +113,7 @@ public class AdjustableSlotButtonScript :MonoBehaviour, IDisposable,IInitializab
                     slotData.IsInputEnabled.Value = false;
                     slotData.IsOutputEnabled.Value = true;
                 }
-                icon.color = new Color(0.1f, 0.11f, 0.7f, 0.5f);
+                BackGround.color = new Color(0.1f, 0.11f, 0.7f, 0.5f);
                 break;
             case 3: // Оба выключены
                 if (userChange)
@@ -120,7 +121,7 @@ public class AdjustableSlotButtonScript :MonoBehaviour, IDisposable,IInitializab
                     slotData.IsInputEnabled.Value = false;
                     slotData.IsOutputEnabled.Value = false;
                 }
-                icon.color = new Color(0, 0, 0, 0.5f);
+                BackGround.color = new Color(0, 0, 0, 0.5f);
                 break;
         }
     }

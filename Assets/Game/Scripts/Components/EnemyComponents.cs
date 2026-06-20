@@ -14,3 +14,8 @@ public struct EnemyPrefabElement : IBufferElementData
     public int ID;
     public Entity PrefabEntity;
 }
+public enum MovementType
+{
+    Ground,
+    Flying
+}

@@ -46,6 +46,9 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
     private MeshFilter _outlineMeshFilter;
     private MeshRenderer _outlineRenderer;
     private GameObject _outlineObj;
+        private readonly Matrix4x4[] _batchBuffer = new Matrix4x4[1023];
+    private const int BatchSize = 1023;
+
 
     void Awake()
     {
@@ -204,16 +207,36 @@ public class ManyPointsBuildingInstanced : BuildingOnScene
         RenderBatch(slopeMatrices, slopeMesh, layer);
     }
 
-    void RenderBatch(List<Matrix4x4> matrices, Mesh mesh, int layer)
+
+  private void RenderBatch(List<Matrix4x4> matrices, Mesh mesh, int layer)
     {
-        if (mesh == null || matrices.Count == 0 || material == null) return;
+        if (mesh == null || material == null) return;
+        
         int count = matrices.Count;
-        for (int i = 0; i < count; i += batchSize)
+        if (count == 0) return;
+
+        for (int i = 0; i < count; i += BatchSize)
         {
-            int length = Mathf.Min(batchSize, count - i);
-            var batch = matrices.GetRange(i, length).ToArray();
-            Graphics.DrawMeshInstanced(mesh, 0, material, batch, length, _instancedBlock, 
-                UnityEngine.Rendering.ShadowCastingMode.On, true, layer);
+            int length = Mathf.Min(BatchSize, count - i);
+            
+            // ОПТИМИЗАЦИЯ 2: Прямое быстрое копирование ссылок по индексу вместо тяжелого .GetRange().ToArray()
+            for (int j = 0; j < length; j++)
+            {
+                _batchBuffer[j] = matrices[i + j];
+            }
+
+            // Отрисовываем пачку, используя фиксированный буфер
+            Graphics.DrawMeshInstanced(
+                mesh, 
+                0, 
+                material, 
+                _batchBuffer, // Передаем постоянный массив
+                length,       // Указываем Unity, сколько именно элементов из него отрисовать
+                _instancedBlock, 
+                UnityEngine.Rendering.ShadowCastingMode.On, 
+                true, 
+                layer
+            );
         }
     }
 

@@ -41,202 +41,295 @@ public partial struct PathFindingSystem : ISystem
         state.Dependency = job.ScheduleParallel(state.Dependency);
     }
 
-[BurstCompile]
-[WithAll(typeof(PathfindingRequest))]
-public partial struct PathfindingParallelJob : IJobEntity
-{
-    [ReadOnly] public NativeParallelHashMap<int3, int> BuildingMap;
-    [ReadOnly] public ChunkMap ChunkMap;
-    [ReadOnly] public BufferLookup<BlockElement> BlockLookup;
-    [ReadOnly] public WorldSettings Settings;
 
-    private struct ChunkCache { public int2 Coords; public DynamicBuffer<BlockElement> Buffer; public bool IsValid; }
 
-    public void Execute(Entity entity, RefRW<PathfindingRequest> requestRef, EnabledRefRW<PathfindingRequest> requestEnabled, DynamicBuffer<MapPoint> pathBuffer)
+    [BurstCompile]
+    [WithAll(typeof(PathfindingRequest))]
+    public partial struct PathfindingParallelJob : IJobEntity
     {
-        var directionMap = new NativeParallelHashMap<int3, int3>(1024, Allocator.Temp);
-        var request = requestRef.ValueRO;
-        pathBuffer.Clear();
+        [ReadOnly] public NativeParallelHashMap<int3, int> BuildingMap;
+        [ReadOnly] public ChunkMap ChunkMap;
+        [ReadOnly] public BufferLookup<BlockElement> BlockLookup;
+        [ReadOnly] public WorldSettings Settings;
 
-        int3 startPos = new int3(
-            (int)math.floor(request.Start.x), 
-            (int)math.floor(request.Start.y + 0.1f), 
-            (int)math.floor(request.Start.z)
-        );
-        int3 endPos = request.End;
+        private struct ChunkCache { public int2 Coords; public DynamicBuffer<BlockElement> Buffer; public bool IsValid; }
+        
+        private struct Node 
+        { 
+            public int3 Position; 
+            public float GScore; 
+            public float HScore; 
+            public int3 Direction; 
+            public float FScore => GScore + HScore; 
+        }
 
-        ChunkCache cache = new ChunkCache { IsValid = false };
-        ChunkCache groundCache = new ChunkCache { IsValid = false };
-
-        var openSet = new NativeList<Node>(Allocator.Temp);
-        var closedSet = new NativeParallelHashSet<int3>(1024, Allocator.Temp);
-        var gScoreMap = new NativeParallelHashMap<int3, float>(1024, Allocator.Temp);
-        var cameFrom = new NativeParallelHashMap<int3, int3>(1024, Allocator.Temp);
-
-        // --- ПЕРЕМЕННЫЕ ДЛЯ ЛУЧШЕЙ ДОСТИЖИМОЙ ТОЧКИ ---
-        int3 bestReachedPos = startPos;
-        float minH = math.distance(math.float3(startPos), math.float3(endPos));
-        // ----------------------------------------------
-
-        openSet.Add(new Node { Position = startPos, GScore = 0, HScore = minH });
-        gScoreMap.TryAdd(startPos, 0f);
-
-        bool found = false;
-        int iterations = 0;
-
-        while (openSet.Length > 0 && iterations < 2000)
+        
+        private bool IsSolidBlock(int3 p, ref ChunkCache cache, int requestBuildingID)
         {
-            iterations++;
+            if (p.y < 0) return true;
+            if (p.y >= Settings.Height) return false;
+
             
-            int bestIdx = 0;
-            float minF = openSet[0].FScore;
-            for (int i = 1; i < openSet.Length; i++) {
-                if (openSet[i].FScore < minF) {
-                    minF = openSet[i].FScore;
-                    bestIdx = i;
+            if (BuildingMap.TryGetValue(p, out int existingBuildingID)) 
+            {
+                
+                if (existingBuildingID != requestBuildingID) return true;
+                return false; 
+            }
+
+            int cx = (int)math.floor((float)p.x / Settings.Size);
+            int cz = (int)math.floor((float)p.z / Settings.Size);
+            int2 cp = new int2(cx, cz);
+
+            if (!cache.IsValid || !cache.Coords.Equals(cp))
+            {
+                if (ChunkMap.ChunkMapData.TryGetValue(cp, out var e) && BlockLookup.HasBuffer(e))
+                {
+                    cache.Buffer = BlockLookup[e];
+                    cache.Coords = cp;
+                    cache.IsValid = true;
+                }
+                else return false; 
+            }
+            int lx = p.x % Settings.Size; if (lx < 0) lx += Settings.Size;
+            int lz = p.z % Settings.Size; if (lz < 0) lz += Settings.Size;
+            int index = lx + Settings.Size * (p.y + Settings.Height * lz);
+            
+            if (index < 0 || index >= cache.Buffer.Length) return false;
+            
+            return cache.Buffer[index].BlockID != 0; 
+        }
+
+        
+        private bool IsWalkableSpace(int3 p, ref ChunkCache cache, int requestBuildingID)
+        {
+            if (IsSolidBlock(p, ref cache, requestBuildingID)) return false;
+            if (IsSolidBlock(p + new int3(0, 1, 0), ref cache, requestBuildingID)) return false;
+            if (!IsSolidBlock(p + new int3(0, -1, 0), ref cache, requestBuildingID)) return false;
+
+            return true;
+        }
+
+        public void Execute(Entity entity, RefRW<PathfindingRequest> requestRef, EnabledRefRW<PathfindingRequest> requestEnabled, DynamicBuffer<MapPoint> pathBuffer)
+        {
+            var request = requestRef.ValueRO;
+            pathBuffer.Clear();
+
+            int3 startPos = new int3(
+                (int)math.floor(request.Start.x), 
+                (int)math.floor(request.Start.y + 0.1f), 
+                (int)math.floor(request.Start.z)
+            );
+            int3 endPos = request.End;
+
+            ChunkCache cache = new ChunkCache { IsValid = false };
+
+            
+            if (IsSolidBlock(endPos, ref cache, request.BuildingID))
+            {
+                int3 alternateEnd = endPos;
+                float closestDist = float.MaxValue;
+                bool foundValidNeighbor = false;
+
+                var checkDirs = new NativeArray<int3>(4, Allocator.Temp);
+                checkDirs[0] = new int3(1, 0, 0);
+                checkDirs[1] = new int3(-1, 0, 0);
+                checkDirs[2] = new int3(0, 0, 1);
+                checkDirs[3] = new int3(0, 0, -1);
+
+                for (int i = 0; i < checkDirs.Length; i++)
+                {
+                    int3 neighbor = endPos + checkDirs[i];
+                    
+                    if (IsWalkableSpace(neighbor, ref cache, request.BuildingID))
+                    {
+                        float d = math.distance(math.float3(startPos), math.float3(neighbor));
+                        if (d < closestDist)
+                        {
+                            closestDist = d;
+                            alternateEnd = neighbor;
+                            foundValidNeighbor = true;
+                        }
+                    }
+                }
+                checkDirs.Dispose();
+                if (foundValidNeighbor)
+                {
+                    endPos = alternateEnd;
+                }
+                else
+                {
+                    requestEnabled.ValueRW = false;
+                    return;
                 }
             }
 
-            var current = openSet[bestIdx];
-            openSet.RemoveAtSwapBack(bestIdx);
-
-            // Обновляем "лучшую" точку, если эта нода ближе к цели, чем предыдущие
-            if (current.HScore < minH)
+            if (math.all(startPos == endPos))
             {
-                minH = current.HScore;
-                bestReachedPos = current.Position;
+                requestEnabled.ValueRW = false;
+                return;
             }
 
-            if (current.Position.Equals(endPos)) { 
-                found = true; 
-                bestReachedPos = current.Position; // Точно дошли
-                break; 
-            }
+            var openSet = new NativeList<Node>(Allocator.Temp);
+            var closedSet = new NativeParallelHashSet<int3>(1024, Allocator.Temp);
+            var gScoreMap = new NativeParallelHashMap<int3, float>(1024, Allocator.Temp);
+            var cameFrom = new NativeParallelHashMap<int3, int3>(1024, Allocator.Temp);
 
-            if (!closedSet.Add(current.Position)) continue;
+            float startH = math.distance(math.float3(startPos), math.float3(endPos)) * 0.5f;
+            openSet.Add(new Node { Position = startPos, GScore = 0, HScore = startH, Direction = new int3(0,0,0) });
+            gScoreMap.TryAdd(startPos, 0f);
 
-                for (int i = 0; i < directions.Length; i++)
+            bool found = false;
+            int iterations = 0;
+
+            var dirs = new NativeArray<int3>(12, Allocator.Temp);
+            dirs[0] = new int3(1,0,0);  dirs[1] = new int3(-1,0,0); dirs[2] = new int3(0,0,1);  dirs[3] = new int3(0,0,-1);
+            dirs[4] = new int3(1,1,0);  dirs[5] = new int3(-1,1,0); dirs[6] = new int3(0,1,1);  dirs[7] = new int3(0,1,-1);
+            dirs[8] = new int3(1,-1,0); dirs[9] = new int3(-1,-1,0);dirs[10] = new int3(0,-1,1); dirs[11] = new int3(0,-1,-1);
+
+            while (openSet.Length > 0 && iterations < 2000)
             {
-                int3 neighbor = current.Position + directions[i];
-                if (closedSet.Contains(neighbor)) continue;
-
-                if (IsPhysicallyBlocked(neighbor, ref cache)) continue;
-
-                int3 under = neighbor + new int3(0, -1, 0);
-                bool hasGround = IsSolidBlock(under, ref groundCache) || IsSolidBlock(under + new int3(0, -1, 0), ref groundCache);
-                if (!hasGround) continue;
-
-                  float cost = math.distance(math.float3(current.Position), math.float3(neighbor));
+                iterations++;
                 
-                // Штраф за поворот (увеличиваем до 10, чтобы диагональ была очень дорогой)
-                if (request.straigh) 
+                int bestIdx = 0;
+                float minF = openSet[bestIdx].FScore;
+                for (int i = 1; i < openSet.Length; i++)
                 {
-                    if (directionMap.TryGetValue(current.Position, out int3 prevDir))
+                    if (openSet[i].FScore < minF)
                     {
-                        int3 currentDir = neighbor - current.Position;
-                        if (!currentDir.Equals(prevDir)) cost += 10.0f; 
+                        minF = openSet[i].FScore;
+                        bestIdx = i;
                     }
                 }
 
-                // Твоя логика SamePerfer (со штрафом/бонусом)
-                bool isSameBuilding = BuildingMap.ContainsKey(neighbor) || BuildingMap.ContainsKey(under);
-                if (isSameBuilding) cost += request.SamePerfer ? -0.9f : 50.0f;
+                Node current = openSet[bestIdx];
 
-                float newG = current.GScore + cost;
-
-                if (!gScoreMap.TryGetValue(neighbor, out float oldG) || newG < oldG)
+                if (math.all(current.Position == endPos))
                 {
-                    // --- 2. ИЗМЕНЕННАЯ ЭВРИСТИКА (H) ---
-                    float h;
-                    if (request.straigh)
+                    found = true;
+                    break;
+                }
+
+                openSet.RemoveAtSwapBack(bestIdx);
+                closedSet.Add(current.Position);
+
+                for (int i = 0; i < dirs.Length; i++)
+                {
+                    if (request.straigh && i > 3) continue;
+
+                    int3 neighborPos = current.Position + dirs[i];
+
+                    if (closedSet.Contains(neighborPos)) continue;
+                    
+                    
+                    if (!IsWalkableSpace(neighborPos, ref cache, request.BuildingID)) continue;
+
+                    if (dirs[i].y != 0)
                     {
-                        // Используем Манхэттенское расстояние: путь по сетке всегда будет иметь одинаковый H
-                        int3 diff = math.abs(neighbor - endPos);
-                        h = (diff.x + diff.y + diff.z) * 1.01f; // небольшой множитель для стабильности
+                        int3 overhead = current.Position + new int3(0, 2, 0);
+                        if (IsSolidBlock(overhead, ref cache, request.BuildingID)) continue;
+                    }
+
+                    float cellCostMultiplier = 1.0f;
+
+                    if (BuildingMap.TryGetValue(neighborPos, out int existingBuildingID))
+                    {
+                        if (existingBuildingID == request.BuildingID)
+                        {
+                            
+                            
+                            cellCostMultiplier = request.SamePerfer ? 0.2f : 3.0f; 
+                        }
+                        else
+                        {
+                            
+                            cellCostMultiplier = 5.0f; 
+                        }
                     }
                     else
                     {
-                        h = math.distance(math.float3(neighbor), math.float3(endPos));
+                        
+                        
+                        
+                        cellCostMultiplier = request.SamePerfer ? 1.5f : 0.8f;
                     }
 
-                    gScoreMap[neighbor] = newG;
-                    cameFrom[neighbor] = current.Position;
-                    directionMap[neighbor] = neighbor - current.Position;
+                    float baseStepCost = (dirs[i].y != 0) ? 1.41f : 1.0f;
+                    float stepCost = baseStepCost * cellCostMultiplier;
+                                        
+                    bool isChangingDirection = math.any(current.Direction != 0) && !math.all(current.Direction == dirs[i]);
 
-                    openSet.Add(new Node { 
-                        Position = neighbor, 
-                        GScore = newG, 
-                        HScore = h 
-                    });
+                    if (request.straigh) 
+                    {
+                        if (isChangingDirection)
+                        {
+                            stepCost += 15.0f; 
+                        }
+                    }
+                    else
+                    {
+                        
+                        
+                        if (!isChangingDirection)
+                        {
+                            
+                            float snakePattern = math.sin(neighborPos.x * 1.2f) * math.cos(neighborPos.z * 1.2f);
+                            stepCost += 0.3f + math.abs(snakePattern) * 0.8f; 
+                        }
+                        else
+                        {
+                            
+                            stepCost += 0.1f; 
+                        }
+                    }
+
+                    float tentativeG = current.GScore + stepCost;
+
+                    if (!gScoreMap.TryGetValue(neighborPos, out float oldG) || tentativeG < oldG)
+                    {
+                        cameFrom[neighborPos] = current.Position;
+                        gScoreMap[neighborPos] = tentativeG;
+
+                        float h = math.distance(math.float3(neighborPos), math.float3(endPos)) * 0.5f;
+                        
+                        Node neighborNode = new Node { Position = neighborPos, GScore = tentativeG, HScore = h, Direction = dirs[i] };
+
+                        bool inOpenSet = false;
+                        for (int j = 0; j < openSet.Length; j++)
+                        {
+                            if (math.all(openSet[j].Position == neighborPos))
+                            {
+                                openSet[j] = neighborNode;
+                                inOpenSet = true;
+                                break;
+                            }
+                        }
+
+                        if (!inOpenSet) openSet.Add(neighborNode);
+                    }
                 }
             }
-        }
 
-        // --- ВОССТАНОВЛЕНИЕ ПУТИ ---
-        // Если нашли цель — строим до цели. Если нет — строим до bestReachedPos.
-        int3 curr = bestReachedPos; 
-        
-        // Предотвращаем бесконечный цикл, если путь не был найден даже на один шаг
-        if (!curr.Equals(startPos) || found) 
-        {
-            while (!curr.Equals(startPos)) {
-                pathBuffer.Add(new MapPoint { pos = curr });
-                if (!cameFrom.TryGetValue(curr, out curr)) break;
-            }
-            pathBuffer.Add(new MapPoint { pos = startPos });
-        }
-        
-        requestEnabled.ValueRW = false;
-    }
-
-    private bool IsSolidBlock(int3 p, ref ChunkCache cache)
-    {
-        // 1. Границы мира
-        if (p.y < 0) return true; // Считаем, что под миром твердь
-        if (p.y >= Settings.Height) return false;
-
-        // 2. Координаты чанка (используем math.floor для отрицательных координат)
-        int cx = (int)math.floor((float)p.x / Settings.Size);
-        int cz = (int)math.floor((float)p.z / Settings.Size);
-        int2 cp = new int2(cx, cz);
-
-        if (!cache.IsValid || !cache.Coords.Equals(cp))
-        {
-            if (ChunkMap.ChunkMapData.TryGetValue(cp, out var e) && BlockLookup.HasBuffer(e))
+            if (found)
             {
-                cache.Buffer = BlockLookup[e];
-                cache.Coords = cp;
-                cache.IsValid = true;
+                int3 curr = endPos;
+                var tempPath = new NativeList<MapPoint>(Allocator.Temp);
+                
+                while (!math.all(curr == startPos))
+                {
+                    tempPath.Add(new MapPoint { pos = math.int3(curr) });
+                    curr = cameFrom[curr];
+                }
+                tempPath.Add(new MapPoint { pos = math.int3(startPos) });
+
+                for (int i = tempPath.Length - 1; i >= 0; i--)
+                {
+                    pathBuffer.Add(tempPath[i]);
+                }
             }
-            else return false; 
+            dirs.Dispose(); 
+            requestEnabled.ValueRW = false;
         }
-
-        // 3. Локальные координаты внутри чанка (безопасно для отрицательных чисел)
-        int lx = p.x % Settings.Size; if (lx < 0) lx += Settings.Size;
-        int lz = p.z % Settings.Size; if (lz < 0) lz += Settings.Size;
-
-        // 4. ФОРМУЛА ИНДЕКСА (взята из твоего генератора)
-        // ГЕНЕРАТОР: x + World.Size * (y + World.Height * z)
-        int index = lx + Settings.Size * (p.y + Settings.Height * lz);
-        
-        if (index < 0 || index >= cache.Buffer.Length) return false;
-        
-        return cache.Buffer[index].BlockID != 0; 
     }
-
-    private bool IsPhysicallyBlocked(int3 p, ref ChunkCache cache)
-    {
-        // Проверка, что сама клетка, куда мы хотим наступить — это воздух
-        return IsSolidBlock(p, ref cache);
-    }
-    // Убрал сильные перепады высот из направлений, чтобы он не прыгал через блоки
-    static readonly int3[] directions = {
-        new int3(1,0,0), new int3(-1,0,0), new int3(0,0,1), new int3(0,0,-1), // Прямые
-        new int3(1,1,0), new int3(-1,1,0), new int3(0,1,1), new int3(0,1,-1), // Ступеньки вверх
-        new int3(1,-1,0), new int3(-1,-1,0), new int3(0,-1,1), new int3(0,-1,-1) // Ступеньки вниз
-    };
-
-    struct Node { public int3 Position; public float GScore; public float HScore; public float FScore => GScore + HScore; }
-}
 
 }

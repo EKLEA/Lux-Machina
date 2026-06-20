@@ -94,8 +94,9 @@ public partial class PlayerPlaceManyPointSystem : SystemBase
                 
                 if(_pos!=_cachedPos||_cachedRot!=_placeManyPointPlayerData.rotation||updateDraw)
                 {
+                    Debug.Log("dssddssd");
                     _cachedRot=_placeManyPointPlayerData.rotation;
-                    ecb.SetComponent(playerCommand,new PathfindingRequest{BuildingID=_buildingID,Start=new int3(_firstPos.x,_firstPos.y,_firstPos.z),End=new int3(_pos.x,_pos.y,_pos.z),SamePerfer= _cachedRot%2==0,straigh=_isStraight});
+                    ecb.SetComponent(playerCommand,new PathfindingRequest{BuildingID=_buildingID,Start=new int3(_firstPos.x,_firstPos.y,_firstPos.z),End=new int3(_pos.x,_pos.y,_pos.z),SamePerfer= _placeManyPointPlayerData.rotation%2==0,straigh=_isStraight});
                     ecb.SetComponentEnabled<PathfindingRequest>(playerCommand,true);
                     _cachedPos=_pos;
                 }

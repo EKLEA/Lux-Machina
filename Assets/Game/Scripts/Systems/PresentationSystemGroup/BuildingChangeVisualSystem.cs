@@ -24,29 +24,30 @@ public partial class BuildingChangeVisualSystem : SystemBase
         Entity mapEntity = SystemAPI.GetSingletonEntity<BuildingMap>();
         EntitiesDictionary entitiesDictionary = SystemAPI.GetSingleton<EntitiesDictionary>();
 
-       foreach (var (turretData, reference) in SystemAPI.Query<RefRW<TurretTranform>, BuildingOnSceneReference>())
-        { 
-            if (!(reference.buildingOnScene is TurretOnScene view)) continue;
-            if (view == null || view.TurretHead == null || view.TurretBarrel == null) continue;
+      foreach (var (turretData, reference) in SystemAPI.Query<RefRW<TurretTranform>, BuildingOnSceneReference>())
+    { 
+        if (!(reference.buildingOnScene is TurretOnScene view)) continue;
+        if (view == null || view.TurretHead == null || view.TurretBarrel == null) continue;
 
-            float deltaTime = SystemAPI.Time.DeltaTime;
-            float lerpSpeed = 10f;
+        float deltaTime = SystemAPI.Time.DeltaTime;
+        float lerpSpeed = 10f;
 
-            view.TurretHead.localRotation = math.slerp(
-                view.TurretHead.localRotation,
-                quaternion.Euler(0, turretData.ValueRO.rotation.y, 0),
-                deltaTime * lerpSpeed
-            );
+        // Изменяем смещение на math.PI (180 градусов), чтобы развернуть пушку вслед за зоной
+        view.TurretHead.localRotation = math.slerp(
+            view.TurretHead.localRotation,
+            quaternion.Euler(0, turretData.ValueRO.rotation.y + math.PI*1.5f, 0), 
+            deltaTime * lerpSpeed
+        );
 
-            view.TurretBarrel.localRotation = math.slerp(
-                view.TurretBarrel.localRotation,
-                quaternion.Euler(turretData.ValueRO.rotation.x, 0, 0),
-                deltaTime * lerpSpeed
-                
-            );
-            turretData.ValueRW.projectTyleSpawn=view.TurretSpawn[0].position;
-        }
-                foreach (var (reference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ChangeBluePrintState>().WithDisabled<ForceDestroyTag>().WithEntityAccess())
+        view.TurretBarrel.localRotation = math.slerp(
+            view.TurretBarrel.localRotation,
+            quaternion.Euler(turretData.ValueRO.rotation.x, 0, 0),
+            deltaTime * lerpSpeed
+        );
+
+        turretData.ValueRW.projectTyleSpawn = view.TurretSpawn[0].position;
+    }
+        foreach (var (reference,entity) in SystemAPI.Query<BuildingOnSceneReference>().WithAll<ChangeBluePrintState>().WithDisabled<ForceDestroyTag>().WithEntityAccess())
         {
             ChangeBluePrintState(reference,entity,ecb);
             ecb.SetComponentEnabled<UpdateClusterSlots>(mapEntity,true);
@@ -166,7 +167,7 @@ public partial class BuildingChangeVisualSystem : SystemBase
                 {
                     for(int y = 0; y< buildingPosData.size.y;y++)
                     {
-                        for(int z = 0; y< buildingPosData.size.z;z++)
+                        for(int z = 0; z< buildingPosData.size.z;z++)
                         {
                             var pos =buildingPosData.LeftCornerPos+new int3(x,y,z);
                             if(MapData.IsBluePrintOrDemolitionPoints.ContainsKey(pos))

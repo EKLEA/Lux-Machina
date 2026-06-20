@@ -143,6 +143,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 99d6e782ee528ee40821bd4208833d1a, type: 2}
+    - target: {fileID: -7511558181221131132, guid: 298bc7872112c124b858b2f61261dee4, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 76c6bb98a43e1234d816d84e56220ba3, type: 2}
     - target: {fileID: 919132149155446097, guid: 298bc7872112c124b858b2f61261dee4, type: 3}
       propertyPath: m_Name
       value: Smelter 3x3 (1)

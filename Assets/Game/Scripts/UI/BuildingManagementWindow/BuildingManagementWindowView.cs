@@ -38,6 +38,7 @@ public class BuildingManagementWindowView:DragableUIWindow
     [SerializeField] Transform InputSlotsHolder;
     [SerializeField] Transform OutputSlotsHolder;
     [SerializeField] Image RecipeSprite;
+    [SerializeField] Color BaseRecipeSpriteColor;
     [SerializeField] Transform RecipeIndicator;
     [SerializeField] TextMeshProUGUI RecipeName;
     [SerializeField] SlotView[] InputSlots;
@@ -266,6 +267,7 @@ public class BuildingManagementWindowView:DragableUIWindow
                 RecipeIndicator.gameObject.SetActive(true);
                 RecipeName.text=recipeInfo.RecipeInfos[recipeViewData.Item2.recipeIDHash].title;
                 RecipeSprite.sprite=recipeInfo.GetRecipeSprite(recipeViewData.Item2.recipeIDHash);
+                RecipeSprite.color=Color.white;
                 ProgressBar.gameObject.SetActive(true);
                 recipeViewData.Item2.CurrTime.Subscribe((value) =>
                 {
@@ -513,6 +515,7 @@ public class BuildingManagementWindowView:DragableUIWindow
         RecipesAndItemsHead.Close();
         ChangeRecipeBT.onClick.RemoveAllListeners();
         RecipeHead.gameObject.SetActive(false);
+        RecipeSprite.color=BaseRecipeSpriteColor;
         CraftSlotsHead.gameObject.SetActive(false);
         ProgressBar.gameObject.SetActive(false);
         InputSlotsHolder.gameObject.SetActive(false);

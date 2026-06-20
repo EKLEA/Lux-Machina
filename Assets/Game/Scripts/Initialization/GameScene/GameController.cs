@@ -198,20 +198,16 @@ public class GameController : IInitializable
             CellDirections=new(1000,Allocator.Persistent),
             CorePos=gameStateData.CorePos
         });
-        World.EntityManager.AddComponentData(Map,new SpawnMobsData
-        {
-            CountOfCicle=0,
-        });
+       
         World.EntityManager.AddComponentData(Map,new TurretGrid
         {
-            EnemyGridMap=new(1000,Allocator.Persistent),
-            EnemyToTurret=new(1000,Allocator.Persistent),
-            TurretGridClaim=new(1000,Allocator.Persistent),
-            EnemyInCellsMap=new(1000,Allocator.Persistent),
+            EnemyGridMap=new(5000,Allocator.Persistent),
+            EnemyToTurret=new(5000,Allocator.Persistent),
+            TurretGridClaim=new(5000,Allocator.Persistent),
+            EnemyInCellsMap=new(5000,Allocator.Persistent),
             CellSize=gameFieldSettings.cellSize
         });
         World.EntityManager.AddBuffer<SpawnPointElement>(Map);
-        World.EntityManager.SetComponentEnabled<SpawnMobsData>(Map,false);
 
 
 
@@ -241,14 +237,22 @@ public class GameController : IInitializable
         World.EntityManager.SetComponentEnabled<UpdateClustersTag>(Map,false);
         World.EntityManager.SetComponentEnabled<UpdateClusterSlots>(Map,false);
         World.EntityManager.SetComponentEnabled<UpdateConnectionsTag>(Map,false);
-         World.EntityManager.AddComponentData(Map, new WorldTime
+        var tData=new WorldTime
         {
             CurrentTick=gameStateData.CurrTick,
-            TicksPerDay=12000,//12000
+            TicksPerDay=400,//12000
             SpeedMultiplier=1,
             baseTick=0.05f,
             dayLength=0.7f
+        };
+         World.EntityManager.AddComponentData(Map, tData);
+         World.EntityManager.AddComponentData(Map,new SpawnMobsData
+        {
+            CountOfCicle=tData.CurrentDay,
+            pointsToSpawnMobs=800,
         });
+        
+        World.EntityManager.SetComponentEnabled<SpawnMobsData>(Map,false);
          World.EntityManager.AddComponentData(Map, new ChunkMap
         {
             ChunkMapData=new(50000,Allocator.Persistent),
@@ -305,7 +309,7 @@ public class GameController : IInitializable
         
         World.EntityManager.AddComponentData(Map,new PlayerData{});
         World.EntityManager.AddComponentData(Map,new PlayerRayCastData{});
-        int range=55;
+        int range=5;
         for (int x = -range; x <= range; x++)
         {
             for (int y = -range; y <= range; y++)
