@@ -240,7 +240,7 @@ public partial struct TurretSystem : ISystem
                 {
                     Position = trans.projectTyleSpawn,
                     Rotation = finalProjectileRotation,
-                    Scale = 1f
+                    Scale = 0.35f
                 });
                 // 3. Заполняем ваши данные для логики полёта
                 ECB.SetComponent(chunkIndex, proj, new ProjectileData

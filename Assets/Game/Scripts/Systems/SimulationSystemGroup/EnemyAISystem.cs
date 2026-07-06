@@ -371,7 +371,7 @@ public struct EvaluateSpawnZonesParallelJob : IJobParallelFor
 
         
         
-        if (currentWeight > 17f || currentWeight < 0.5f) return; 
+        if (currentWeight < 25f) return;
 
         
         if (!IsFlyingEnemy)
@@ -386,63 +386,58 @@ public struct EvaluateSpawnZonesParallelJob : IJobParallelFor
 
         
        
-       if (FlowDirections.TryGetValue(centerPos, out float3 moveDir) && math.lengthsq(moveDir) > 0.001f)
-{
-    float3 awayDir = -math.normalize(moveDir);
-    const int STRICT_CHECK_DIST = 25; 
-    bool trappedInsideBase = false;
-
-    for (int stepIdx = 1; stepIdx <= STRICT_CHECK_DIST; stepIdx++)
-    {
-        int3 checkPos = (int3)math.floor((float3)centerPos + awayDir * stepIdx);
-
-        
-        if (IsBlocked(checkPos))
+      if (FlowDirections.TryGetValue(centerPos, out float3 moveDir) && math.lengthsq(moveDir) > 0.001f)
         {
-            trappedInsideBase = true;
-            break;
-        }
+            float3 awayDir = -math.normalize(moveDir);
+            const int STRICT_CHECK_DIST = 25; 
+            bool trappedInsideBase = false;
 
-        
-        if (WeightsMap.TryGetValue(checkPos, out float outerWeight))
-        {
-            
-            if (outerWeight >= 16.0f)
+            for (int stepIdx = 1; stepIdx <= STRICT_CHECK_DIST; stepIdx++)
             {
-                trappedInsideBase = true;
-                break;
+                int3 checkPos = (int3)math.floor((float3)centerPos + awayDir * stepIdx);
+
+                if (IsBlocked(checkPos))
+                {
+                    trappedInsideBase = true;
+                    break;
+                }
+
+                if (WeightsMap.TryGetValue(checkPos, out float outerWeight))
+                {
+                    // ИСПРАВЛЕНО: Маленький вес означает, что луч прилетел обратно на базу
+                    // Замените 5.0f на минимально допустимый вес "чистого поля" за стенами
+                    if (outerWeight <= 5.0f) 
+                    {
+                        trappedInsideBase = true;
+                        break;
+                    }
+                }
+
+                if (FlowDirections.TryGetValue(checkPos, out float3 outerDir) && math.lengthsq(outerDir) > 0.001f)
+                {
+                    if (math.dot(math.normalize(outerDir), awayDir) < -0.5f)
+                    {
+                        trappedInsideBase = true;
+                        break;
+                    }
+                }
             }
+
+            // ИСПРАВЛЕНО: Проверка находится строго после завершения цикла for
+            if (trappedInsideBase) return;
         }
 
+
         
-        if (FlowDirections.TryGetValue(checkPos, out float3 outerDir) && math.lengthsq(outerDir) > 0.001f)
-        {
-            
-            
-            if (math.dot(math.normalize(outerDir), awayDir) < -0.5f)
+        float spawnScore = currentWeight; 
+            if (spawnScore > 0.5f)
             {
-                trappedInsideBase = true;
-                break;
+                ResultPoints.AddNoResize(new SpawnPointElement
+                { 
+                    Position = centerPos, 
+                    Weight = spawnScore 
+                });
             }
-        }
-    }
-
-    
-    if (trappedInsideBase) return;
-}
-
-
-        
-        float spawnScore = 21f - currentWeight; 
-
-        if (spawnScore > 0.5f)
-        {
-            ResultPoints.AddNoResize(new SpawnPointElement
-            { 
-                Position = centerPos, 
-                Weight = spawnScore 
-            });
-        }
     }
 
     bool IsBlocked(int3 worldPos)
@@ -491,90 +486,78 @@ public struct ClearMultiHashMapsJob : IJob
     }
 }
 
-
 [BurstCompile]
 [WithDisabled(typeof(LoadInfo))]
 public partial struct EnemyLogicJob : IJobEntity
 {
     [ReadOnly] public NativeParallelHashMap<int3, float3> FlowDirections;
     [ReadOnly] public NativeParallelHashMap<int3, Entity> CellEntities;
-
     [ReadOnly] public NativeParallelMultiHashMap<int3, int> TurretCells;
-
     [ReadOnly] public BufferLookup<TakeDamage> DamageLookUp;
     [ReadOnly] public ComponentLookup<CheckForDestroy> CheckForDestroyLookUp;
     [ReadOnly] public NativeParallelHashMap<int3, bool> IsBluePrintOrDemolition;
-     [ReadOnly] public ChunkMap ChunkMap;
+    [ReadOnly] public ChunkMap ChunkMap;
     [ReadOnly] public BufferLookup<BlockElement> BlockLookup;
     [ReadOnly] public WorldSettings Settings;
-    public EntityCommandBuffer.ParallelWriter ECB;   
+    public EntityCommandBuffer.ParallelWriter ECB; 
     public NativeParallelMultiHashMap<int, Entity>.ParallelWriter TurretTargets;
     public NativeParallelMultiHashMap<Entity, int>.ParallelWriter TargetsToTurrets;
-    
     public NativeParallelMultiHashMap<int3, Entity>.ParallelWriter EnemyInCellsMap;
-     
     public float DeltaTime;
     public float ElapsedTime;
+
     float GetGroundHeight(float3 position)
     {
         int3 cell = (int3)math.floor(position);
-        
-        
         for (int y = cell.y; y >= 0; y--)
         {
             if (IsBlocked(new int3(cell.x, y, cell.z)))
             {
-                
                 return (float)(y + 1); 
             }
         }
         return 0f; 
     }
+
     bool IsBlocked(int3 worldPos)
     {
         if (worldPos.y < 0 || worldPos.y >= Settings.Height)
             return true; 
-
         int2 chunkPos = new int2(
             (int)math.floor((float)worldPos.x / Settings.Size),
             (int)math.floor((float)worldPos.z / Settings.Size)
         );
-
         if (!ChunkMap.ChunkMapData.TryGetValue(chunkPos, out var chunkEntity))
             return true; 
-
         if (!BlockLookup.HasBuffer(chunkEntity))
             return true;
-
         var buffer = BlockLookup[chunkEntity];
-
-        
         int3 local = new int3(
             worldPos.x - chunkPos.x * Settings.Size,
             worldPos.y,
             worldPos.z - chunkPos.y * Settings.Size
         );
-
         if (local.x < 0 || local.z < 0 || local.x >= Settings.Size || local.z >= Settings.Size)
             return true;
-
         int index = local.x + Settings.Size * (local.y + Settings.Height * local.z);
-
         if (index < 0 || index >= buffer.Length)
             return true;
-
         return buffer[index].BlockID != 0;
     }
-    public void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndex, ref LocalTransform transform, ref EnemyStats stats)
+
+    // ДОБАВИЛИ: ref-параметры анимации прямо в метод Execute
+    public void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndex, 
+        ref LocalTransform transform, 
+        ref EnemyStats stats,
+        ref VatTimeComponent vatTime,
+        ref VatOffsetComponent vatOffset,
+        ref UnitAnimationState animState)
     {
         float3 currentPos = transform.Position;
-        
-        
         if (math.isnan(currentPos.x) || math.isinf(currentPos.x)) return;
-
         int3 cellPos = (int3)math.floor(currentPos);
         EnemyInCellsMap.Add(cellPos, entity);
-
+        
         if (TurretCells.TryGetFirstValue(cellPos, out int turretIndex, out var it))
         {
             do
@@ -584,18 +567,22 @@ public partial struct EnemyLogicJob : IJobEntity
             } 
             while (TurretCells.TryGetNextValue(out turretIndex, ref it));
         }
-        
-        
+
+        // ПЕРЕМЕННЫЕ ДЛЯ ОПРЕДЕЛЕНИЯ ТЕКУЩЕГО СОСТОЯНИЯ В ЭТОМ КАДРЕ
+        float targetOffset = animState.CurrentStateOffset;
+        float targetDuration = animState.CurrentClipDuration;
+        float targetAnimSpeed = animState.Speed;
+
+        bool hasMoved = false;
+        bool isAttacking = false;
         
         if (FlowDirections.TryGetValue(cellPos, out float3 moveDir) && math.lengthsq(moveDir) > 0.001f)
         {
-            int3 nextCell = (int3)math.floor(currentPos + moveDir * 0.5f); 
-
+           int3 nextCell = (int3)math.floor(currentPos + moveDir * 1.3f); 
             if (CellEntities.TryGetValue(nextCell, out Entity targetBuilding))
             {
                 bool isBlueprint = IsBluePrintOrDemolition.ContainsKey(nextCell) && IsBluePrintOrDemolition[nextCell];
-
-              if (!isBlueprint) 
+                if (!isBlueprint) 
                 {
                     if (ElapsedTime > stats.LastAttackTime + stats.AttackInterval)
                     {
@@ -606,23 +593,31 @@ public partial struct EnemyLogicJob : IJobEntity
                         stats.LastAttackTime = ElapsedTime;
                     }
                     
-                    
+                    isAttacking = true; 
+
+                    // ИСПРАВЛЕНО: Разворачиваем паука лицом к зданию, не ломая вертикальную ось
                     float3 flatMoveDir = moveDir;
                     flatMoveDir.y = 0f; 
-                    
                     if (math.lengthsq(flatMoveDir) > 0.001f)
                     {
-                        transform.Rotation = quaternion.LookRotation(math.normalize(flatMoveDir), math.up());
+                        quaternion targetLook = quaternion.LookRotation(math.normalize(flatMoveDir), math.up());
+                        transform.Rotation = targetLook;
                     }
+                    
+                    ApplyAnimationState(isAttacking, hasMoved, ref targetOffset, ref targetDuration, ref targetAnimSpeed);
+                    UpdateVatPlayback(ref vatTime, ref vatOffset, targetOffset, targetDuration, targetAnimSpeed);
+                    
+                    // Важно: так как сработал return, паук застынет на месте и не пойдет дальше внутрь стены
                     return; 
                 }
             }
-
+            
+            // Обычное движение вперед
+            hasMoved = true;
             float pseudoRandom = math.sin(entity.Index + ElapsedTime) * 0.1f;
             float3 sideDir = new float3(-moveDir.z, 0f, moveDir.x) * pseudoRandom;
             float3 finalMove = moveDir + sideDir;
 
-            
             if (math.lengthsq(finalMove) > 0.001f)
             {
                 finalMove = math.normalize(finalMove);
@@ -633,27 +628,48 @@ public partial struct EnemyLogicJob : IJobEntity
             }
 
             float3 nextPosition = transform.Position + (finalMove * stats.Speed * DeltaTime);
-            nextPosition.y = GetGroundHeight(nextPosition); 
-            
-            
+
+            // ИСПРАВЛЕНИЕ: Считаем упреждающие точки коллизии слева, справа и впереди врага
+            // Увеличиваем радиус с ~0.45f до 0.9f (в 2 раза), чтобы он не врезался в стены
+            float enemyRadius = 0.9f; 
+            float3 forwardCheck = nextPosition + finalMove * enemyRadius;
+            float3 rightCheck = nextPosition + new float3(-finalMove.z, 0f, finalMove.x) * (enemyRadius * 0.5f);
+            float3 leftCheck = nextPosition + new float3(finalMove.z, 0f, -finalMove.x) * (enemyRadius * 0.5f);
+
+            // Если любая из точек заходит в стену — блокируем движение в эту сторону
+            if (IsBlocked((int3)math.floor(forwardCheck)) || 
+                IsBlocked((int3)math.floor(rightCheck)) || 
+                IsBlocked((int3)math.floor(leftCheck)))
+            {
+                // Не даем пройти сквозь текстуру стен
+                nextPosition = transform.Position; 
+            }
+            else
+            {
+                nextPosition.y = GetGroundHeight(nextPosition); 
+            }
+
             if (!math.isnan(nextPosition.x) && !math.isinf(nextPosition.x))
             {
                 transform.Position = nextPosition;
-                transform.Rotation = quaternion.LookRotation(finalMove, math.up());
+
+                quaternion targetLook = quaternion.LookRotation(finalMove, math.up());
+                transform.Rotation = targetLook; 
             }
+
+            ApplyAnimationState(isAttacking, hasMoved, ref targetOffset, ref targetDuration, ref targetAnimSpeed);
+            UpdateVatPlayback(ref vatTime, ref vatOffset, targetOffset, targetDuration, targetAnimSpeed);
             return;
         }
-        
-        
+
+        // 2. ЛОГИКА АТАКЫ БЛИЖАЙШЕЙ ЦЕЛИ
         float3 nearestTargetPos = float3.zero;
         float minDistance = float.MaxValue;
         bool targetFound = false;
-
         foreach (var building in CellEntities)
         {
             float3 bPos = new float3(building.Key.x, building.Key.y, building.Key.z);
             float dist = math.distancesq(currentPos, bPos);
-            
             if (dist < minDistance)
             {
                 minDistance = dist;
@@ -661,47 +677,34 @@ public partial struct EnemyLogicJob : IJobEntity
                 targetFound = true;
             }
         }
-
-        float3 targetDirection = new float3(0f, 0f, 1f); 
         
-       if (targetFound)
+        float3 targetDirection = new float3(0f, 0f, 1f); 
+        if (targetFound)
         {
             float3 vectorToTarget = nearestTargetPos - currentPos;
             float distToTarget = math.length(vectorToTarget);
-            
-            
             float3 flatTargetDir = vectorToTarget;
             flatTargetDir.y = 0f;
             if (math.lengthsq(flatTargetDir) > 0.001f)
             {
                 targetDirection = math.normalize(flatTargetDir);
             }
-
-            
             
             int3 cellUnder = (int3)math.floor(currentPos);
             float3 surfaceNormal = new float3(0f, 1f, 0f); 
-
-            
             int3 cellForward = cellUnder + (int3)math.forward();
             int3 cellBackward = cellUnder + (int3)math.back();
             int3 cellRight = cellUnder + (int3)math.right();
             int3 cellLeft = cellUnder + (int3)math.left();
-
-            
             float dz = (IsBlocked(cellForward) ? 1f : 0f) - (IsBlocked(cellBackward) ? 1f : 0f);
             float dx = (IsBlocked(cellRight) ? 1f : 0f) - (IsBlocked(cellLeft) ? 1f : 0f);
-
-            
             float3 slopeNormal = new float3(-dx, 2f, -dz);
             if (math.lengthsq(slopeNormal) > 0.001f)
             {
                 surfaceNormal = math.normalize(slopeNormal);
             }
-
-            int3 targetCell = (int3)math.floor(nearestTargetPos);
-
             
+            int3 targetCell = (int3)math.floor(nearestTargetPos);
             if (distToTarget <= 1.5f) 
             {
                 if (CellEntities.TryGetValue(targetCell, out Entity targetBuilding))
@@ -716,11 +719,15 @@ public partial struct EnemyLogicJob : IJobEntity
                     }
                 }
                 
-                
+                isAttacking = true; // Стоит вплотную и бьет цель
+
                 if (math.lengthsq(targetDirection) > 0.001f)
                 {
                     transform.Rotation = quaternion.LookRotation(targetDirection, surfaceNormal);
                 }
+
+                ApplyAnimationState(isAttacking, hasMoved, ref targetOffset, ref targetDuration, ref targetAnimSpeed);
+                UpdateVatPlayback(ref vatTime, ref vatOffset, targetOffset, targetDuration, targetAnimSpeed);
                 return; 
             }
         }
@@ -732,11 +739,12 @@ public partial struct EnemyLogicJob : IJobEntity
                 targetDirection = math.normalize(fallback);
             }
         }
-
+        
+        // 3. ФОЛБЕК-ДВИЖЕНИЕ (ЕСЛИ ЦЕЛЬ ДАЛЕКО)
+        hasMoved = true;
         float pseudoRandomFallback = math.sin(entity.Index * 0.5f) * 0.15f;
         float3 sideDirFallback = new float3(-targetDirection.z, 0f, targetDirection.x) * pseudoRandomFallback;
         float3 finalMoveFallback = targetDirection + sideDirFallback;
-
         if (math.lengthsq(finalMoveFallback) > 0.001f)
         {
             finalMoveFallback = math.normalize(finalMoveFallback);
@@ -745,15 +753,48 @@ public partial struct EnemyLogicJob : IJobEntity
         {
             finalMoveFallback = targetDirection;
         }
-
         float3 nextPosFallback = transform.Position + (finalMoveFallback * stats.Speed * DeltaTime);
         nextPosFallback.y = GetGroundHeight(nextPosFallback);
-
+        
         if (!math.isnan(nextPosFallback.x) && !math.isinf(nextPosFallback.x))
         {
             transform.Position = nextPosFallback;
             transform.Rotation = quaternion.LookRotation(finalMoveFallback, math.up());
         }
+
+        ApplyAnimationState(isAttacking, hasMoved, ref targetOffset, ref targetDuration, ref targetAnimSpeed);
+        UpdateVatPlayback(ref vatTime, ref vatOffset, targetOffset, targetDuration, targetAnimSpeed);
+    }
+
+   private void ApplyAnimationState(bool isAttacking, bool hasMoved, ref float offset, ref float duration, ref float animSpeed)
+    {
+        if (isAttacking)
+        {
+            // Анимация [Armature|Attack]
+            offset = 0.5000f;   
+            duration = 0.5000f; 
+            animSpeed = 0.5f; // Базовая скорость атаки (можно увеличить, если бьет слишком медленно)
+        }
+        else if (hasMoved)
+        {
+            // Анимация [Armature|ArmatureAction] во время бега
+            offset = 0.0000f;   
+            duration = 0.5000f; 
+            animSpeed = 0.05f; // Немного ускоряем анимацию ног при движении, чтобы не "скользил"
+        }
+        else
+        {
+            // Анимация [Armature|ArmatureAction] когда паук просто стоит
+            offset = 0.0000f;   
+            duration = 0.5000f; 
+            animSpeed = 0.5f;
+        }
+    }
+    private void UpdateVatPlayback(ref VatTimeComponent vatTime, ref VatOffsetComponent vatOffset, float targetOffset, float targetDuration, float speed)
+    {
+        if (vatOffset.Value != targetOffset){vatTime.Value = 0.0f;vatOffset.Value = targetOffset;}
+        vatTime.Value += DeltaTime * speed;
+        if (vatTime.Value >= targetDuration){vatTime.Value = 0.0f;}
     }
 }
 

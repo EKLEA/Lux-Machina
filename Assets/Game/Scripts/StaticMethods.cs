@@ -45,6 +45,7 @@ public class UnityMathematicsConverter : JsonConverter
         return objectType == typeof(int3) || 
                objectType == typeof(int2) || 
                objectType == typeof(float3) || 
+               objectType == typeof(float2) || 
                objectType == typeof(quaternion) ||
                name.Contains("FixedList");
     }
@@ -72,6 +73,13 @@ public class UnityMathematicsConverter : JsonConverter
             writer.WritePropertyName("x"); writer.WriteValue(f3.x);
             writer.WritePropertyName("y"); writer.WriteValue(f3.y);
             writer.WritePropertyName("z"); writer.WriteValue(f3.z);
+            writer.WriteEndObject();
+        }
+         else if (value is float2 f2)
+        {
+            writer.WriteStartObject();
+            writer.WritePropertyName("x"); writer.WriteValue(f2.x);
+            writer.WritePropertyName("y"); writer.WriteValue(f2.y);
             writer.WriteEndObject();
         }
         else if (value is quaternion q)
@@ -136,6 +144,8 @@ public class UnityMathematicsConverter : JsonConverter
                 return new int3((int)(jo["x"] ?? 0), (int)(jo["y"] ?? 0),(int)(jo["z"] ?? 0));
             if (objectType == typeof(float3))
                 return new float3((float)(jo["x"] ?? 0), (float)(jo["y"] ?? 0), (float)(jo["z"] ?? 0));
+              if (objectType == typeof(float2))
+                return new float2((float)(jo["x"] ?? 0), (float)(jo["y"] ?? 0));
             if (objectType == typeof(quaternion))
                 return new quaternion((float)(jo["x"] ?? 0), (float)(jo["y"] ?? 0), (float)(jo["z"] ?? 0), (float)(jo["w"] ?? 0));
         }

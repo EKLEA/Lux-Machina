@@ -1,12 +1,13 @@
 using System;
+using Unity.Mathematics;
 using UnityEngine;
 
 [System.Serializable]
 public class PlayerCamData
 {
-    public Vector3 lookPointPosition;
-    public Vector2 cameraRotation;
+    public float3  lookPointPosition;
+    public float2  cameraRotation;
     public float cameraDistance;
-    public Vector3 CamPosition;
+    public float3  CamPosition;
     public bool isInitialized = false;
 }

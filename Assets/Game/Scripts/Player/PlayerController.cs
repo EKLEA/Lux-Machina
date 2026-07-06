@@ -424,7 +424,7 @@ public class PlayerController : MonoBehaviour, IDisposable,IPlayerConnectData
     {
         if (context.performed)
         {
-           PlaceDelegate?.Invoke(Hold.IsPressed(),isForce);
+           PlaceDelegate?.Invoke(Hold.IsPressed(),true);
         }
     }
 

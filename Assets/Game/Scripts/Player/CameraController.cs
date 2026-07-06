@@ -1,5 +1,6 @@
 using System;
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Zenject;
@@ -51,6 +52,7 @@ public class CameraController : MonoBehaviour,IInitializable
     [SerializeField]
     LayerMask layerMask;
     [Inject] World world;
+    [Inject] IReadOnlySave readOnlySave;
     Vector2 currentRotation;
     Vector2 targetRotation;
     Vector2 rotationVelocity;
@@ -66,33 +68,29 @@ public class CameraController : MonoBehaviour,IInitializable
         if (minDistance > maxDistance)
             maxDistance = minDistance + 1;
     }
-    public void SetUp(PlayerCamData playerCamData)
+public void SetUp(PlayerCamData playerCamData)
+{
+    if (playerCamData != null && playerCamData.isInitialized)
     {
-        camData = playerCamData;
+        // Явное приведение float3 -> Vector3
+        LookPoint.position = (Vector3)playerCamData.lookPointPosition;
 
-        if (camData != null && camData.isInitialized)
-        {
-            LookPoint.position = camData.lookPointPosition;
+        // Явное приведение float2 -> Vector2/Vector3
+        currentRotation = targetRotation = (Vector2)playerCamData.cameraRotation;
 
-            currentRotation = targetRotation = camData.cameraRotation;
+        currentDistance = targetDistance = playerCamData.cameraDistance;
 
-            currentDistance = targetDistance = camData.cameraDistance;
-
-            ApplyCameraPosition();
-        }
-        else
-        {
-            currentDistance = targetDistance = Vector3.Distance(
-                transform.position,
-                LookPoint.position
-            );
-
-            Vector3 direction = (transform.position - LookPoint.position).normalized;
-            currentRotation = targetRotation = Quaternion.LookRotation(direction).eulerAngles;
-
-            SaveCameraState();
-        }
+        ApplyCameraPosition();
     }
+    else
+    {
+        // Твой старый блок else...
+        currentDistance = targetDistance = Vector3.Distance(transform.position, LookPoint.position);
+        Vector3 direction = (transform.position - LookPoint.position).normalized;
+        currentRotation = targetRotation = Quaternion.LookRotation(direction).eulerAngles;
+        SaveCameraState();
+    }
+}
     void Update()
     {
         if (CameraRotateBT.action.IsPressed())
@@ -124,85 +122,169 @@ public class CameraController : MonoBehaviour,IInitializable
         LookPoint.transform.position += moveDirection;
     }
 
-    public void ChangeDistance()
-    {
-        float zoomInput = Scrool.action.ReadValue<float>();
-        if (zoomInput != 0)
-        {
-            targetDistance -= zoomInput * zoomSpeed * Time.deltaTime;
-            targetDistance = Mathf.Clamp(targetDistance, minDistance, maxDistance);
-            currentDistance = Mathf.SmoothDamp(
-                currentDistance,
-                targetDistance,
-                ref zoomVelocity,
-                smoothTime
-            );
+public void ChangeDistance()
+{
+    float zoomInput = Scrool.action.ReadValue<float>();
 
-            ApplyCameraPosition();
-        }
-    }
-
-    void ApplyCameraPosition()
+    if (zoomInput != 0)
     {
-        if (LookPoint != null)
+        float nextDistance = targetDistance - zoomInput * zoomSpeed * Time.deltaTime;
+        nextDistance = Mathf.Clamp(nextDistance, minDistance, maxDistance);
+
+        if (zoomInput > 0)
         {
             Quaternion rotation = Quaternion.Euler(currentRotation.x, currentRotation.y, 0f);
             Vector3 direction = rotation * Vector3.forward;
 
-            transform.position = LookPoint.position - direction * currentDistance;
-            transform.LookAt(LookPoint);
-        }
-    }
+            Vector3 nextCameraPosition =
+                LookPoint.position - direction * nextDistance;
 
-    public void RotateCam()
-    {
-        Vector2 mouseDelta = MouseRotate.action.ReadValue<Vector2>();
+            bool blocked =
+                Physics.CheckSphere(
+                    nextCameraPosition,
+                    2f,
+                    layerMask);
 
-        targetRotation.y += mouseDelta.x * rotationSpeed * Time.deltaTime;
-        targetRotation.x -= mouseDelta.y * rotationSpeed * Time.deltaTime;
-
-        targetRotation.x = Mathf.Clamp(targetRotation.x, -verticalAngleLimit, verticalAngleLimit);
-
-        currentRotation.x = Mathf.SmoothDampAngle(
-            currentRotation.x,
-            targetRotation.x,
-            ref rotationVelocity.x,
-            smoothTime
-        );
-        currentRotation.y = Mathf.SmoothDampAngle(
-            currentRotation.y,
-            targetRotation.y,
-            ref rotationVelocity.y,
-            smoothTime
-        );
-
-        ApplyCameraPosition();
-    }
-
-    void SaveCameraState()
-    {
-        if (camData != null)
-        {
-            camData.lookPointPosition = LookPoint.position;
-            camData.cameraRotation = currentRotation;
-            camData.cameraDistance = currentDistance;
-            camData.CamPosition = transform.position;
-            camData.isInitialized = true;
-        }
-        var query = world.EntityManager.CreateEntityQuery(typeof(PlayerRayCastData));
-        if (!query.IsEmpty) {
-            var entity = query.GetSingletonEntity();
-            
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            
-            world.EntityManager.SetComponentData(entity, new PlayerRayCastData 
+            if (!blocked)
             {
-                Origin = ray.origin,
-                Direction = ray.direction,
-                MaxDistance = 1000
-            });
+                Ray downRay = new Ray(nextCameraPosition + Vector3.up, Vector3.down);
+
+                if (Physics.Raycast(
+                    downRay,
+                    out RaycastHit hit,
+                    10f,
+                    layerMask))
+                {
+                    blocked = hit.distance <= 3f;
+                }
+            }
+
+            if (blocked)
+                return;
+        }
+
+        targetDistance = nextDistance;
+    }
+
+    currentDistance = Mathf.SmoothDamp(
+        currentDistance,
+        targetDistance,
+        ref zoomVelocity,
+        smoothTime);
+
+    ApplyCameraPosition();
+}
+
+
+void ApplyCameraPosition()
+{
+    if (LookPoint == null)
+        return;
+
+    Quaternion rotation = Quaternion.Euler(currentRotation.x, currentRotation.y, 0f);
+
+    Vector3 direction = rotation * Vector3.forward;
+
+    transform.position =
+        LookPoint.position - direction * currentDistance;
+
+    transform.LookAt(LookPoint.position);
+}
+
+
+   public void RotateCam()
+{
+    Vector2 mouseDelta = MouseRotate.action.ReadValue<Vector2>();
+
+    float nextRotationX = targetRotation.x - mouseDelta.y * rotationSpeed * Time.deltaTime;
+    nextRotationX = Mathf.Clamp(nextRotationX, -verticalAngleLimit, verticalAngleLimit);
+
+    var query = world.EntityManager.CreateEntityQuery(typeof(PlayerRayCastData));
+    if (!query.IsEmpty)
+    {
+        var ecsData = query.GetSingletonEntity();
+        var currentEcsData = world.EntityManager.GetComponentData<PlayerRayCastData>(ecsData);
+
+        if (currentEcsData.CamHasHit)
+        {
+            float groundHeight = currentEcsData.CamHitBlockPos.y + 1f;
+            float minAllowedY = groundHeight + 0.5f;
+
+            float nextRotationY = targetRotation.y + mouseDelta.x * rotationSpeed * Time.deltaTime;
+
+            Quaternion potentialRot = Quaternion.Euler(nextRotationX, nextRotationY, 0f);
+            Vector3 potentialDir = potentialRot * Vector3.forward;
+
+            float actualDistance = targetDistance;
+
+            float potentialY =
+                LookPoint.position.y - potentialDir.y * actualDistance;
+
+            if (potentialY < minAllowedY)
+            {
+                nextRotationX = targetRotation.x;
+            }
         }
     }
+
+    targetRotation.x = nextRotationX;
+    targetRotation.y += mouseDelta.x * rotationSpeed * Time.deltaTime;
+
+    currentRotation.x = Mathf.SmoothDampAngle(
+        currentRotation.x,
+        targetRotation.x,
+        ref rotationVelocity.x,
+        smoothTime);
+
+    currentRotation.y = Mathf.SmoothDampAngle(
+        currentRotation.y,
+        targetRotation.y,
+        ref rotationVelocity.y,
+        smoothTime);
+
+    ApplyCameraPosition();
+}
+
+void SaveCameraState()
+{
+    
+    if (readOnlySave != null && readOnlySave.GameState != null)
+    {
+        if (readOnlySave.GameState.camData == null)
+            readOnlySave.GameState.camData = new PlayerCamData();
+
+        var activeCamData = readOnlySave.GameState.camData;
+
+        // Принудительно приводим Vector3/Vector2 к float3/float2 перед записью
+        activeCamData.lookPointPosition = (float3)LookPoint.position;
+        activeCamData.cameraRotation = (float2)currentRotation;
+        activeCamData.cameraDistance = currentDistance;
+        activeCamData.CamPosition = (float3)transform.position;
+        activeCamData.isInitialized = true;
+    }
+
+    var query = world.EntityManager.CreateEntityQuery(typeof(PlayerRayCastData));
+    if (!query.IsEmpty) 
+    {
+        var entity = query.GetSingletonEntity();
+        
+        Ray mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+        world.EntityManager.SetComponentData(entity, new PlayerRayCastData
+        {
+            Origin = mouseRay.origin,
+            Direction = mouseRay.direction,
+            MaxDistance = 1000,
+            
+            // Чтобы ECS считал землю под ИДЕАЛЬНОЙ позицией камеры, а не под прижатой к стене:
+            CamOrigin = new float3(LookPoint.position.x - (Quaternion.Euler(currentRotation.x, currentRotation.y, 0f) * Vector3.forward).x * targetDistance, 
+                                   LookPoint.position.y + 20f, 
+                                   LookPoint.position.z - (Quaternion.Euler(currentRotation.x, currentRotation.y, 0f) * Vector3.forward).z * targetDistance),
+            CamDirection = new float3(0f, -1f, 0f), 
+            CamMaxDistance = 100f
+        });
+    }
+}
+
 
     float GetGroundHeight(Vector3 position)
     {

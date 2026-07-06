@@ -240,7 +240,7 @@ public class GameController : IInitializable
         var tData=new WorldTime
         {
             CurrentTick=gameStateData.CurrTick,
-            TicksPerDay=400,//12000
+            TicksPerDay=800,//12000
             SpeedMultiplier=1,
             baseTick=0.05f,
             dayLength=0.7f
@@ -272,9 +272,6 @@ public class GameController : IInitializable
             Smoothness = 0.2f,
             DetailScale = 0.015f,
             ErosionThreshold = 0.2f,
-// Size 0.01 - огромные жилы, 0.02 - средние.
-// Frequency 0.02 - редко, 0.05 - умеренно.
-// Richness теперь множитель. 1.0 - бедно, 6.0 - очень богато.
         Iron   = new OreSettings { Frequency = 0.012f, Size = 0.013f, Richness = 2.0f },
         Copper = new OreSettings { Frequency = 0.015f, Size = 0.012f, Richness = 1.8f },
         Tin    = new OreSettings { Frequency = 0.015f, Size = 0.015f, Richness = 1.5f },
@@ -309,7 +306,7 @@ public class GameController : IInitializable
         
         World.EntityManager.AddComponentData(Map,new PlayerData{});
         World.EntityManager.AddComponentData(Map,new PlayerRayCastData{});
-        int range=5;
+        int range=45;
         for (int x = -range; x <= range; x++)
         {
             for (int y = -range; y <= range; y++)

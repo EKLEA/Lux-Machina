@@ -192,6 +192,7 @@ public class BuildingManagementWindowView:DragableUIWindow
         allDisposables=new();
         addOne.onClick.RemoveAllListeners();
         removeOne.onClick.RemoveAllListeners();
+        DestroyBT.onClick.RemoveAllListeners();
         model.tempUpdate+=()=>{SetUpData(buildingViewData.buildingEntity);};
         addOne.onClick.AddListener(()=>model.AddAmount(1));
         removeOne.onClick.AddListener(()=>model.AddAmount(-1));
@@ -199,6 +200,7 @@ public class BuildingManagementWindowView:DragableUIWindow
         BuildingText.text=buildingInfo.BuildingInfos[buildingViewData.buildingID].title;
         BuildingDescriptionText.text=buildingInfo.BuildingInfos[buildingViewData.buildingID].description;
         DestroyBT.gameObject.SetActive(CanDestory);
+        DestroyBT.onClick.AddListener(()=>model.MarkAsForceDestory());
         ToggleSwitchBT.gameObject.SetActive(SwitchData!=null);
         if (SwitchData != null)
         {

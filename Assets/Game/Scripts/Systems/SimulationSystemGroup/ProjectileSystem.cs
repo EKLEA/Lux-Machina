@@ -94,7 +94,7 @@ public partial struct ProjectileSystem : ISystem
                                     float distSq = math.distancesq(data.TargetPos.xz, victimPos.xz);
                                     
                                     // Эффективный радиус: радиус взрыва/пули + толщина врага (0.9f)
-                                    float combinedRadius = searchRadius + 0.9f;
+                                    float combinedRadius = searchRadius + 1.8f;
 
                                     if (distSq <= (combinedRadius * combinedRadius)) 
                                     {

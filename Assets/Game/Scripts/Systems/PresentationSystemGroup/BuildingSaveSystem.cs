@@ -40,7 +40,9 @@ public partial class BuildingSaveSystem : SystemBase
         if(SaveLoadInfo.IsEmpty) return;
         var save = new GameStateData(); 
 
+
         var time=SystemAPI.GetSingleton<WorldTime>();
+        save.camData=saveData.GameState.camData;
         save.IsGameOver=isInvoked;
         save.CurrTick=time.CurrentTick;
         save.TicksPerDay=time.TicksPerDay;

@@ -3,6 +3,7 @@ using System.IO;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
 using NUnit.Framework;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
@@ -109,41 +110,65 @@ public class SaveService : IGameStateSaver,IReadOnlySave,IEnemyAIConfig
         }
     }
 
-    GameStateData GenerateDefault()
+     GameStateData GenerateDefault()
     {
         var save = new GameStateData();
-        save.IsGameOver=false;
-        save.CurrTick=0;
-        save.EnemyAiConfig=new();
-        save.Buildings=new();
-        save.ManyPointsBuildings=new();
-        save.constructionSlotsSaveData=new();
-        save.excessSlotsSaveData=new();
-        save.recipeBuildingSaveData=new();
-        save.storageSlotsSaveData=new();
-        save.buildingEnergyNetvorkLinkSaveData=new();
+        save.IsGameOver = false;
+        save.CurrTick = 0;
+        save.EnemyAiConfig = new();
+        save.Buildings = new();
+        save.ManyPointsBuildings = new();
+        save.constructionSlotsSaveData = new();
+        save.excessSlotsSaveData = new();
+        save.recipeBuildingSaveData = new();
+        save.storageSlotsSaveData = new();
+        save.buildingEnergyNetvorkLinkSaveData = new();
 
         save.camData = new PlayerCamData()
         {
-            lookPointPosition = new Vector3(0, 0, 0),
-            CamPosition = new Vector3(0, 25, -25),
+            lookPointPosition = new float3(0, 0, 0),
+            CamPosition = new float3(0, 50, -25),
+            cameraRotation = new float2(45f, 0f),
+            cameraDistance = 55.9f,
+            isInitialized = true
         };
+        
         var hash = "Core".GetStableHashCode();
-        save.CoreID=hash;
-        save.CorePos=new int3(-2, 11,-2);
+        save.CoreID = hash;
+        save.CorePos = new int3(-2, 11, -2);
         save.Buildings.Add(
             hash,
             new BaseBuildingSaveData
             {
-                buildingID=hash,
-                buildingPosition= save.CorePos,
+                buildingID = hash,
+                buildingPosition = save.CorePos,
                 rotation = 1,
-                isBlueprint=false,
+                isBlueprint = false,
             }
         );
 
+        // --- ДОБАВЛЕНИЕ СТАРТОВЫХ ПРЕДМЕТОВ В CORE STORAGE ---
+         var coreStorage = new StorageSlotsSaveData
+        {
+            slots = new FixedList512Bytes<StorageSlotData>(),
+            priority = DistributionPriority.Height
+        };
+
+        // Точные расчеты по JSON конфигурации для:
+        // 200 дорог, 6 дрелей, 7 печек, 6 конструкторов, 3 турелей + 10 пуль
+        coreStorage.slots.Add(new StorageSlotData { ItemId = 23, Amount = 238, Capacity = 500, IsInputEnabled = true, IsOutputEnabled = true }); // Дороги(200)+Дрели(6)+Печки(14)+Конструкторы(12)+Турели(6)
+        coreStorage.slots.Add(new StorageSlotData { ItemId = 10, Amount = 206, Capacity = 500, IsInputEnabled = true, IsOutputEnabled = true }); // Дороги(200)+Дreли(6)
+        coreStorage.slots.Add(new StorageSlotData { ItemId = 7,  Amount = 19,  Capacity = 100, IsInputEnabled = true, IsOutputEnabled = true }); // Дрели(6)+Печки(7)+Конструкторы(6)
+        coreStorage.slots.Add(new StorageSlotData { ItemId = 8,  Amount = 13,  Capacity = 100, IsInputEnabled = true, IsOutputEnabled = true }); // Печки(7)+Конструкторы(6)
+        coreStorage.slots.Add(new StorageSlotData { ItemId = 9,  Amount = 6,   Capacity = 100, IsInputEnabled = true, IsOutputEnabled = true }); // Конструкторы(6)
+        coreStorage.slots.Add(new StorageSlotData { ItemId = 26, Amount = 16,  Capacity = 100, IsInputEnabled = true, IsOutputEnabled = true }); // Турели(6) + 10 базовых пуль про запас
+
+        save.storageSlotsSaveData.Add(hash, coreStorage);
+        // -----------------------------------------------------
+
         return save;
     }
+    
 }
 public interface  IEnemyAIConfig
 {

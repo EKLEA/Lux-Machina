@@ -53,15 +53,23 @@ public struct PlayerData : IComponentData
     public int2 blockedPos;
     public int2 chunkPos;
 }
-public struct PlayerRayCastData : IComponentData {
+public struct PlayerRayCastData : IComponentData 
+{
+    // Данные для рейкаста мыши (твои старые поля)
     public float3 Origin;
     public float3 Direction;
     public float MaxDistance;
-    
     public bool HasHit;
-    public int3 HitBlockPos;   // Где блок
-    public int3 PlaceBlockPos; // Где воздух перед блоком
-    public int HitBlockID;    // Тип блока
+    public int3 HitBlockPos;
+    public int3 PlaceBlockPos;
+    public int HitBlockID;
+
+    // --- НОВЫЕ ПОЛЯ ДЛЯ КАМЕРЫ ---
+    public float3 CamOrigin;
+    public float3 CamDirection;
+    public float CamMaxDistance;
+    public bool CamHasHit;
+    public int3 CamHitBlockPos;
 }
 
 public struct UpdateChunkDataTag: IComponentData, IEnableableComponent {}

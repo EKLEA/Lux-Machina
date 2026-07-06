@@ -11947,7 +11947,7 @@ MonoBehaviour:
   rotationSpeed: 80
   smoothTime: 0.08
   verticalAngleLimit: 80
-  zoomSpeed: 100
+  zoomSpeed: 200
   maxDistance: 100
   minDistance: 10
   baseSpeed: 10
@@ -11958,7 +11958,7 @@ MonoBehaviour:
   HoldBT: {fileID: -6919726673049597988, guid: 8bec56acce13f784db01f00503be5ddb, type: 3}
   layerMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 64
 --- !u!1 &384488878
 GameObject:
   m_ObjectHideFlags: 0

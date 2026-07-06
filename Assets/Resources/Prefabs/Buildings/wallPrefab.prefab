@@ -140,7 +140,7 @@ MonoBehaviour:
   slopeMesh: {fileID: 0}
   foundationMesh: {fileID: 6549673948351473199, guid: 8151c3970e291b74b9c2d7abbb264a0d, type: 3}
   material: {fileID: 2100000, guid: 99d6e782ee528ee40821bd4208833d1a, type: 2}
-  topMeshYOffset: 1
+  topMeshYOffset: 0
 --- !u!114 &5076338796290987020
 MonoBehaviour:
   m_ObjectHideFlags: 0
